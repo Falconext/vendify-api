@@ -1,0 +1,7002 @@
+[
+  {
+    "nombre": "Panadol Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 85,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Panadol Niños",
+    "descripcion": "Jarabe 60ml",
+    "precioSugerido": 18,
+    "unidadConteo": "NIU",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Apronax 550mg",
+    "descripcion": "Caja x 120 tabletas",
+    "precioSugerido": 140,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Antalgina 500mg",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Kitadol 500mg",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Nastizol Compositum",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 90,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gripefina",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 70,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Aspirina 100mg",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 45,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Redoxon Total",
+    "descripcion": "Tubo x 10 efervescentes",
+    "precioSugerido": 15,
+    "unidadConteo": "NIU",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vick Vaporub 50g",
+    "descripcion": "Lata pequeña",
+    "precioSugerido": 12,
+    "unidadConteo": "NIU",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Bismutol",
+    "descripcion": "Frasco 150ml",
+    "precioSugerido": 22,
+    "unidadConteo": "NIU",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sal de Andrews",
+    "descripcion": "Caja x 100 sobres",
+    "precioSugerido": 40,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Hepabionta",
+    "descripcion": "Caja x 20 cápsulas",
+    "precioSugerido": 35,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Neurobion 5000",
+    "descripcion": "Caja x 3 ampollas",
+    "precioSugerido": 45,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dolo-Neurobion",
+    "descripcion": "Caja x 1 ampolla",
+    "precioSugerido": 25,
+    "unidadConteo": "NIU",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Hirudoid Forte",
+    "descripcion": "Gel 40g",
+    "precioSugerido": 38,
+    "unidadConteo": "NIU",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Voltaren 50mg",
+    "descripcion": "Caja x 20 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Buscapina Compositum",
+    "descripcion": "Caja x 20 grageas",
+    "precioSugerido": 28,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Plidan",
+    "descripcion": "Caja x 20 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Aero-Om",
+    "descripcion": "Gotas 15ml",
+    "precioSugerido": 20,
+    "unidadConteo": "NIU",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 46,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Paracetamol 500mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 1g (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 50,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Paracetamol 1g Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 1g Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 1g Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 50,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml Pfizer",
+    "descripcion": "Caja x 100 tabletas - Pfizer",
+    "precioSugerido": 125,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 54,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Ibuprofeno 400mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 81,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 81,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 81,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 600mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 43,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Ibuprofeno 600mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 600mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 600mg Sanofi",
+    "descripcion": "Caja x 100 tabletas - Sanofi",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 40,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Amoxicilina 500mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 50,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": 50,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 50,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 80,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": 80,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": 133,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 875mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Amoxicilina 875mg Abbott",
+    "descripcion": "Caja x 100 tabletas - Abbott",
+    "precioSugerido": 93,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 875mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 875mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Cetirizina 10mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 57,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 57,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": 57,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 5mg/5ml (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Cetirizina 5mg/5ml GSK",
+    "descripcion": "Caja x 100 tabletas - GSK",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 5mg/5ml Pfizer",
+    "descripcion": "Caja x 100 tabletas - Pfizer",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 5mg/5ml AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 32,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Loratadina 10mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg GSK",
+    "descripcion": "Caja x 100 tabletas - GSK",
+    "precioSugerido": 98,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg Bagó",
+    "descripcion": "Caja x 100 tabletas - Bagó",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 5mg/5ml (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 44,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Loratadina 5mg/5ml Abbott",
+    "descripcion": "Caja x 100 tabletas - Abbott",
+    "precioSugerido": 110,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 5mg/5ml GSK",
+    "descripcion": "Caja x 100 tabletas - GSK",
+    "precioSugerido": 110,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 5mg/5ml Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Naproxeno 550mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg Abbott",
+    "descripcion": "Caja x 100 tabletas - Abbott",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg GSK",
+    "descripcion": "Caja x 100 tabletas - GSK",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 275mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Naproxeno 275mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 63,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 275mg Sanofi",
+    "descripcion": "Caja x 100 tabletas - Sanofi",
+    "precioSugerido": 63,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 275mg Abbott",
+    "descripcion": "Caja x 100 tabletas - Abbott",
+    "precioSugerido": 105,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 15,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 26,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Azitromicina 500mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 200mg/5ml (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 52,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Azitromicina 200mg/5ml Pfizer",
+    "descripcion": "Caja x 100 tabletas - Pfizer",
+    "precioSugerido": 130,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 200mg/5ml IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 200mg/5ml Bagó",
+    "descripcion": "Caja x 100 tabletas - Bagó",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 10,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Diclofenaco 50mg Bagó",
+    "descripcion": "Caja x 100 tabletas - Bagó",
+    "precioSugerido": 15,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 15,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 100mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 31,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Diclofenaco 100mg Abbott",
+    "descripcion": "Caja x 100 tabletas - Abbott",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 100mg Sanofi",
+    "descripcion": "Caja x 100 tabletas - Sanofi",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 100mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 50,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml GSK",
+    "descripcion": "Caja x 100 tabletas - GSK",
+    "precioSugerido": 125,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": 125,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 18,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Omeprazol 20mg Abbott",
+    "descripcion": "Caja x 100 tabletas - Abbott",
+    "precioSugerido": 45,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 40mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Omeprazol 40mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 54,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 40mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": 54,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 40mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 54,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Metformina 850mg Abbott",
+    "descripcion": "Caja x 100 tabletas - Abbott",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg Pfizer",
+    "descripcion": "Caja x 100 tabletas - Pfizer",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg Sanofi",
+    "descripcion": "Caja x 100 tabletas - Sanofi",
+    "precioSugerido": 32,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 500mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 7,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Metformina 500mg Abbott",
+    "descripcion": "Caja x 100 tabletas - Abbott",
+    "precioSugerido": 18,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 500mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 11,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 500mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": 11,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 1g (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Metformina 1g Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 1g Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 1g AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 45,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Losartan 50mg Pfizer",
+    "descripcion": "Caja x 100 tabletas - Pfizer",
+    "precioSugerido": 113,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 68,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 68,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 100mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Losartan 100mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 100mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 100mg Pfizer",
+    "descripcion": "Caja x 100 tabletas - Pfizer",
+    "precioSugerido": 118,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Enalapril 10mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 80,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": 80,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg Pfizer",
+    "descripcion": "Caja x 100 tabletas - Pfizer",
+    "precioSugerido": 133,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 20mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 44,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Enalapril 20mg Abbott",
+    "descripcion": "Caja x 100 tabletas - Abbott",
+    "precioSugerido": 110,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 20mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 20mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Atorvastatina 20mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 35,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": 35,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": 35,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 40mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 8,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Atorvastatina 40mg GSK",
+    "descripcion": "Caja x 100 tabletas - GSK",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 40mg Abbott",
+    "descripcion": "Caja x 100 tabletas - Abbott",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 40mg Bagó",
+    "descripcion": "Caja x 100 tabletas - Bagó",
+    "precioSugerido": 12,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 50mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 18,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Sildenafilo 50mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 50mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 50mg Sanofi",
+    "descripcion": "Caja x 100 tabletas - Sanofi",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 32,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Sildenafilo 100mg GSK",
+    "descripcion": "Caja x 100 tabletas - GSK",
+    "precioSugerido": 80,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": 48,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 48,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 15,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Glibenclamida 5mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 5mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 7,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Prednisona 5mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 11,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 5mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": 18,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 5mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 11,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 6,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Prednisona 20mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 9,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 9,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": 9,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 50mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Prednisona 50mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 50mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 50mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 9,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 14,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": 14,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml Pfizer",
+    "descripcion": "Caja x 100 tabletas - Pfizer",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 0.5mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 12,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Dexametasona 0.5mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 18,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 0.5mg GSK",
+    "descripcion": "Caja x 100 tabletas - GSK",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 0.5mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 18,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Clorfenamina 4mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": 68,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg Bagó",
+    "descripcion": "Caja x 100 tabletas - Bagó",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 10mg/ml (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Clorfenamina 10mg/ml Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 10mg/ml Pfizer",
+    "descripcion": "Caja x 100 tabletas - Pfizer",
+    "precioSugerido": 68,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 10mg/ml IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Salbutamol 100mcg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Salbutamol 100mcg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 62,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Salbutamol 100mcg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": 62,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Salbutamol 100mcg Sanofi",
+    "descripcion": "Caja x 100 tabletas - Sanofi",
+    "precioSugerido": 62,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Salbutamol Jarabe (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Salbutamol Jarabe Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": 57,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Salbutamol Jarabe IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": 57,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Salbutamol Jarabe GSK",
+    "descripcion": "Caja x 100 tabletas - GSK",
+    "precioSugerido": 95,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Bismuto 150ml (Genérico)",
+    "descripcion": "Frasco x 1 ml",
+    "precioSugerido": 9,
+    "unidadConteo": "FCO",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Bismuto 150ml Hersil",
+    "descripcion": "Frasco x 1 ml - Hersil",
+    "precioSugerido": 14,
+    "unidadConteo": "FCO",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Bismuto 150ml Medifarma",
+    "descripcion": "Frasco x 1 ml - Medifarma",
+    "precioSugerido": 14,
+    "unidadConteo": "FCO",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Bismuto 150ml Teva",
+    "descripcion": "Frasco x 1 ml - Teva",
+    "precioSugerido": 14,
+    "unidadConteo": "FCO",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Simeticona 40mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Simeticona 40mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Simeticona 40mg Bagó",
+    "descripcion": "Caja x 100 tabletas - Bagó",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Simeticona 40mg Sanofi",
+    "descripcion": "Caja x 100 tabletas - Sanofi",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Simeticona 80mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 19,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Simeticona 80mg Sanofi",
+    "descripcion": "Caja x 100 tabletas - Sanofi",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Simeticona 80mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Simeticona 80mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Fluconazol 150mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 44,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 44,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 44,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 19,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Ketoconazol 200mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol Crema 2% (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 19,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Ketoconazol Crema 2% Bagó",
+    "descripcion": "Caja x 100 tabletas - Bagó",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol Crema 2% Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol Crema 2% Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol Crema 1% (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 6,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Clotrimazol Crema 1% Bagó",
+    "descripcion": "Caja x 100 tabletas - Bagó",
+    "precioSugerido": 9,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol Crema 1% Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 9,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol Crema 1% Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": 15,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gentamicina 160mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 32,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Gentamicina 160mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 48,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gentamicina 160mg Bagó",
+    "descripcion": "Caja x 100 tabletas - Bagó",
+    "precioSugerido": 48,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gentamicina 160mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": 80,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gentamicina 80mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 16,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Gentamicina 80mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gentamicina 80mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gentamicina 80mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 12,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Amlodipino 5mg Pfizer",
+    "descripcion": "Caja x 100 tabletas - Pfizer",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg Abbott",
+    "descripcion": "Caja x 100 tabletas - Abbott",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": 18,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 10mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 34,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Amlodipino 10mg GSK",
+    "descripcion": "Caja x 100 tabletas - GSK",
+    "precioSugerido": 85,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 10mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 10mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tamsulosina 0.4mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Tamsulosina 0.4mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tamsulosina 0.4mg Pfizer",
+    "descripcion": "Caja x 100 tabletas - Pfizer",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tamsulosina 0.4mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Gabapentina 300mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg Abbott",
+    "descripcion": "Caja x 100 tabletas - Abbott",
+    "precioSugerido": 118,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 400mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 43,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Gabapentina 400mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 400mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 400mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 9,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Pregabalina 75mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": 14,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": 14,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": 14,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 150mg (Genérico)",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Pregabalina 150mg GSK",
+    "descripcion": "Caja x 100 tabletas - GSK",
+    "precioSugerido": 103,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 150mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": 62,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 150mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": 103,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 63,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 82,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 91,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 74,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 72,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 63,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 48,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 98,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 64,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 98,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 77,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 35,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 67,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 43,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 96,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 91,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 91,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 58,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 67,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 34,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 43,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 58,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 31,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 49,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 31,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 34,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 72,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 62,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 54,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 84,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 90,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 50,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 79,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 64,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 84,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 77,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 32,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 46,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 54,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 46,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 98,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 32,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 46,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 57,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 89,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 94,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 31,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 94,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 83,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 28,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 83,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 93,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 58,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 98,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 52,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 62,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 28,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 26,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 64,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 77,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 84,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 73,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 73,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 43,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 52,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 52,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 73,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 62,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 49,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 97,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 32,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 58,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 82,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 98,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 44,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 91,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 80,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 73,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 98,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 92,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 31,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 96,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 79,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 90,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 72,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 34,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 67,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 63,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 97,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 40,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 85,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 83,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 46,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 97,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 62,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 92,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 48,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 77,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 62,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 28,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 79,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 81,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 40,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 82,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 97,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 96,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 34,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 77,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 92,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 32,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 70,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 64,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 84,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 52,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 34,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 96,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 79,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 34,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 26,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 63,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 54,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 46,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 85,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 93,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 62,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 93,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 49,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 90,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 94,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 85,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 74,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 67,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 67,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 96,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 64,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 83,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 76,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 54,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 73,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 44,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 90,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 40,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 96,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 54,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 90,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 32,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 79,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 35,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 97,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 91,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 62,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 28,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 89,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 92,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 49,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 48,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 97,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 89,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 64,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 97,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 45,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 89,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 63,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 49,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 40,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 68,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 34,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 46,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 34,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 79,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 62,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 49,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 52,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 26,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 40,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 48,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 84,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 92,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 70,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 31,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 68,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 46,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 63,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 94,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 85,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 31,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 67,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 26,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 74,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 46,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 44,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 70,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 74,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 63,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 76,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 43,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 70,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 72,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 96,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 63,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 85,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 46,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 35,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 72,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 40,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 50,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 67,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 82,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 79,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 84,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 34,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 70,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 76,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 63,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 26,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 28,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 68,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 90,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 98,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 57,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 92,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 83,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 91,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 76,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 95,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 74,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 70,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 57,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 32,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 86,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 76,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 81,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 58,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 52,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 52,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 73,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 43,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 89,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 94,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 52,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 98,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 97,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 95,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 43,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 82,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 63,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 85,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 50,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 46,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 70,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 83,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 92,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 72,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 97,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 74,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 80,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 40,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 26,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 49,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 91,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 48,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 89,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 76,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 89,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 97,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 50,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 67,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 67,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 35,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 95,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 39,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 54,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 57,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 98,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 80,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 64,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 50,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 74,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 66,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 31,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 68,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 54,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 26,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 52,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 37,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 46,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 52,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 74,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 90,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 68,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 74,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 80,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 83,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 48,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 20,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 93,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 32,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 29,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 50,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 84,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 98,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 48,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 27,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 94,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 26,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 97,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 79,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 85,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 79,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 84,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 45,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 26,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 81,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 21,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 71,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 22,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 28,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 65,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 32,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 26,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 48,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 85,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 93,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 34,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 52,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 87,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 23,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 57,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 82,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 97,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 72,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 54,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 94,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 76,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 90,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 90,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 76,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 43,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 45,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 61,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 99,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 36,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 33,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 41,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioBismuto Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 59,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSimeticona Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 95,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioFluconazol Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 58,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioKetoconazol Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 75,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClotrimazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 70,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGentamicina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 34,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmlodipino Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioTamsulosina Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 96,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGabapentina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 85,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPregabalina Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 47,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioParacetamol GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioIbuprofeno AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 89,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAmoxicilina Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 53,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCetirizina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 51,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLoratadina Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioNaproxeno Hersil Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 92,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioCiprofloxacino Farmindustria Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAzitromicina Medifarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 78,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDiclofenaco Portugal Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 56,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioOmeprazol IQFarma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 89,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioMetformina Genfar Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioLosartan Teva Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 82,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioEnalapril Siegfried Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 88,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioAtorvastatina Abbott Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 98,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSildenafilo Bagó Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 69,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioGlibenclamida GSK Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 35,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioPrednisona AC Farma Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 84,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioDexametasona Bayer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 35,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioClorfenamina Sanofi Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 24,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  },
+  {
+    "nombre": "BioSalbutamol Pfizer Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 72,
+    "unidadConteo": "CJA",
+    "esGenerico": false
+  }
+]

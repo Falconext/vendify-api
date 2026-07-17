@@ -1,0 +1,4346 @@
+[
+  {
+    "nombre": "Panadol Forte",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 85,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Panadol Antigripal",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 95,
+    "unidadConteo": "CJA",
+    "categoria": "Respiratorio",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Panadol Niños",
+    "descripcion": "Jarabe 60ml",
+    "precioSugerido": 18,
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Panadol Gotas",
+    "descripcion": "Frasco 15ml",
+    "precioSugerido": 15,
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Apronax 550mg",
+    "descripcion": "Caja x 120 tabletas",
+    "precioSugerido": 140,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Apronax 275mg",
+    "descripcion": "Caja x 20 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Apronax Gel",
+    "descripcion": "Tubo 40g",
+    "precioSugerido": 35,
+    "unidadConteo": "NIU",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Antalgina 500mg",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Antalgina Jarabe",
+    "descripcion": "Frasco 120ml",
+    "precioSugerido": 15,
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Antalgina Gotas",
+    "descripcion": "Frasco 10ml",
+    "precioSugerido": 12,
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Kitadol 500mg",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 55,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gripefina",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 70,
+    "unidadConteo": "CJA",
+    "categoria": "Respiratorio",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Nastizol Compositum",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 90,
+    "unidadConteo": "CJA",
+    "categoria": "Respiratorio",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Nastizol Jarabe",
+    "descripcion": "Frasco 120ml",
+    "precioSugerido": 35,
+    "unidadConteo": "NIU",
+    "categoria": "Respiratorio",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Aspirina 100mg",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 45,
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Aspirina Forte",
+    "descripcion": "Caja x 40 tabletas",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Redoxon Total",
+    "descripcion": "Tubo x 10 efervescentes",
+    "precioSugerido": 15,
+    "unidadConteo": "NIU",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vick Vaporub",
+    "descripcion": "Lata 50g",
+    "precioSugerido": 12,
+    "unidadConteo": "NIU",
+    "categoria": "Respiratorio",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vick Pyrena",
+    "descripcion": "Caja x 50 sobres",
+    "precioSugerido": 60,
+    "unidadConteo": "CJA",
+    "categoria": "Respiratorio",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Bismutol",
+    "descripcion": "Frasco 150ml",
+    "precioSugerido": 22,
+    "unidadConteo": "NIU",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Bismutol Tabletas",
+    "descripcion": "Caja x 100 tabletas",
+    "precioSugerido": 80,
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sal de Andrews",
+    "descripcion": "Caja x 100 sobres",
+    "precioSugerido": 40,
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gastrozepina",
+    "descripcion": "Caja x 30 tabletas",
+    "precioSugerido": 45,
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Hepabionta",
+    "descripcion": "Caja x 20 cápsulas",
+    "precioSugerido": 35,
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Neurobion 5000",
+    "descripcion": "Caja x 3 ampollas",
+    "precioSugerido": 45,
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dolo-Neurobion",
+    "descripcion": "Caja x 1 ampolla",
+    "precioSugerido": 25,
+    "unidadConteo": "NIU",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dolo-Neurobion Forte",
+    "descripcion": "Caja x 10 tabletas",
+    "precioSugerido": 30,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Hirudoid Forte",
+    "descripcion": "Gel 40g",
+    "precioSugerido": 38,
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Voltaren 50mg",
+    "descripcion": "Caja x 20 tabletas",
+    "precioSugerido": 42,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Voltaren Emulgel",
+    "descripcion": "Tubo 30g",
+    "precioSugerido": 35,
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Buscapina Compositum",
+    "descripcion": "Caja x 20 grageas",
+    "precioSugerido": 28,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Buscapina Fem",
+    "descripcion": "Caja x 10 tabletas",
+    "precioSugerido": 15,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Plidan",
+    "descripcion": "Caja x 20 tabletas",
+    "precioSugerido": 25,
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Aero-Om",
+    "descripcion": "Gotas 15ml",
+    "precioSugerido": 20,
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gaseovet",
+    "descripcion": "Gotas 15ml",
+    "precioSugerido": 18,
+    "unidadConteo": "NIU",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enterogermina",
+    "descripcion": "Caja x 10 ampollas bebibles",
+    "precioSugerido": 45,
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Floratil",
+    "descripcion": "Caja x 10 cápsulas",
+    "precioSugerido": 38,
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Electrolight",
+    "descripcion": "Frasco 1L Fresa",
+    "precioSugerido": 6.5,
+    "unidadConteo": "NIU",
+    "categoria": "Hidratación",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pedialyte 60",
+    "descripcion": "Frasco 500ml Uva",
+    "precioSugerido": 9.5,
+    "unidadConteo": "NIU",
+    "categoria": "Hidratación",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ensure Advance",
+    "descripcion": "Lata 400g Vainilla",
+    "precioSugerido": 68,
+    "unidadConteo": "NIU",
+    "categoria": "Nutrición",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glucerna",
+    "descripcion": "Lata 400g Vainilla",
+    "precioSugerido": 72,
+    "unidadConteo": "NIU",
+    "categoria": "Nutrición",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pediasure",
+    "descripcion": "Lata 400g Chocolate",
+    "precioSugerido": 65,
+    "unidadConteo": "NIU",
+    "categoria": "Nutrición",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tio Nacho Acondicionador",
+    "descripcion": "Frasco 415ml",
+    "precioSugerido": 25,
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tio Nacho Shampoo",
+    "descripcion": "Frasco 415ml",
+    "precioSugerido": 25,
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Eucerin Bloqueador 50+",
+    "descripcion": "Frasco 50ml",
+    "precioSugerido": 95,
+    "unidadConteo": "NIU",
+    "categoria": "Dermocosmética",
+    "esGenerico": false
+  },
+  {
+    "nombre": "La Roche-Posay Anthelios",
+    "descripcion": "Frasco 50ml",
+    "precioSugerido": 110,
+    "unidadConteo": "NIU",
+    "categoria": "Dermocosmética",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Huggies M",
+    "descripcion": "Paquete x 52 pañales",
+    "precioSugerido": 48,
+    "unidadConteo": "NIU",
+    "categoria": "Bebé",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Huggies XG",
+    "descripcion": "Paquete x 48 pañales",
+    "precioSugerido": 52,
+    "unidadConteo": "NIU",
+    "categoria": "Bebé",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Babysec M",
+    "descripcion": "Paquete x 52 pañales",
+    "precioSugerido": 40,
+    "unidadConteo": "NIU",
+    "categoria": "Bebé",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pampers G",
+    "descripcion": "Paquete x 50 pañales",
+    "precioSugerido": 45,
+    "unidadConteo": "NIU",
+    "categoria": "Bebé",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Paracetamol 500mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "15.04",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "16.24",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "15.16",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "16.27",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "17.80",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "16.38",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "16.14",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "16.46",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "16.88",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 500mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "17.60",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml",
+    "descripcion": "Frasco 120ml (Genérico)",
+    "precioSugerido": 8,
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml Portugal",
+    "descripcion": "Frasco 120ml - Portugal",
+    "precioSugerido": "8.00",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml Genfar",
+    "descripcion": "Frasco 120ml - Genfar",
+    "precioSugerido": "8.90",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml Farmindustria",
+    "descripcion": "Frasco 120ml - Farmindustria",
+    "precioSugerido": "12.90",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml IQFarma",
+    "descripcion": "Frasco 120ml - IQFarma",
+    "precioSugerido": "12.90",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml AC Farma",
+    "descripcion": "Frasco 120ml - AC Farma",
+    "precioSugerido": "8.00",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml Hersil",
+    "descripcion": "Frasco 120ml - Hersil",
+    "precioSugerido": "12.50",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml Teva",
+    "descripcion": "Frasco 120ml - Teva",
+    "precioSugerido": "12.50",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml Siegfried",
+    "descripcion": "Frasco 120ml - Siegfried",
+    "precioSugerido": "22.90",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml Medifarma",
+    "descripcion": "Frasco 120ml - Medifarma",
+    "precioSugerido": "12.50",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Paracetamol 120mg/5ml Bayer",
+    "descripcion": "Frasco 120ml - Bayer",
+    "precioSugerido": "22.50",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Ibuprofeno 400mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "17.98",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "17.31",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "15.25",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "18.82",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "18.06",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "15.24",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "16.10",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "15.18",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "19.99",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 400mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "19.97",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml",
+    "descripcion": "Frasco 120ml (Genérico)",
+    "precioSugerido": 8,
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml Portugal",
+    "descripcion": "Frasco 120ml - Portugal",
+    "precioSugerido": "8.50",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml Genfar",
+    "descripcion": "Frasco 120ml - Genfar",
+    "precioSugerido": "8.00",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml Farmindustria",
+    "descripcion": "Frasco 120ml - Farmindustria",
+    "precioSugerido": "12.50",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml IQFarma",
+    "descripcion": "Frasco 120ml - IQFarma",
+    "precioSugerido": "12.90",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml AC Farma",
+    "descripcion": "Frasco 120ml - AC Farma",
+    "precioSugerido": "8.50",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml Hersil",
+    "descripcion": "Frasco 120ml - Hersil",
+    "precioSugerido": "12.90",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml Teva",
+    "descripcion": "Frasco 120ml - Teva",
+    "precioSugerido": "12.90",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml Siegfried",
+    "descripcion": "Frasco 120ml - Siegfried",
+    "precioSugerido": "22.90",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml Medifarma",
+    "descripcion": "Frasco 120ml - Medifarma",
+    "precioSugerido": "12.50",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ibuprofeno 100mg/5ml Bayer",
+    "descripcion": "Frasco 120ml - Bayer",
+    "precioSugerido": "22.50",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Naproxeno 550mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "15.15",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "19.52",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "17.07",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "15.77",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "16.23",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "19.90",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "18.17",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "16.19",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "15.61",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Naproxeno 550mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "19.31",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Diclofenaco 50mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "18.27",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "15.27",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "15.95",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "15.65",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "18.86",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "15.43",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "18.26",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "17.21",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "18.72",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 50mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "18.68",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml",
+    "descripcion": "Caja x 100 ampollas (Genérico)",
+    "precioSugerido": 40,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml Portugal",
+    "descripcion": "Caja x 100 ampollas - Portugal",
+    "precioSugerido": "40.90",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml Genfar",
+    "descripcion": "Caja x 100 ampollas - Genfar",
+    "precioSugerido": "40.90",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml Farmindustria",
+    "descripcion": "Caja x 100 ampollas - Farmindustria",
+    "precioSugerido": "60.90",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml IQFarma",
+    "descripcion": "Caja x 100 ampollas - IQFarma",
+    "precioSugerido": "60.90",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml AC Farma",
+    "descripcion": "Caja x 100 ampollas - AC Farma",
+    "precioSugerido": "40.90",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml Hersil",
+    "descripcion": "Caja x 100 ampollas - Hersil",
+    "precioSugerido": "60.90",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml Teva",
+    "descripcion": "Caja x 100 ampollas - Teva",
+    "precioSugerido": "60.00",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml Siegfried",
+    "descripcion": "Caja x 100 ampollas - Siegfried",
+    "precioSugerido": "108.50",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml Medifarma",
+    "descripcion": "Caja x 100 ampollas - Medifarma",
+    "precioSugerido": "60.90",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Diclofenaco 75mg/3ml Bayer",
+    "descripcion": "Caja x 100 ampollas - Bayer",
+    "precioSugerido": "108.90",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketorolaco 10mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Ketorolaco 10mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "19.30",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketorolaco 10mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "16.95",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketorolaco 10mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "17.66",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketorolaco 10mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "15.42",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketorolaco 10mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "16.56",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketorolaco 10mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "17.40",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketorolaco 10mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "16.70",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketorolaco 10mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "16.14",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketorolaco 10mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "15.16",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketorolaco 10mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "17.80",
+    "unidadConteo": "CJA",
+    "categoria": "Dolor y Fiebre",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg",
+    "descripcion": "Caja x 100 cápsulas (Genérico)",
+    "precioSugerido": 12,
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Amoxicilina 500mg Portugal",
+    "descripcion": "Caja x 100 cápsulas - Portugal",
+    "precioSugerido": "16.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg Genfar",
+    "descripcion": "Caja x 100 cápsulas - Genfar",
+    "precioSugerido": "16.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg Farmindustria",
+    "descripcion": "Caja x 100 cápsulas - Farmindustria",
+    "precioSugerido": "23.50",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg IQFarma",
+    "descripcion": "Caja x 100 cápsulas - IQFarma",
+    "precioSugerido": "23.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg AC Farma",
+    "descripcion": "Caja x 100 cápsulas - AC Farma",
+    "precioSugerido": "16.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg Hersil",
+    "descripcion": "Caja x 100 cápsulas - Hersil",
+    "precioSugerido": "23.50",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg Teva",
+    "descripcion": "Caja x 100 cápsulas - Teva",
+    "precioSugerido": "23.00",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg Siegfried",
+    "descripcion": "Caja x 100 cápsulas - Siegfried",
+    "precioSugerido": "42.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg Medifarma",
+    "descripcion": "Caja x 100 cápsulas - Medifarma",
+    "precioSugerido": "23.50",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 500mg Bayer",
+    "descripcion": "Caja x 100 cápsulas - Bayer",
+    "precioSugerido": "42.50",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml",
+    "descripcion": "Frasco 120ml (Genérico)",
+    "precioSugerido": 8,
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml Portugal",
+    "descripcion": "Frasco 120ml - Portugal",
+    "precioSugerido": "8.50",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml Genfar",
+    "descripcion": "Frasco 120ml - Genfar",
+    "precioSugerido": "8.90",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml Farmindustria",
+    "descripcion": "Frasco 120ml - Farmindustria",
+    "precioSugerido": "12.00",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml IQFarma",
+    "descripcion": "Frasco 120ml - IQFarma",
+    "precioSugerido": "12.90",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml AC Farma",
+    "descripcion": "Frasco 120ml - AC Farma",
+    "precioSugerido": "8.00",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml Hersil",
+    "descripcion": "Frasco 120ml - Hersil",
+    "precioSugerido": "12.50",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml Teva",
+    "descripcion": "Frasco 120ml - Teva",
+    "precioSugerido": "12.00",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml Siegfried",
+    "descripcion": "Frasco 120ml - Siegfried",
+    "precioSugerido": "22.50",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml Medifarma",
+    "descripcion": "Frasco 120ml - Medifarma",
+    "precioSugerido": "12.00",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amoxicilina 250mg/5ml Bayer",
+    "descripcion": "Frasco 120ml - Bayer",
+    "precioSugerido": "22.00",
+    "unidadConteo": "NIU",
+    "categoria": "Infantil",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Azitromicina 500mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "19.72",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "15.14",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "15.58",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "15.71",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "18.13",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "18.03",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "16.28",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "18.50",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "19.41",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Azitromicina 500mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "18.00",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "18.38",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "19.86",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "18.50",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "17.35",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "16.71",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "16.35",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "15.57",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "18.50",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "19.61",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ciprofloxacino 500mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "18.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cefalexina 500mg",
+    "descripcion": "Caja x 100 cápsulas (Genérico)",
+    "precioSugerido": 12,
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Cefalexina 500mg Portugal",
+    "descripcion": "Caja x 100 cápsulas - Portugal",
+    "precioSugerido": "16.00",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cefalexina 500mg Genfar",
+    "descripcion": "Caja x 100 cápsulas - Genfar",
+    "precioSugerido": "16.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cefalexina 500mg Farmindustria",
+    "descripcion": "Caja x 100 cápsulas - Farmindustria",
+    "precioSugerido": "23.00",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cefalexina 500mg IQFarma",
+    "descripcion": "Caja x 100 cápsulas - IQFarma",
+    "precioSugerido": "23.50",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cefalexina 500mg AC Farma",
+    "descripcion": "Caja x 100 cápsulas - AC Farma",
+    "precioSugerido": "16.00",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cefalexina 500mg Hersil",
+    "descripcion": "Caja x 100 cápsulas - Hersil",
+    "precioSugerido": "23.00",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cefalexina 500mg Teva",
+    "descripcion": "Caja x 100 cápsulas - Teva",
+    "precioSugerido": "23.00",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cefalexina 500mg Siegfried",
+    "descripcion": "Caja x 100 cápsulas - Siegfried",
+    "precioSugerido": "42.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cefalexina 500mg Medifarma",
+    "descripcion": "Caja x 100 cápsulas - Medifarma",
+    "precioSugerido": "23.50",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cefalexina 500mg Bayer",
+    "descripcion": "Caja x 100 cápsulas - Bayer",
+    "precioSugerido": "42.50",
+    "unidadConteo": "CJA",
+    "categoria": "Antibióticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Cetirizina 10mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "17.06",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "17.52",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "18.64",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "15.74",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "17.83",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "18.89",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "18.03",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "17.47",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "16.83",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Cetirizina 10mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "18.01",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Loratadina 10mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "19.22",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "19.42",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "19.45",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "19.84",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "15.81",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "17.89",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "19.66",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "18.96",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "17.88",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Loratadina 10mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "18.51",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Clorfenamina 4mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "19.54",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "17.65",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "18.47",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "16.57",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "17.99",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "17.63",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "16.20",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "17.88",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "18.24",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clorfenamina 4mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "18.97",
+    "unidadConteo": "CJA",
+    "categoria": "Alergias",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Prednisona 20mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "18.55",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "16.85",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "17.39",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "17.59",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "16.81",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "16.77",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "16.08",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "16.85",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "17.45",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Prednisona 20mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "15.29",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml",
+    "descripcion": "Caja x 100 ampollas (Genérico)",
+    "precioSugerido": 40,
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml Portugal",
+    "descripcion": "Caja x 100 ampollas - Portugal",
+    "precioSugerido": "40.50",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml Genfar",
+    "descripcion": "Caja x 100 ampollas - Genfar",
+    "precioSugerido": "40.50",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml Farmindustria",
+    "descripcion": "Caja x 100 ampollas - Farmindustria",
+    "precioSugerido": "60.00",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml IQFarma",
+    "descripcion": "Caja x 100 ampollas - IQFarma",
+    "precioSugerido": "60.90",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml AC Farma",
+    "descripcion": "Caja x 100 ampollas - AC Farma",
+    "precioSugerido": "40.90",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml Hersil",
+    "descripcion": "Caja x 100 ampollas - Hersil",
+    "precioSugerido": "60.00",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml Teva",
+    "descripcion": "Caja x 100 ampollas - Teva",
+    "precioSugerido": "60.90",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml Siegfried",
+    "descripcion": "Caja x 100 ampollas - Siegfried",
+    "precioSugerido": "108.90",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml Medifarma",
+    "descripcion": "Caja x 100 ampollas - Medifarma",
+    "precioSugerido": "60.00",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Dexametasona 4mg/2ml Bayer",
+    "descripcion": "Caja x 100 ampollas - Bayer",
+    "precioSugerido": "108.90",
+    "unidadConteo": "CJA",
+    "categoria": "Corticoides",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg",
+    "descripcion": "Caja x 100 cápsulas (Genérico)",
+    "precioSugerido": 12,
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Omeprazol 20mg Portugal",
+    "descripcion": "Caja x 100 cápsulas - Portugal",
+    "precioSugerido": "15.59",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg Genfar",
+    "descripcion": "Caja x 100 cápsulas - Genfar",
+    "precioSugerido": "18.15",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg Farmindustria",
+    "descripcion": "Caja x 100 cápsulas - Farmindustria",
+    "precioSugerido": "18.00",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg IQFarma",
+    "descripcion": "Caja x 100 cápsulas - IQFarma",
+    "precioSugerido": "18.00",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg AC Farma",
+    "descripcion": "Caja x 100 cápsulas - AC Farma",
+    "precioSugerido": "18.80",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg Hersil",
+    "descripcion": "Caja x 100 cápsulas - Hersil",
+    "precioSugerido": "18.00",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg Teva",
+    "descripcion": "Caja x 100 cápsulas - Teva",
+    "precioSugerido": "18.50",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg Siegfried",
+    "descripcion": "Caja x 100 cápsulas - Siegfried",
+    "precioSugerido": "32.90",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg Medifarma",
+    "descripcion": "Caja x 100 cápsulas - Medifarma",
+    "precioSugerido": "18.90",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Omeprazol 20mg Bayer",
+    "descripcion": "Caja x 100 cápsulas - Bayer",
+    "precioSugerido": "32.50",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Esomeprazol 40mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Esomeprazol 40mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "17.70",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Esomeprazol 40mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "16.57",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Esomeprazol 40mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "17.14",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Esomeprazol 40mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "18.44",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Esomeprazol 40mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "16.29",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Esomeprazol 40mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "19.74",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Esomeprazol 40mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "17.11",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Esomeprazol 40mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "17.41",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Esomeprazol 40mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "18.29",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Esomeprazol 40mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "18.05",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ranitidina 300mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Ranitidina 300mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "16.23",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ranitidina 300mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "18.83",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ranitidina 300mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "19.82",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ranitidina 300mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "17.31",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ranitidina 300mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "17.49",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ranitidina 300mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "18.37",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ranitidina 300mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "18.81",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ranitidina 300mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "17.47",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ranitidina 300mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "19.72",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ranitidina 300mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "16.62",
+    "unidadConteo": "CJA",
+    "categoria": "Estomacal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Losartan 50mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "16.05",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "15.65",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "17.93",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "17.99",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "15.61",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "16.85",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "19.82",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "16.22",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "15.32",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Losartan 50mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "16.31",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Enalapril 10mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "17.01",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "17.06",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "16.96",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "15.95",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "16.52",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "17.56",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "15.42",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "16.88",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "18.42",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Enalapril 10mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "18.98",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Amlodipino 5mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "19.54",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "18.86",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "16.66",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "18.43",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "17.88",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "16.37",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "19.36",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "19.32",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "19.31",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Amlodipino 5mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "17.45",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Atorvastatina 20mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "19.75",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "17.81",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "18.55",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "19.73",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "15.92",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "16.95",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "19.06",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "15.24",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "18.67",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Atorvastatina 20mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "16.43",
+    "unidadConteo": "CJA",
+    "categoria": "Cardiovascular",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Metformina 850mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "16.50",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "19.91",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "17.28",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "15.45",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "16.49",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "18.52",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "19.14",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "19.74",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "17.40",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Metformina 850mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "16.13",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Glibenclamida 5mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "19.33",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "16.89",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "19.04",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "18.67",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "16.00",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "19.56",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "15.27",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "18.20",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "18.84",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Glibenclamida 5mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "16.73",
+    "unidadConteo": "CJA",
+    "categoria": "Diabetes",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg",
+    "descripcion": "Caja x 100 cápsulas (Genérico)",
+    "precioSugerido": 12,
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Fluconazol 150mg Portugal",
+    "descripcion": "Caja x 100 cápsulas - Portugal",
+    "precioSugerido": "19.00",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg Genfar",
+    "descripcion": "Caja x 100 cápsulas - Genfar",
+    "precioSugerido": "15.28",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg Farmindustria",
+    "descripcion": "Caja x 100 cápsulas - Farmindustria",
+    "precioSugerido": "18.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg IQFarma",
+    "descripcion": "Caja x 100 cápsulas - IQFarma",
+    "precioSugerido": "18.00",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg AC Farma",
+    "descripcion": "Caja x 100 cápsulas - AC Farma",
+    "precioSugerido": "18.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg Hersil",
+    "descripcion": "Caja x 100 cápsulas - Hersil",
+    "precioSugerido": "18.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg Teva",
+    "descripcion": "Caja x 100 cápsulas - Teva",
+    "precioSugerido": "18.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg Siegfried",
+    "descripcion": "Caja x 100 cápsulas - Siegfried",
+    "precioSugerido": "32.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg Medifarma",
+    "descripcion": "Caja x 100 cápsulas - Medifarma",
+    "precioSugerido": "18.50",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Fluconazol 150mg Bayer",
+    "descripcion": "Caja x 100 cápsulas - Bayer",
+    "precioSugerido": "32.90",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Ketoconazol 200mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "16.17",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "18.12",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "15.80",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "18.71",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "15.33",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "15.98",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "17.12",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "17.79",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "15.88",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Ketoconazol 200mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "17.40",
+    "unidadConteo": "CJA",
+    "categoria": "Antimicóticos",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol 1%",
+    "descripcion": "Tubo 20g (Genérico)",
+    "precioSugerido": 6,
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Clotrimazol 1% Portugal",
+    "descripcion": "Tubo 20g - Portugal",
+    "precioSugerido": "6.50",
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol 1% Genfar",
+    "descripcion": "Tubo 20g - Genfar",
+    "precioSugerido": "6.50",
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol 1% Farmindustria",
+    "descripcion": "Tubo 20g - Farmindustria",
+    "precioSugerido": "9.00",
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol 1% IQFarma",
+    "descripcion": "Tubo 20g - IQFarma",
+    "precioSugerido": "9.90",
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol 1% AC Farma",
+    "descripcion": "Tubo 20g - AC Farma",
+    "precioSugerido": "6.50",
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol 1% Hersil",
+    "descripcion": "Tubo 20g - Hersil",
+    "precioSugerido": "9.90",
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol 1% Teva",
+    "descripcion": "Tubo 20g - Teva",
+    "precioSugerido": "9.90",
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol 1% Siegfried",
+    "descripcion": "Tubo 20g - Siegfried",
+    "precioSugerido": "16.00",
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol 1% Medifarma",
+    "descripcion": "Tubo 20g - Medifarma",
+    "precioSugerido": "9.50",
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clotrimazol 1% Bayer",
+    "descripcion": "Tubo 20g - Bayer",
+    "precioSugerido": "16.50",
+    "unidadConteo": "NIU",
+    "categoria": "Tópico",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Sildenafilo 100mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "15.01",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "16.36",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "19.02",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "16.98",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "15.16",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "15.47",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "18.07",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "15.74",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "18.61",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Sildenafilo 100mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "15.23",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tadalafilo 20mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Tadalafilo 20mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "16.40",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tadalafilo 20mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "18.82",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tadalafilo 20mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "16.46",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tadalafilo 20mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "15.02",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tadalafilo 20mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "17.52",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tadalafilo 20mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "15.37",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tadalafilo 20mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "19.12",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tadalafilo 20mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "16.12",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tadalafilo 20mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "17.81",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Tadalafilo 20mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "17.43",
+    "unidadConteo": "CJA",
+    "categoria": "Salud Sexual",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Alprazolam 0.5mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Alprazolam 0.5mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "19.61",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Alprazolam 0.5mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "17.24",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Alprazolam 0.5mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "19.76",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Alprazolam 0.5mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "19.97",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Alprazolam 0.5mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "18.46",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Alprazolam 0.5mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "19.28",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Alprazolam 0.5mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "19.67",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Alprazolam 0.5mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "19.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Alprazolam 0.5mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "18.59",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Alprazolam 0.5mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "19.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clonazepam 0.5mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Clonazepam 0.5mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "19.95",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clonazepam 0.5mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "15.46",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clonazepam 0.5mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "18.26",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clonazepam 0.5mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "15.78",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clonazepam 0.5mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "17.12",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clonazepam 0.5mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "18.84",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clonazepam 0.5mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "19.13",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clonazepam 0.5mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "19.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clonazepam 0.5mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "16.56",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Clonazepam 0.5mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "19.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg",
+    "descripcion": "Caja x 100 cápsulas (Genérico)",
+    "precioSugerido": 12,
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Gabapentina 300mg Portugal",
+    "descripcion": "Caja x 100 cápsulas - Portugal",
+    "precioSugerido": "17.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg Genfar",
+    "descripcion": "Caja x 100 cápsulas - Genfar",
+    "precioSugerido": "17.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg Farmindustria",
+    "descripcion": "Caja x 100 cápsulas - Farmindustria",
+    "precioSugerido": "25.50",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg IQFarma",
+    "descripcion": "Caja x 100 cápsulas - IQFarma",
+    "precioSugerido": "25.00",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg AC Farma",
+    "descripcion": "Caja x 100 cápsulas - AC Farma",
+    "precioSugerido": "17.50",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg Hersil",
+    "descripcion": "Caja x 100 cápsulas - Hersil",
+    "precioSugerido": "25.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg Teva",
+    "descripcion": "Caja x 100 cápsulas - Teva",
+    "precioSugerido": "25.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg Siegfried",
+    "descripcion": "Caja x 100 cápsulas - Siegfried",
+    "precioSugerido": "45.00",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg Medifarma",
+    "descripcion": "Caja x 100 cápsulas - Medifarma",
+    "precioSugerido": "25.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Gabapentina 300mg Bayer",
+    "descripcion": "Caja x 100 cápsulas - Bayer",
+    "precioSugerido": "45.50",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg",
+    "descripcion": "Caja x 100 cápsulas (Genérico)",
+    "precioSugerido": 12,
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Pregabalina 75mg Portugal",
+    "descripcion": "Caja x 100 cápsulas - Portugal",
+    "precioSugerido": "17.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg Genfar",
+    "descripcion": "Caja x 100 cápsulas - Genfar",
+    "precioSugerido": "17.50",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg Farmindustria",
+    "descripcion": "Caja x 100 cápsulas - Farmindustria",
+    "precioSugerido": "25.00",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg IQFarma",
+    "descripcion": "Caja x 100 cápsulas - IQFarma",
+    "precioSugerido": "25.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg AC Farma",
+    "descripcion": "Caja x 100 cápsulas - AC Farma",
+    "precioSugerido": "17.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg Hersil",
+    "descripcion": "Caja x 100 cápsulas - Hersil",
+    "precioSugerido": "25.50",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg Teva",
+    "descripcion": "Caja x 100 cápsulas - Teva",
+    "precioSugerido": "25.00",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg Siegfried",
+    "descripcion": "Caja x 100 cápsulas - Siegfried",
+    "precioSugerido": "45.00",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg Medifarma",
+    "descripcion": "Caja x 100 cápsulas - Medifarma",
+    "precioSugerido": "25.00",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pregabalina 75mg Bayer",
+    "descripcion": "Caja x 100 cápsulas - Bayer",
+    "precioSugerido": "45.90",
+    "unidadConteo": "CJA",
+    "categoria": "Neurología",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Complejo B Fuerte",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Complejo B Fuerte Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "19.81",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Complejo B Fuerte Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "19.84",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Complejo B Fuerte Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "15.42",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Complejo B Fuerte IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "17.26",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Complejo B Fuerte AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "19.10",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Complejo B Fuerte Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "17.11",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Complejo B Fuerte Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "19.63",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Complejo B Fuerte Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "17.20",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Complejo B Fuerte Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "19.36",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Complejo B Fuerte Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "18.09",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vitamina C 1g",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Vitamina C 1g Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "15.30",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vitamina C 1g Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "18.05",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vitamina C 1g Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "15.46",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vitamina C 1g IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "15.66",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vitamina C 1g AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "15.64",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vitamina C 1g Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "18.18",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vitamina C 1g Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "15.55",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vitamina C 1g Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "17.92",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vitamina C 1g Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "16.68",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Vitamina C 1g Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "17.51",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Calcio + Vit D 500mg",
+    "descripcion": "Caja x 100 tabletas (Genérico)",
+    "precioSugerido": 5,
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": true
+  },
+  {
+    "nombre": "Calcio + Vit D 500mg Portugal",
+    "descripcion": "Caja x 100 tabletas - Portugal",
+    "precioSugerido": "17.16",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Calcio + Vit D 500mg Genfar",
+    "descripcion": "Caja x 100 tabletas - Genfar",
+    "precioSugerido": "18.21",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Calcio + Vit D 500mg Farmindustria",
+    "descripcion": "Caja x 100 tabletas - Farmindustria",
+    "precioSugerido": "16.74",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Calcio + Vit D 500mg IQFarma",
+    "descripcion": "Caja x 100 tabletas - IQFarma",
+    "precioSugerido": "19.72",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Calcio + Vit D 500mg AC Farma",
+    "descripcion": "Caja x 100 tabletas - AC Farma",
+    "precioSugerido": "18.70",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Calcio + Vit D 500mg Hersil",
+    "descripcion": "Caja x 100 tabletas - Hersil",
+    "precioSugerido": "15.04",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Calcio + Vit D 500mg Teva",
+    "descripcion": "Caja x 100 tabletas - Teva",
+    "precioSugerido": "19.65",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Calcio + Vit D 500mg Siegfried",
+    "descripcion": "Caja x 100 tabletas - Siegfried",
+    "precioSugerido": "16.92",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Calcio + Vit D 500mg Medifarma",
+    "descripcion": "Caja x 100 tabletas - Medifarma",
+    "precioSugerido": "16.87",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Calcio + Vit D 500mg Bayer",
+    "descripcion": "Caja x 100 tabletas - Bayer",
+    "precioSugerido": "19.56",
+    "unidadConteo": "CJA",
+    "categoria": "Vitaminas",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pasta Dental Colgate Total 12 Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "23.59",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pasta Dental Colgate Total 12 Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "5.17",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pasta Dental Colgate Total 12 Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "16.63",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pasta Dental Colgate Total 12 Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "14.46",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pasta Dental Kolynos Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "22.18",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pasta Dental Kolynos Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "11.36",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pasta Dental Kolynos Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "6.79",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pasta Dental Kolynos Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "24.50",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Crema Dental Oral-B Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "24.26",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Crema Dental Oral-B Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "21.77",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Crema Dental Oral-B Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "11.15",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Crema Dental Oral-B Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "21.34",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Shampoo Head&Shoulders Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "12.91",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Shampoo Head&Shoulders Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "17.83",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Shampoo Head&Shoulders Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "18.56",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Shampoo Head&Shoulders Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "9.87",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Shampoo Pantene Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "21.18",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Shampoo Pantene Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "6.01",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Shampoo Pantene Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "15.29",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Shampoo Pantene Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "6.52",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Shampoo Savital Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "23.29",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Shampoo Savital Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "5.92",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Shampoo Savital Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "16.40",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Shampoo Savital Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "17.00",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Jabón Protex Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "18.32",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Jabón Protex Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "23.05",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Jabón Protex Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "18.60",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Jabón Protex Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "24.52",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Jabón Neko Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "5.50",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Jabón Neko Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "21.45",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Jabón Neko Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "18.48",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Jabón Neko Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "13.50",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Jabón Dove Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "14.19",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Jabón Dove Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "8.78",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Jabón Dove Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "17.02",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Jabón Dove Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "18.17",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Desodorante Rexona Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "15.21",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Desodorante Rexona Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "9.65",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Desodorante Rexona Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "9.16",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Desodorante Rexona Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "8.58",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Desodorante Nivea Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "19.62",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Desodorante Nivea Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "11.84",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Desodorante Nivea Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "10.77",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Desodorante Nivea Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "8.32",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Desodorante Old Spice Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "19.70",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Desodorante Old Spice Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "24.22",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Desodorante Old Spice Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "6.13",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Desodorante Old Spice Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "13.45",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Toallas Nosotras Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "7.50",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Toallas Nosotras Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "11.15",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Toallas Nosotras Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "18.60",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Toallas Nosotras Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "22.48",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Toallas Kotex Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "12.06",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Toallas Kotex Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "11.75",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Toallas Kotex Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "19.79",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Toallas Kotex Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "8.33",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Papel Higiénico Elite Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "10.03",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Papel Higiénico Elite Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "9.27",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Papel Higiénico Elite Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "18.47",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Papel Higiénico Elite Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "24.99",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pañuelos Kleenex Pequeño",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "18.04",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pañuelos Kleenex Mediano",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "5.23",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pañuelos Kleenex Grande",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "15.33",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  },
+  {
+    "nombre": "Pañuelos Kleenex Pack x 3",
+    "descripcion": "Unidad de aseo personal",
+    "precioSugerido": "24.73",
+    "unidadConteo": "NIU",
+    "categoria": "Cuidado Personal",
+    "esGenerico": false
+  }
+]
