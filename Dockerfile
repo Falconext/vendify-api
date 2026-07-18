@@ -64,8 +64,10 @@ COPY src ./src
 # Build de la aplicación
 RUN npx nest build
 
-# Generar Prisma client después del build
-RUN npx prisma generate
+# Generar Prisma client después del build. Se usa un DATABASE_URL placeholder
+# SOLO para que `generate` pase la validación del schema en build-time; en
+# runtime se usa el DATABASE_URL real inyectado por Railway.
+RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" npx prisma generate
 
 # Configurar producción
 ENV NODE_ENV=production
