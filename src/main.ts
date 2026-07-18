@@ -70,9 +70,13 @@ async function bootstrap() {
       const isVendifyOrigin =
         /^https?:\/\/([a-z0-9-]+\.)*vendify\.pe(:\d+)?$/.test(origin);
 
+      // Despliegues del frontend en Vercel (producción y previews: *.vercel.app).
+      const isVercelOrigin = /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin);
+
       if (
         allowedOrigins.includes(origin) ||
         isVendifyOrigin ||
+        isVercelOrigin ||
         (!isProduction && isLocalDevelopmentOrigin)
       ) {
         callback(null, true);
