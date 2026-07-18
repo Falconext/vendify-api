@@ -80,5 +80,7 @@ RUN chown -R appuser:appgroup /app /tmp/chrome-data
 USER appuser
 EXPOSE 4000
 
-# Ejecutar migraciones y iniciar aplicación
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/src/main.js"]
+# Sincroniza el esquema (sin --accept-data-loss: aplica cambios seguros y
+# FALLA en vez de borrar datos ante un cambio destructivo) e inicia la app.
+# El seed de catálogos/ubigeo/admin lo hace initializeDatabase() al arrancar.
+CMD ["sh", "-c", "npx prisma db push && node dist/src/main.js"]
