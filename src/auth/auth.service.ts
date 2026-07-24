@@ -54,10 +54,28 @@ export class AuthService {
     return null;
   }
 
-  async login(
-    { email, password, brand: bodyBrand }: LoginPayload,
-    origin?: string,
-  ) {
+  // Resuelve el reseller dueño del host desde el que se hace login, matcheando
+  // Reseller.dominioPersonalizado (ej. jamble.vendify.pe -> RES-001). Devuelve
+  // null para hosts del sistema (app.vendify.pe, landing, localhost) o hosts sin
+  // reseller asociado — esos NO restringen el acceso por portal.
+  private async resolveResellerFromOrigin(
+    origin: string | undefined,
+  ): Promise<{ id: number } | null> {
+    if (!origin) return null;
+    const host = origin
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .split('/')[0]
+      .split(':')[0];
+    if (!host) return null;
+    return this.prisma.reseller.findFirst({
+      where: { activo: true, dominioPersonalizado: host },
+      select: { id: true },
+    });
+  }
+
+  async login({ email, password }: LoginPayload, origin?: string) {
     const user: any = await this.prisma.usuario.findUnique({
       where: { email },
       include: { empresa: true },
@@ -84,14 +102,15 @@ export class AuthService {
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) throw new UnauthorizedException('Credenciales inválidas');
 
-    // ── Brand validation ─────────────────────────────────────────
-    // ADMIN_SISTEMA y RESELLER no tienen empresa, pueden entrar desde cualquier frontend
+    // ── Portal (reseller) validation ─────────────────────────────
+    // ADMIN_SISTEMA y RESELLER no tienen empresa, pueden entrar desde cualquier frontend.
+    // Para usuarios de empresa: si el host corresponde al portal de un reseller
+    // (ej. jamble.vendify.pe), la empresa debe pertenecer a ese reseller. Los hosts
+    // del sistema (app.vendify.pe, landing, localhost) no imponen restricción.
     const rolesLibres = ['ADMIN_SISTEMA', 'RESELLER'];
     if (!rolesLibres.includes(user.rol) && user.empresa) {
-      // Origin header tiene prioridad; si no resuelve, usa el brand enviado en el body
-      const expectedBrand =
-        this.resolveBrandFromOrigin(origin) ?? bodyBrand ?? null;
-      if (expectedBrand && user.empresa.brand !== expectedBrand) {
+      const portalReseller = await this.resolveResellerFromOrigin(origin);
+      if (portalReseller && user.empresa.resellerId !== portalReseller.id) {
         throw new ForbiddenException(
           `Esta cuenta no pertenece a este portal. Accede desde el portal correcto.`,
         );
