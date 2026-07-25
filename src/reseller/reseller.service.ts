@@ -1656,7 +1656,9 @@ export class ResellerService {
     const descuento = Number(reseller.porcentajeDescuento) || 0;
 
     const empresas = await this.prisma.empresa.findMany({
-      where: { resellerId, estado: 'ACTIVO' },
+      // Solo clientes en PRODUCCIÓN generan ingreso recurrente; los DEMO no pagan
+      // y no deben contar en MRR / ingreso / costo / ganancia.
+      where: { resellerId, estado: 'ACTIVO', usaDemo: false },
       select: {
         id: true,
         razonSocial: true,
