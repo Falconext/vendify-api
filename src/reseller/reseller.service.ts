@@ -118,6 +118,50 @@ export class ResellerService {
     return this.calculatePlanCostWithDiscount(planCosto, porcentajeDescuento);
   }
 
+  // Cobra al saldo del reseller la activación de un cliente (paso demo -> producción,
+  // o creación directa en producción). Lanza BadRequestException si el saldo no
+  // alcanza. Debe llamarse dentro de una transacción. Devuelve el costo cobrado.
+  private async cobrarActivacionCliente(
+    tx: any,
+    resellerId: number,
+    empresa: { razonSocial: string; plan: { nombre: string; costo: any } },
+    ciclo: string = 'MENSUAL',
+  ): Promise<number> {
+    const reseller = await tx.reseller.findUnique({
+      where: { id: resellerId },
+      select: { saldo: true, porcentajeDescuento: true },
+    });
+    if (!reseller) throw new NotFoundException('Distribuidor no encontrado');
+    const clientesActuales = await tx.empresa.count({
+      where: { resellerId, estado: 'ACTIVO' },
+    });
+    const costoFinal = this.resolveClientCost(
+      empresa.plan.nombre,
+      Number(empresa.plan.costo),
+      Number(reseller.porcentajeDescuento) || 0,
+      clientesActuales + 1,
+      ciclo,
+    );
+    if (Number(reseller.saldo) < costoFinal) {
+      throw new BadRequestException(
+        `Saldo insuficiente. El plan cuesta S/${costoFinal.toFixed(2)} y tienes S/${Number(reseller.saldo).toFixed(2)}`,
+      );
+    }
+    await tx.reseller.update({
+      where: { id: resellerId },
+      data: { saldo: { decrement: costoFinal } },
+    });
+    await tx.resellerMovimiento.create({
+      data: {
+        resellerId,
+        tipo: 'ACTIVACION',
+        monto: -costoFinal,
+        descripcion: `Activación (producción): ${empresa.razonSocial} - Plan: ${empresa.plan.nombre}`,
+      },
+    });
+    return costoFinal;
+  }
+
   // Días a extender el vencimiento según el ciclo.
   private getCicloDias(ciclo: string): number {
     return String(ciclo).toUpperCase() === 'ANUAL' ? 365 : 30;
@@ -762,6 +806,51 @@ export class ResellerService {
     });
   }
 
+  /**
+   * Ajusta (corrige) el saldo de un reseller al valor exacto indicado. Útil
+   * cuando se recargó de más o por error. Registra un movimiento de tipo AJUSTE
+   * con el delta y el motivo para auditoría. NO toca el descuento.
+   */
+  async ajustarSaldo(resellerId: number, nuevoSaldo: number, motivo: string) {
+    if (!Number.isFinite(nuevoSaldo) || nuevoSaldo < 0) {
+      throw new BadRequestException('El nuevo saldo debe ser un número >= 0');
+    }
+    const motivoLimpio = String(motivo || '').trim();
+    if (!motivoLimpio) {
+      throw new BadRequestException('Debes indicar el motivo del ajuste');
+    }
+    const saldoFinal = Math.round(nuevoSaldo * 100) / 100;
+
+    return this.prisma.$transaction(async (tx) => {
+      const reseller = await tx.reseller.findUnique({
+        where: { id: resellerId },
+        select: { saldo: true },
+      });
+      if (!reseller) throw new NotFoundException('Distribuidor no encontrado');
+
+      const saldoActual = Number(reseller.saldo);
+      const delta = Math.round((saldoFinal - saldoActual) * 100) / 100;
+
+      const updated = await tx.reseller.update({
+        where: { id: resellerId },
+        data: { saldo: saldoFinal },
+      });
+
+      await tx.resellerMovimiento.create({
+        data: {
+          resellerId,
+          tipo: 'AJUSTE',
+          monto: delta,
+          estado: 'APLICADO',
+          motivo: motivoLimpio,
+          descripcion: `Ajuste manual de saldo: S/${saldoActual.toFixed(2)} → S/${saldoFinal.toFixed(2)} (${delta >= 0 ? '+' : ''}${delta.toFixed(2)}) · ${motivoLimpio}`,
+        },
+      });
+
+      return updated;
+    });
+  }
+
   async createClient(
     resellerId: number,
     data: {
@@ -877,33 +966,37 @@ export class ResellerService {
           ciclo,
         );
 
-        if (Number(reseller.saldo) < costoFinal) {
-          throw new BadRequestException(
-            `Saldo insuficiente. El plan cuesta S/${costoFinal.toFixed(2)} y tienes S/${Number(reseller.saldo).toFixed(2)}`,
-          );
+        // Los clientes DEMO NO cobran saldo; el cobro ocurre al pasar a producción.
+        const esDemoCreacion = Boolean(data.usaDemo);
+        if (!esDemoCreacion) {
+          if (Number(reseller.saldo) < costoFinal) {
+            throw new BadRequestException(
+              `Saldo insuficiente. El plan cuesta S/${costoFinal.toFixed(2)} y tienes S/${Number(reseller.saldo).toFixed(2)}`,
+            );
+          }
+
+          // 4. Deduct Balance
+          await tx.reseller.update({
+            where: { id: resellerId },
+            data: { saldo: { decrement: costoFinal } },
+          });
+
+          const usaPrecioPorVolumen =
+            getVolumeTierPrice(plan.nombre, clientesConNuevo) !== null;
+          const cicloLabel = ciclo === 'ANUAL' ? 'Anual' : 'Mensual';
+          const descripcionActivacion = usaPrecioPorVolumen
+            ? `Activación cliente: ${data.razonSocial} - Plan: ${plan.nombre} (${cicloLabel}${ciclo === 'ANUAL' ? '' : ` · Tier ${this.getTierLabel(clientesConNuevo)}`})`
+            : `Activación cliente: ${data.razonSocial} - Plan: ${plan.nombre} (${cicloLabel} · ${descuento}% Off)`;
+
+          await tx.resellerMovimiento.create({
+            data: {
+              resellerId,
+              tipo: 'ACTIVACION',
+              monto: -costoFinal,
+              descripcion: descripcionActivacion,
+            },
+          });
         }
-
-        // 4. Deduct Balance
-        await tx.reseller.update({
-          where: { id: resellerId },
-          data: { saldo: { decrement: costoFinal } },
-        });
-
-        const usaPrecioPorVolumen =
-          getVolumeTierPrice(plan.nombre, clientesConNuevo) !== null;
-        const cicloLabel = ciclo === 'ANUAL' ? 'Anual' : 'Mensual';
-        const descripcionActivacion = usaPrecioPorVolumen
-          ? `Activación cliente: ${data.razonSocial} - Plan: ${plan.nombre} (${cicloLabel}${ciclo === 'ANUAL' ? '' : ` · Tier ${this.getTierLabel(clientesConNuevo)}`})`
-          : `Activación cliente: ${data.razonSocial} - Plan: ${plan.nombre} (${cicloLabel} · ${descuento}% Off)`;
-
-        await tx.resellerMovimiento.create({
-          data: {
-            resellerId,
-            tipo: 'ACTIVACION',
-            monto: -costoFinal,
-            descripcion: descripcionActivacion,
-          },
-        });
 
         const unidadMedida = await tx.unidadMedida.findFirst();
         if (!unidadMedida) {
@@ -2308,6 +2401,24 @@ export class ResellerService {
       if (data.telefono !== undefined)
         updateEmpresa.whatsappTienda = data.telefono;
 
+      // Cobro al pasar de DEMO a PRODUCCIÓN desde el modal de edición.
+      const pasaAProduccion =
+        empresa.usaDemo === true && data.usaDemo === false;
+      if (pasaAProduccion) {
+        const planEfectivoId =
+          (updateEmpresa as any).planId ?? empresa.planId;
+        const planEfectivo = await tx.plan.findUnique({
+          where: { id: planEfectivoId },
+          select: { nombre: true, costo: true },
+        });
+        if (!planEfectivo)
+          throw new BadRequestException('El cliente no tiene un plan válido.');
+        await this.cobrarActivacionCliente(tx, resellerId, {
+          razonSocial: empresa.razonSocial,
+          plan: planEfectivo,
+        });
+      }
+
       if (Object.keys(updateEmpresa).length) {
         await tx.empresa.update({
           where: { id: empresaId },
@@ -2352,16 +2463,28 @@ export class ResellerService {
   ) {
     const empresa = await this.prisma.empresa.findFirst({
       where: { id: empresaId, resellerId },
-      select: { id: true },
+      include: { plan: true },
     });
     if (!empresa)
       throw new NotFoundException(
         'Cliente no encontrado o no pertenece a este distribuidor',
       );
-    return this.prisma.empresa.update({
-      where: { id: empresaId },
-      data: { usaDemo: Boolean(usaDemo) },
-      select: { id: true, ruc: true, razonSocial: true, usaDemo: true },
+
+    // Al pasar de DEMO a PRODUCCIÓN se cobra la activación al saldo del reseller.
+    const pasaAProduccion =
+      empresa.usaDemo === true && Boolean(usaDemo) === false;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (pasaAProduccion) {
+        if (!empresa.plan)
+          throw new BadRequestException('El cliente no tiene un plan asignado.');
+        await this.cobrarActivacionCliente(tx, resellerId, empresa as any);
+      }
+      return tx.empresa.update({
+        where: { id: empresaId },
+        data: { usaDemo: Boolean(usaDemo) },
+        select: { id: true, ruc: true, razonSocial: true, usaDemo: true },
+      });
     });
   }
 
