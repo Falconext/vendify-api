@@ -209,6 +209,7 @@ model Empresa {
   hotelSyncAt         DateTime?
   usuarioPse          String?
   contrasenaPse       String?
+  qpseExternalId      String?
   usaDemo             Boolean              @default(false)
   metodoSalidaLotes   String               @default("LIFO")
   notas               NotaEmpresa[]

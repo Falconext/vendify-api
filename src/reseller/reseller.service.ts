@@ -186,6 +186,7 @@ export class ResellerService {
         billingProvider: true,
         usuarioPse: true,
         contrasenaPse: true,
+        qpseExternalId: true,
       },
     });
     if (!empresa) return { ok: false, message: 'Empresa no encontrada' };
@@ -198,34 +199,207 @@ export class ResellerService {
         message: 'La plataforma no tiene configurado el token maestro de QPSE',
       };
     }
+    const usaDemo = Boolean(empresa.usaDemo);
     if (empresa.usuarioPse && empresa.contrasenaPse && !opts?.forzar) {
+      // Ya tiene credenciales. Si falta el external_id (lo necesita el paso de
+      // "pasar a producción"), intentamos rellenarlo sin fallar si no se puede.
+      if (!empresa.qpseExternalId) {
+        const externalId = await this.obtenerExternalIdQpse(
+          empresa.ruc,
+          usaDemo,
+        );
+        if (externalId) {
+          await this.prisma.empresa.update({
+            where: { id: empresaId },
+            data: { qpseExternalId: externalId },
+          });
+        }
+      }
       return {
         ok: true,
         message: 'La empresa ya tiene credenciales QPSE configuradas',
         provisionado: false,
       };
     }
+    let username: string | undefined;
+    let password: string | undefined;
+    let externalId: string | undefined;
     try {
       const prov = await this.qpseClient.crearEmpresa({
         ruc: empresa.ruc,
-        usaDemo: Boolean(empresa.usaDemo),
+        usaDemo,
+      });
+      username = prov.username;
+      password = prov.password;
+      externalId = prov.external_id;
+    } catch (e) {
+      // Caso típico: "La empresa ya se encuentra registrada en su cuenta". QPSE
+      // no devuelve las credenciales al fallar el crear, así que las recuperamos
+      // desde el listado de la cuenta maestra (GET /api/empresas).
+      try {
+        const existente = await this.qpseClient.buscarEmpresaPorRuc(
+          empresa.ruc,
+          usaDemo,
+        );
+        if (existente?.username && existente?.password) {
+          username = existente.username;
+          password = existente.password;
+          externalId = existente.external_id;
+        }
+      } catch (lookupErr) {
+        console.error(
+          `[QPSE] No se pudo recuperar credenciales de ${empresa.ruc}: ${(lookupErr as Error)?.message}`,
+        );
+      }
+      if (!username || !password) {
+        const message = (e as Error)?.message || 'Error al aprovisionar en QPSE';
+        console.error(
+          `[QPSE] Auto-aprovisionamiento falló para ${empresa.ruc}: ${message}`,
+        );
+        return { ok: false, message };
+      }
+    }
+    // crear no devuelve external_id; lo obtenemos del listado si aún falta.
+    if (!externalId) {
+      externalId = await this.obtenerExternalIdQpse(empresa.ruc, usaDemo);
+    }
+    await this.prisma.empresa.update({
+      where: { id: empresaId },
+      data: {
+        usuarioPse: username,
+        contrasenaPse: password,
+        ...(externalId ? { qpseExternalId: externalId } : {}),
+      },
+    });
+    console.log(
+      `[QPSE] Empresa aprovisionada: ${empresa.ruc} → usuario ${username}`,
+    );
+    return {
+      ok: true,
+      message: 'Credenciales QPSE generadas correctamente',
+      provisionado: true,
+    };
+  }
+
+  /** Obtiene el external_id de QPSE para un RUC sin lanzar excepción. */
+  private async obtenerExternalIdQpse(
+    ruc: string,
+    usaDemo: boolean,
+  ): Promise<string | undefined> {
+    try {
+      const encontrada = await this.qpseClient.buscarEmpresaPorRuc(ruc, usaDemo);
+      return encontrada?.external_id;
+    } catch (err) {
+      console.error(
+        `[QPSE] No se pudo obtener external_id de ${ruc}: ${(err as Error)?.message}`,
+      );
+      return undefined;
+    }
+  }
+
+  /**
+   * Migra la empresa de un cliente de demo a PRODUCCIÓN en QPSE (irreversible).
+   * Requiere que ya tenga credenciales QPSE y que en QPSE tenga cargado el
+   * certificado digital + OSE. Al éxito, marca la empresa como no-demo.
+   */
+  async pasarClienteAProduccion(
+    resellerId: number,
+    empresaId: number,
+    planType: '01' | '02' = '01',
+  ): Promise<{ ok: boolean; message: string; environment?: string }> {
+    const empresa = await this.prisma.empresa.findFirst({
+      where: { id: empresaId, resellerId },
+      select: {
+        id: true,
+        ruc: true,
+        usaDemo: true,
+        billingProvider: true,
+        usuarioPse: true,
+        contrasenaPse: true,
+        qpseExternalId: true,
+      },
+    });
+    if (!empresa) {
+      throw new BadRequestException(
+        'El cliente no pertenece a este distribuidor.',
+      );
+    }
+    if (String(empresa.billingProvider).toUpperCase() !== 'QPSE') {
+      return { ok: false, message: 'El proveedor de la empresa no es QPSE' };
+    }
+    if (!this.qpseClient.getIntegrationToken()) {
+      return {
+        ok: false,
+        message: 'La plataforma no tiene configurado el token maestro de QPSE',
+      };
+    }
+    if (!empresa.usuarioPse || !empresa.contrasenaPse) {
+      return {
+        ok: false,
+        message:
+          'Primero genera las credenciales QPSE del cliente antes de pasarlo a producción.',
+      };
+    }
+    if (!empresa.usaDemo) {
+      return {
+        ok: true,
+        message: 'La empresa ya se encuentra en producción.',
+        environment: 'production',
+      };
+    }
+    if (planType !== '01' && planType !== '02') {
+      return {
+        ok: false,
+        message: 'El tipo de plan debe ser 01 (por comprobante) o 02 (ilimitado).',
+      };
+    }
+    // Necesitamos el external_id. Está guardado o lo buscamos en la cuenta QPSE
+    // (probando el entorno demo actual y, por si acaso, producción).
+    let externalId = empresa.qpseExternalId || undefined;
+    if (!externalId) {
+      externalId =
+        (await this.obtenerExternalIdQpse(empresa.ruc, true)) ||
+        (await this.obtenerExternalIdQpse(empresa.ruc, false));
+      if (externalId) {
+        await this.prisma.empresa.update({
+          where: { id: empresaId },
+          data: { qpseExternalId: externalId },
+        });
+      }
+    }
+    if (!externalId) {
+      return {
+        ok: false,
+        message:
+          'No se pudo obtener el identificador (external_id) de la empresa en QPSE.',
+      };
+    }
+    try {
+      // El endpoint de gestión se resuelve sobre el dominio donde la empresa
+      // vive actualmente (demo); es donde crear/listar están probados.
+      const result = await this.qpseClient.pasarAProduccion({
+        externalId,
+        planType,
+        usaDemo: true,
       });
       await this.prisma.empresa.update({
         where: { id: empresaId },
-        data: { usuarioPse: prov.username, contrasenaPse: prov.password },
+        data: { usaDemo: false, qpseExternalId: externalId },
       });
       console.log(
-        `[QPSE] Empresa aprovisionada: ${empresa.ruc} → usuario ${prov.username}`,
+        `[QPSE] Empresa pasada a producción: ${empresa.ruc} (external_id ${externalId})`,
       );
       return {
         ok: true,
-        message: 'Credenciales QPSE generadas correctamente',
-        provisionado: true,
+        message:
+          result?.message || 'Empresa actualizada a producción correctamente.',
+        environment: result?.data?.environment || 'production',
       };
     } catch (e) {
-      const message = (e as Error)?.message || 'Error al aprovisionar en QPSE';
+      const message =
+        (e as Error)?.message || 'Error al pasar la empresa a producción en QPSE';
       console.error(
-        `[QPSE] Auto-aprovisionamiento falló para ${empresa.ruc}: ${message}`,
+        `[QPSE] Pasar a producción falló para ${empresa.ruc}: ${message}`,
       );
       return { ok: false, message };
     }

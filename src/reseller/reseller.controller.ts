@@ -283,6 +283,26 @@ export class ResellerController {
   }
 
   @Roles('ADMIN_SISTEMA', 'RESELLER')
+  @Post(':id/clientes/:empresaId/pasar-produccion')
+  async pasarProduccion(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('empresaId', ParseIntPipe) empresaId: number,
+    @Body() body: { planType?: '01' | '02' },
+    @Request() req: any,
+  ) {
+    await this.resellerService.validateResellerAccess(
+      req.user.id,
+      req.user.rol,
+      id,
+    );
+    return this.resellerService.pasarClienteAProduccion(
+      id,
+      empresaId,
+      body?.planType === '02' ? '02' : '01',
+    );
+  }
+
+  @Roles('ADMIN_SISTEMA', 'RESELLER')
   @Get(':id/consultar-documento')
   async consultarDocumento(
     @Param('id', ParseIntPipe) id: number,
