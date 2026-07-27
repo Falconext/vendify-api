@@ -312,11 +312,14 @@ export class ResellerService {
       select: {
         id: true,
         ruc: true,
+        razonSocial: true,
         usaDemo: true,
         billingProvider: true,
         usuarioPse: true,
         contrasenaPse: true,
         qpseExternalId: true,
+        cicloFacturacion: true,
+        plan: { select: { nombre: true, costo: true } },
       },
     });
     if (!empresa) {
@@ -374,35 +377,96 @@ export class ResellerService {
           'No se pudo obtener el identificador (external_id) de la empresa en QPSE.',
       };
     }
+    if (!empresa.plan) {
+      return {
+        ok: false,
+        message: 'El cliente no tiene un plan válido para activar la producción.',
+      };
+    }
+    // Pre-chequeo de saldo: pasar a producción cobra la activación al reseller
+    // (mismo criterio que el toggle del modal de edición). No migramos en QPSE
+    // si el saldo no alcanza, porque la migración es irreversible.
+    const ciclo = empresa.cicloFacturacion || 'MENSUAL';
+    const reseller = await this.prisma.reseller.findUnique({
+      where: { id: resellerId },
+      select: { saldo: true, porcentajeDescuento: true },
+    });
+    const clientesActivos = await this.prisma.empresa.count({
+      where: { resellerId, estado: 'ACTIVO' },
+    });
+    const costoActivacion = this.resolveClientCost(
+      empresa.plan.nombre,
+      Number(empresa.plan.costo),
+      Number(reseller?.porcentajeDescuento) || 0,
+      clientesActivos + 1,
+      ciclo,
+    );
+    if (!reseller || Number(reseller.saldo) < costoActivacion) {
+      return {
+        ok: false,
+        message: `Saldo insuficiente para activar producción: cuesta S/${costoActivacion.toFixed(2)} y tienes S/${Number(reseller?.saldo || 0).toFixed(2)}. Recarga tu saldo e inténtalo de nuevo.`,
+      };
+    }
+
+    // 1) Migración en QPSE (irreversible). Se resuelve sobre el dominio donde
+    // la empresa vive actualmente (demo). Si QPSE responde que ya estaba en
+    // producción, continuamos (para cobrar y marcar local sin duplicar).
+    let migracionMsg = '';
+    let environment = 'production';
     try {
-      // El endpoint de gestión se resuelve sobre el dominio donde la empresa
-      // vive actualmente (demo); es donde crear/listar están probados.
       const result = await this.qpseClient.pasarAProduccion({
         externalId,
         planType,
         usaDemo: true,
       });
-      await this.prisma.empresa.update({
-        where: { id: empresaId },
-        data: { usaDemo: false, qpseExternalId: externalId },
+      migracionMsg = result?.message || '';
+      environment = result?.data?.environment || 'production';
+    } catch (e) {
+      const message = (e as Error)?.message || '';
+      if (!/ya se encuentra en produc/i.test(message)) {
+        console.error(
+          `[QPSE] Pasar a producción falló para ${empresa.ruc}: ${message}`,
+        );
+        return {
+          ok: false,
+          message:
+            message || 'Error al pasar la empresa a producción en QPSE',
+        };
+      }
+      migracionMsg = 'La empresa ya estaba en producción en QPSE.';
+    }
+
+    // 2) Cobro de activación + marca local (usaDemo=false). El guard de arriba
+    // (retorna si ya no es demo) evita cobrar dos veces.
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await this.cobrarActivacionCliente(
+          tx,
+          resellerId,
+          { razonSocial: empresa.razonSocial, plan: empresa.plan! },
+          ciclo,
+        );
+        await tx.empresa.update({
+          where: { id: empresaId },
+          data: { usaDemo: false, qpseExternalId: externalId },
+        });
       });
-      console.log(
-        `[QPSE] Empresa pasada a producción: ${empresa.ruc} (external_id ${externalId})`,
-      );
-      return {
-        ok: true,
-        message:
-          result?.message || 'Empresa actualizada a producción correctamente.',
-        environment: result?.data?.environment || 'production',
-      };
     } catch (e) {
       const message =
-        (e as Error)?.message || 'Error al pasar la empresa a producción en QPSE';
+        (e as Error)?.message || 'Error al cobrar/activar la producción';
       console.error(
-        `[QPSE] Pasar a producción falló para ${empresa.ruc}: ${message}`,
+        `[QPSE] Cobro/activación falló para ${empresa.ruc}: ${message}`,
       );
       return { ok: false, message };
     }
+    console.log(
+      `[QPSE] Empresa pasada a producción: ${empresa.ruc} (external_id ${externalId})`,
+    );
+    return {
+      ok: true,
+      message: migracionMsg || 'Empresa actualizada a producción correctamente.',
+      environment,
+    };
   }
 
   /** Valida que la empresa pertenezca al reseller y aprovisiona QPSE. */
