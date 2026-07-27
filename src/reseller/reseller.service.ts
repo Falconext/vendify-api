@@ -1524,6 +1524,7 @@ export class ResellerService {
             where: { estado: 'ACTIVO' },
             select: {
               id: true,
+              usaDemo: true,
               plan: { select: { costo: true } },
             },
           },
@@ -1575,8 +1576,10 @@ export class ResellerService {
 
     return resellers.map((reseller) => {
       const clientesActivos = reseller.empresas.length;
+      // Solo clientes en PRODUCCIÓN generan MRR; los DEMO no pagan (consistente
+      // con buildEarnings). Los conteos de clientes usan _count.empresas aparte.
       const mrrBruto = reseller.empresas.reduce(
-        (acc, empresa) => acc + Number(empresa.plan.costo),
+        (acc, empresa) => acc + (empresa.usaDemo ? 0 : Number(empresa.plan.costo)),
         0,
       );
       const descuento = Number(reseller.porcentajeDescuento) || 0;
