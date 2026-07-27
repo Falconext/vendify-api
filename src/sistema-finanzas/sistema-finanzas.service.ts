@@ -53,9 +53,10 @@ export class SistemaFinanzasService {
     if (sistemaProducto)
       empresaScopeWhere.producto = sistemaProducto.toLowerCase();
 
-    // Empresas activas con su plan
+    // Empresas activas EN PRODUCCIÓN con su plan. Los clientes DEMO no pagan y
+    // no deben contar en MRR/ARR ni en el ingreso recurrente.
     const empresasParaMRR = await this.prisma.empresa.findMany({
-      where: { estado: 'ACTIVO', ...empresaScopeWhere },
+      where: { estado: 'ACTIVO', usaDemo: false, ...empresaScopeWhere },
       select: {
         id: true,
         fechaExpiracion: true,
