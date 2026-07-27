@@ -2472,6 +2472,7 @@ export class ResellerService {
     empresaId: number,
     data: {
       planId?: number;
+      ruc?: string;
       telefono?: string;
       razonSocial?: string;
       adminEmail?: string;
@@ -2576,6 +2577,27 @@ export class ResellerService {
         (updateEmpresa as any).esWhiteLabel = Boolean(data.esWhiteLabel);
       if (data.telefono !== undefined)
         updateEmpresa.whatsappTienda = data.telefono;
+
+      // Cambio de RUC (p. ej. el RUC anterior ya estaba registrado en QPSE).
+      // Valida 11 dígitos + unicidad y limpia las credenciales QPSE (atadas al
+      // RUC anterior) para poder re-aprovisionar con el nuevo RUC.
+      if (data.ruc !== undefined) {
+        const nuevoRuc = String(data.ruc || '').replace(/\D/g, '');
+        if (nuevoRuc && nuevoRuc !== empresa.ruc) {
+          if (nuevoRuc.length !== 11)
+            throw new BadRequestException('El RUC debe tener 11 dígitos.');
+          const dup = await tx.empresa.findFirst({
+            where: { ruc: nuevoRuc, id: { not: empresaId } },
+            select: { id: true },
+          });
+          if (dup)
+            throw new BadRequestException('Ya existe otra empresa con ese RUC.');
+          updateEmpresa.ruc = nuevoRuc;
+          (updateEmpresa as any).usuarioPse = null;
+          (updateEmpresa as any).contrasenaPse = null;
+          (updateEmpresa as any).qpseExternalId = null;
+        }
+      }
 
       // Cobro al pasar de DEMO a PRODUCCIÓN desde el modal de edición.
       const pasaAProduccion =
