@@ -25,6 +25,17 @@ type PublicBranding = {
   dashboardUrl: string;
 };
 
+// Marca pública para vitrinas (brand strip). Subconjunto seguro de PublicBranding.
+type ShowcaseBrand = {
+  key: string;
+  name: string;
+  domain: string;
+  website: string;
+  logo: string;
+  primaryColor: string;
+  secondaryColor: string;
+};
+
 @Injectable()
 export class BrandingService {
   constructor(private readonly prisma: PrismaService) {}
@@ -92,6 +103,47 @@ export class BrandingService {
     }
 
     return this.mergeResellerBranding(reseller, defaults, `https://${host}`);
+  }
+
+  // Marcas blancas activas para vitrinas públicas (brand strip del landing).
+  // Solo campos seguros; excluye resellers sin white-label (usan la marca base).
+  async getShowcase(): Promise<ShowcaseBrand[]> {
+    const resellers = await this.prisma.reseller.findMany({
+      where: {
+        activo: true,
+        whiteLabelNombre: { not: null },
+      },
+      select: {
+        id: true,
+        codigo: true,
+        nombre: true,
+        dominioPersonalizado: true,
+        whiteLabelNombre: true,
+        whiteLabelLogoUrl: true,
+        whiteLabelWebsite: true,
+        whiteLabelColorPrimario: true,
+        whiteLabelColorSecundario: true,
+      },
+      orderBy: { creadoEn: 'asc' },
+    });
+
+    const defaults = this.getDefaults();
+    return resellers.map((r) => {
+      const website =
+        r.whiteLabelWebsite ||
+        (r.dominioPersonalizado ? `https://${r.dominioPersonalizado}` : '');
+      const domain =
+        r.dominioPersonalizado || this.normalizeHost(website) || '';
+      return {
+        key: r.codigo?.toLowerCase?.() || `reseller-${r.id}`,
+        name: r.whiteLabelNombre || r.nombre,
+        domain,
+        website,
+        logo: r.whiteLabelLogoUrl || '',
+        primaryColor: r.whiteLabelColorPrimario || defaults.primaryColor,
+        secondaryColor: r.whiteLabelColorSecundario || defaults.secondaryColor,
+      };
+    });
   }
 
   async getPublicBrandingByResellerId(
