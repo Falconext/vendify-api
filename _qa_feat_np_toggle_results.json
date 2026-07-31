@@ -1,0 +1,15 @@
+{
+  "np_sin_descuento": {
+    "emit_status": 201,
+    "s0": 130,
+    "s1": 130,
+    "PASS": true
+  },
+  "np_con_descuento": {
+    "emit_status": 201,
+    "s1": 130,
+    "s2": 128,
+    "esperado": 128,
+    "PASS": true
+  }
+}

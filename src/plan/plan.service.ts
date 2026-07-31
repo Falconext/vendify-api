@@ -123,12 +123,15 @@ export class PlanService {
     };
   }
 
-  private normalizeProducto(value?: string | null): 'facturacion' | 'hotel' {
-    return String(value ?? '')
+  private normalizeProducto(
+    value?: string | null,
+  ): 'facturacion' | 'hotel' | 'restaurante' {
+    const v = String(value ?? '')
       .trim()
-      .toLowerCase() === 'hotel'
-      ? 'hotel'
-      : 'facturacion';
+      .toLowerCase();
+    if (v === 'hotel') return 'hotel';
+    if (v === 'restaurante') return 'restaurante';
+    return 'facturacion';
   }
 
   // Sistema de marca única (Vendify): plataforma neutra 'default' por defecto.
@@ -140,7 +143,7 @@ export class PlanService {
   }
 
   private async validateProductAssignments(
-    producto: 'facturacion' | 'hotel',
+    producto: 'facturacion' | 'hotel' | 'restaurante',
     moduloIds?: number[],
     subModuloIds?: number[],
   ) {

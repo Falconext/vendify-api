@@ -1,0 +1,25 @@
+{
+  "factura_tarjeta_sin_ref": {
+    "status": 201,
+    "sunat_success": true,
+    "code": "0",
+    "msg": "La Factura numero F001-00000030, ha sido aceptada",
+    "serie": "F001",
+    "correlativo": 30,
+    "PASS": true
+  },
+  "boleta_split_tarjeta_sin_ref": {
+    "status": 201,
+    "sunat_success": true,
+    "code": "0",
+    "msg": "La Boleta numero B001-00000020, ha sido aceptada",
+    "serie": "B001",
+    "correlativo": 20,
+    "PASS": true
+  },
+  "transferencia_sin_cuenta": {
+    "status": 400,
+    "msg": "El pago por transferencia requiere cuenta bancaria destino",
+    "PASS": true
+  }
+}

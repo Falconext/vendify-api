@@ -1,0 +1,85 @@
+{
+  "NC01_anulacion": {
+    "status": 201,
+    "ok": true,
+    "code": "0",
+    "msg": "La Nota de Credito numero FC01-00000009, ha sido aceptada",
+    "id": 84,
+    "serie": "FC01",
+    "correlativo": 9
+  },
+  "ND01_mora": {
+    "status": 201,
+    "ok": true,
+    "code": "0",
+    "msg": "La Nota de Debito numero FD01-00000004, ha sido aceptada",
+    "id": 85,
+    "serie": "FD01",
+    "correlativo": 4
+  },
+  "NV_contado": {
+    "status": 201,
+    "msg": "OK",
+    "id": 86,
+    "serie": "NV01",
+    "correlativo": 11,
+    "estadoPago": "COMPLETADO",
+    "saldo": 0,
+    "tipoDoc": "NV",
+    "estadoSunat": "NO_APLICA"
+  },
+  "NV_adelanto": {
+    "status": 201,
+    "msg": "OK",
+    "id": 87,
+    "serie": "NV01",
+    "correlativo": 12,
+    "estadoPago": "PAGO_PARCIAL",
+    "saldo": 60,
+    "tipoDoc": "NV",
+    "estadoSunat": "NO_APLICA"
+  },
+  "NV_credito": {
+    "status": 201,
+    "msg": "OK",
+    "id": 88,
+    "serie": "NV01",
+    "correlativo": 13,
+    "estadoPago": "PENDIENTE_PAGO",
+    "saldo": 100,
+    "tipoDoc": "NV",
+    "estadoSunat": "NO_APLICA"
+  },
+  "OT_adelanto": {
+    "status": 201,
+    "msg": "OK",
+    "id": 89,
+    "serie": "OT01",
+    "correlativo": 5,
+    "estadoPago": "PAGO_PARCIAL",
+    "saldo": 120,
+    "tipoDoc": "OT",
+    "estadoSunat": "NO_APLICA"
+  },
+  "COT": {
+    "status": 201,
+    "msg": "OK",
+    "id": 90,
+    "serie": "COT1",
+    "correlativo": 4,
+    "estadoPago": "COMPLETADO",
+    "saldo": 0,
+    "tipoDoc": "COT",
+    "estadoSunat": "NO_APLICA"
+  },
+  "ANULAR_NV": {
+    "status": 200,
+    "msg": "OK",
+    "estadoSunat": "ANULADO",
+    "estadoPago": "ANULADO"
+  },
+  "ANULAR_FACTURA_EMITIDA": {
+    "status": 200,
+    "msg": "OK"
+  }
+}

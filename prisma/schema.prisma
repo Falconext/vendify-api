@@ -125,6 +125,9 @@ model Empresa {
   rubroId                 Int?
   providerId              String?
   tipoEmpresa             TipoEmpresa                   @default(FORMAL)
+  // Régimen tributario SUNAT: GENERAL | RER | MYPE | RUS. Por defecto GENERAL para no
+  // alterar empresas existentes. En RUS se bloquea la emisión de Factura (solo boletas).
+  regimenTributario       String                        @default("GENERAL")
   aceptaEfectivo          Boolean                       @default(true)
   colorPrimario           String?                       @default("#000000")
   colorSecundario         String?                       @default("#ffffff")
@@ -152,6 +155,10 @@ model Empresa {
   ticketLogoSize          Int?                          @default(96)
   usaCodigoBarrasManual   Boolean?
   usarPrecioLoteFefo      Boolean                       @default(false)
+  // Sobreventa: cuando es true, la venta/comprobante NO se bloquea por falta de stock
+  // (se registra la salida aunque el stock quede en 0/negativo). Default false = mantiene
+  // el bloqueo por stock insuficiente.
+  permitirVentaSinStock   Boolean                       @default(false)
   costoActivacionReseller Decimal?                      @default(0)
   precioClienteFinal      Decimal?                      @db.Decimal(10, 2) // Precio mensual que el reseller le cobra a este cliente (para calcular ganancia). Null = usar precio de lista del plan.
   esWhiteLabel            Boolean                       @default(false) // Cliente bajo la marca blanca del reseller vs. marca estándar.
@@ -207,6 +214,9 @@ model Empresa {
   hotelTenantId       String?
   hotelAdminUserId    String?
   hotelSyncAt         DateTime?
+  restauranteTenantId    String?
+  restauranteAdminUserId String?
+  restauranteSyncAt      DateTime?
   usuarioPse          String?
   contrasenaPse       String?
   qpseExternalId      String?
@@ -420,6 +430,7 @@ model Producto {
   comboItems               ComboItem[]
   gruposModificadores      ProductoGrupoModificador[]
   lotes                    ProductoLote[]
+  codigosBarras            ProductoCodigoBarras[]
   detallesGuiaRemision     DetalleGuiaRemision[]
   stocks                   ProductoStock[]
   recetasComoProductoFinal RecetaProduccion[]            @relation("RecetaProductoFinal")
@@ -635,6 +646,9 @@ model Cliente {
   productoReviews ProductoReview[]
   detallesComosPaciente DetalleComprobante[] @relation("PacienteDetalle")
   vehiculos             Vehiculo[]
+
+  // Lookup por documento en cada emisión de comprobante/compra (dedup de cliente/proveedor)
+  @@index([empresaId, nroDoc])
 }
 
 model Doctor {
@@ -697,6 +711,7 @@ model Comprobante {
   formaPagoTipo         String
   formaPagoMoneda       String
   tipoMoneda            String
+  tipoCambio            Float?               @default(1) // TC del día cuando tipoMoneda = USD
   observaciones         String?
   mtoOperGravadas       Float
   mtoIGV                Float
@@ -716,7 +731,10 @@ model Comprobante {
   motivoId              Int?
   mtoOperInafectas      Float                @default(0)
   mtoOperExoneradas     Float                @default(0)
+  mtoOperExportacion    Float                @default(0)
   mtoDescuentoGlobal    Float                @default(0)
+  mtoAnticipos          Float                @default(0)
+  anticipos             Json?
   sunatCdrResponse      String?
   sunatCdrZip           String?
   sunatErrorMsg         String?
@@ -774,6 +792,13 @@ model Comprobante {
   comisiones            ComisionVendedor[]
   campanas              CampanaMarketing[]
   productoSeries        ProductoSerie[]
+
+  // Panel de ventas / reportes: filtran por empresa + rango de fecha, opcional sede/usuario
+  @@index([empresaId, fechaEmision])
+  @@index([empresaId, sedeId, fechaEmision])
+  @@index([empresaId, usuarioId, fechaEmision])
+  // resumenPorCobrarGlobal: comprobantes con saldo pendiente por empresa (sin filtro de fecha)
+  @@index([empresaId, estadoPago])
 }
 
 model DetalleComprobante {
@@ -792,6 +817,10 @@ model DetalleComprobante {
   totalImpuestos    Float
   numerosSerie      Json?
   mtoPrecioUnitario Float
+  // Descuento por línea (monto bruto, incl. IGV) — solo para mostrar en el ticket el precio
+  // de lista y el ahorro; el precio ya viene con descuento en mtoPrecioUnitario/mtoValorVenta,
+  // por lo que NO afecta el XML enviado a SUNAT.
+  mtoDescuento      Float?          @default(0)
   // Farmacia: trazabilidad de lote dispensado
   loteId            Int?
   // Farmacia: datos de receta médica y medicamentos controlados
@@ -808,6 +837,10 @@ model DetalleComprobante {
   medico            Doctor?       @relation("MedicoDetalle", fields: [medicoId], references: [id])
   paciente          Cliente?      @relation("PacienteDetalle", fields: [pacienteId], references: [id])
   seriesVendidas    ProductoSerie[]
+
+  // FK usada en todo include/join de ventas, dashboard, finanzas y kardex
+  @@index([comprobanteId])
+  @@index([productoId])
 }
 
 enum EstadoProductoSerie {
@@ -967,6 +1000,9 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
   usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+
+  // deleteMany por usuario al renovar sesión
+  @@index([usuarioId])
 }
 
 model MovimientoCaja {
@@ -1337,6 +1373,24 @@ model ProductoLote {
   @@map("producto_lotes")
 }
 
+// Códigos de barra ADICIONALES por producto. Un mismo producto (p. ej. un perfume
+// sellado importado en distintos lotes) puede traer un EAN/UPC diferente por
+// importación, pero es el MISMO producto (mismo precio, mismo stock). Al escanear
+// cualquiera de estos códigos se resuelve al producto padre. El `codigoBarras`
+// principal vive en Producto; esta tabla guarda los alternos.
+model ProductoCodigoBarras {
+  id         Int      @id @default(autoincrement())
+  productoId Int
+  empresaId  Int
+  codigo     String
+  creadoEn   DateTime @default(now())
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  @@unique([empresaId, codigo])
+  @@index([productoId])
+  @@map("producto_codigos_barras")
+}
+
 model MovimientoKardexLote {
   id             Int              @id @default(autoincrement())
   productoLoteId Int
@@ -1360,6 +1414,9 @@ model Sede {
   codigo        String?
   tipo          TipoSede @default(PUNTO_DE_VENTA)
   esPrincipal   Boolean  @default(false)
+  // Permite emitir comprobantes aun cuando la sede es de tipo ALMACEN.
+  // Para PUNTO_DE_VENTA es irrelevante (siempre puede facturar).
+  permiteFacturacion Boolean @default(false)
   activo        Boolean  @default(true)
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
@@ -2281,6 +2338,8 @@ model Vehiculo {
   modelo        String?
   color         String?
   anio          Int?
+  kilometraje      Int?
+  nivelCombustible String? // LLENO | 3/4 | 1/2 | 1/4 | VACIO
   clienteId     Int?
   observaciones String?
   creadoEn      DateTime @default(now())
@@ -2290,6 +2349,7 @@ model Vehiculo {
   cliente   Cliente?           @relation(fields: [clienteId], references: [id])
   actas     ActaInspeccion[]
   contratos ContratoVehicular[]
+  contratoItems ContratoVehiculoItem[]
 
   @@unique([empresaId, placa])
   @@index([empresaId])
@@ -2332,9 +2392,29 @@ model ContratoVehicular {
   empresa   Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   vehiculo  Vehiculo  @relation(fields: [vehiculoId], references: [id], onDelete: Cascade)
   producto  Producto? @relation(fields: [productoId], references: [id])
+  unidades  ContratoVehiculoItem[]
 
   @@index([empresaId])
   @@index([empresaId, estado])
   @@index([vehiculoId])
   @@index([fechaFin])
+}
+
+// Vehículos incluidos en un contrato (permite contratos multi-vehículo con
+// monto individual por unidad). El `vehiculoId` de ContratoVehicular apunta al
+// vehículo principal (el primero) y se conserva por compatibilidad; el detalle
+// completo de unidades vive aquí.
+model ContratoVehiculoItem {
+  id         Int      @id @default(autoincrement())
+  contratoId Int
+  vehiculoId Int
+  montoAnual Decimal? @db.Decimal(12, 2)
+  creadoEn   DateTime @default(now())
+
+  contrato ContratoVehicular @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  vehiculo Vehiculo          @relation(fields: [vehiculoId], references: [id], onDelete: Cascade)
+
+  @@unique([contratoId, vehiculoId])
+  @@index([contratoId])
+  @@index([vehiculoId])
 }

@@ -5,10 +5,12 @@ import { NotificacionesService } from '../notificaciones/notificaciones.service'
 import { InventarioNotificacionesService } from '../notificaciones/inventario-notificaciones.service';
 import { ResellerService } from '../reseller/reseller.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { WhatsAppService } from '../whatsapp/whatsapp.service';
 
 @Injectable()
 export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name);
+  private sunatJobsDisabledLogged = false;
 
   constructor(
     private readonly verificarSunat: VerificarPendientesSunatService,
@@ -16,11 +18,30 @@ export class SchedulerService {
     private readonly inventarioNotificacionesService: InventarioNotificacionesService,
     private readonly resellerService: ResellerService,
     private readonly prisma: PrismaService,
+    private readonly whatsappService: WhatsAppService,
   ) {}
+
+  /**
+   * Los jobs de SUNAT (verificación y reintentos) se pueden apagar por entorno con
+   * SUNAT_JOBS_ENABLED=false. Imprescindible cuando un backend de desarrollo apunta
+   * a una base de datos compartida: sus reintentos saldrían por el entorno QPSE
+   * equivocado (demo vs producción) y pisarían los estados del backend desplegado.
+   */
+  private sunatJobsEnabled(): boolean {
+    const enabled = process.env.SUNAT_JOBS_ENABLED !== 'false';
+    if (!enabled && !this.sunatJobsDisabledLogged) {
+      this.sunatJobsDisabledLogged = true;
+      this.logger.warn(
+        '⏸️ Jobs de SUNAT deshabilitados (SUNAT_JOBS_ENABLED=false): no se verificarán ni reintentarán comprobantes/guías desde esta instancia.',
+      );
+    }
+    return enabled;
+  }
 
   // Job 1: Check status of PENDIENTE invoices with documentoId (every 5 min)
   @Cron(CronExpression.EVERY_5_MINUTES)
   async verificarComprobantesPendientes(): Promise<void> {
+    if (!this.sunatJobsEnabled()) return;
     try {
       await this.verificarSunat.execute();
     } catch (error: any) {
@@ -33,6 +54,7 @@ export class SchedulerService {
   // Job 2: Retry FALLIDO_ENVIO invoices and guías that are ready for retry (every 5 min)
   @Cron(CronExpression.EVERY_5_MINUTES)
   async reintentarEnviosFallidos(): Promise<void> {
+    if (!this.sunatJobsEnabled()) return;
     try {
       // Reintentar Comprobantes
       await this.verificarSunat.reintentarEnviosFallidos();
@@ -52,6 +74,7 @@ export class SchedulerService {
     timeZone: 'America/Lima',
   })
   async notificarPendientesEstancados(): Promise<void> {
+    if (!this.sunatJobsEnabled()) return;
     try {
       await this.verificarSunat.notificarPendientesEstancados();
     } catch (error: any) {
@@ -181,6 +204,9 @@ export class SchedulerService {
       await this.notificarContratos(porVencerAhoraVencidos, 'VENCIDO');
       await this.notificarContratos(nuevosPorVencer, 'POR_VENCER');
 
+      // 4) Recordatorios (correo + WhatsApp) a 15, 5, 1 y 0 días del vencimiento.
+      await this.enviarRecordatoriosVencimientoContratos();
+
       this.logger.log(
         `✅ Contratos: ${vencidos.count} marcados VENCIDO, ${porVencer.count} marcados POR_VENCER`,
       );
@@ -237,5 +263,237 @@ export class SchedulerService {
         );
       }
     }
+  }
+
+  // ── Recordatorios de vencimiento de contrato vehicular (correo + WhatsApp) ──
+  // Empresa (admins) por correo; cliente por correo y WhatsApp, a 15, 5, 1 o 0 días.
+  private async enviarRecordatoriosVencimientoContratos(): Promise<void> {
+    const emailOn = !!process.env.RESEND_API_KEY;
+    let waOn = false;
+    try {
+      waOn = this.whatsappService.isEnabled();
+    } catch {
+      /* WhatsApp no configurado */
+    }
+    if (!emailOn && !waOn) return; // ningún canal configurado
+
+    const hoy = new Date();
+    const desde = new Date(hoy);
+    desde.setDate(desde.getDate() - 1);
+    const hasta = new Date(hoy);
+    hasta.setDate(hasta.getDate() + 16);
+
+    const contratos = await this.prisma.contratoVehicular.findMany({
+      where: {
+        estado: { in: ['VIGENTE', 'POR_VENCER'] },
+        fechaFin: { gte: desde, lte: hasta },
+      },
+      include: {
+        vehiculo: {
+          select: {
+            placa: true,
+            marca: true,
+            modelo: true,
+            cliente: { select: { nombre: true, email: true, telefono: true } },
+          },
+        },
+        producto: { select: { descripcion: true } },
+        empresa: {
+          select: {
+            id: true,
+            nombreComercial: true,
+            razonSocial: true,
+          },
+        },
+      },
+    });
+    if (!contratos.length) return;
+
+    // Comparación por fecha de calendario (UTC) para no depender de la zona horaria.
+    const UMBRALES = [15, 5, 1, 0];
+    const utcStr = (base: Date, addDays: number) =>
+      new Date(
+        Date.UTC(
+          base.getUTCFullYear(),
+          base.getUTCMonth(),
+          base.getUTCDate() + addDays,
+        ),
+      )
+        .toISOString()
+        .slice(0, 10);
+    const targets = new Map<string, number>();
+    for (const n of UMBRALES) targets.set(utcStr(hoy, n), n);
+
+    // Cache de emails de administradores por empresa.
+    const adminsCache = new Map<number, { email: string; nombre: string }[]>();
+    const getAdmins = async (empresaId: number) => {
+      if (adminsCache.has(empresaId)) return adminsCache.get(empresaId)!;
+      const admins = await this.prisma.usuario.findMany({
+        where: { empresaId, rol: 'ADMIN_EMPRESA', estado: 'ACTIVO' },
+        select: { email: true, nombre: true },
+      });
+      adminsCache.set(empresaId, admins as any);
+      return admins as any;
+    };
+
+    const appUrl = (
+      process.env.FRONTEND_URL || 'https://app.vendify.pe'
+    ).replace(/\/$/, '');
+    let enviados = 0;
+
+    for (const c of contratos) {
+      const fechaFinStr = new Date(c.fechaFin).toISOString().slice(0, 10);
+      const dias = targets.get(fechaFinStr);
+      if (dias === undefined) continue; // no cae en ningún umbral hoy
+
+      const placa = c.vehiculo?.placa || '—';
+      const vehiculoDesc =
+        [c.vehiculo?.marca, c.vehiculo?.modelo].filter(Boolean).join(' ') ||
+        undefined;
+      const servicio = c.producto?.descripcion || undefined;
+      const appName = process.env.APP_BRAND_NAME || 'Vendify';
+      const negocioNombre =
+        c.empresa?.nombreComercial || c.empresa?.razonSocial || undefined;
+      const fechaVencimiento = new Intl.DateTimeFormat('es-PE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }).format(new Date(c.fechaFin));
+
+      // 1) Cliente dueño del vehículo — correo (si tiene) y WhatsApp (si tiene teléfono).
+      const clienteNombre = c.vehiculo?.cliente?.nombre || 'Estimado cliente';
+      const clienteEmail = c.vehiculo?.cliente?.email;
+      if (emailOn && clienteEmail) {
+        try {
+          await this.enviarCorreoVencimiento(clienteEmail, {
+            destinatarioNombre: clienteNombre,
+            esCliente: true,
+            placa,
+            vehiculoDesc,
+            servicio,
+            diasRestantes: dias,
+            fechaVencimiento,
+            negocioNombre,
+            appName,
+          });
+          enviados++;
+        } catch (e: any) {
+          this.logger.error(
+            `Correo cliente contrato ${c.id}: ${e?.message || e}`,
+          );
+        }
+      }
+
+      const clienteTelefono = c.vehiculo?.cliente?.telefono;
+      if (waOn && clienteTelefono) {
+        try {
+          const msg = this.mensajeWhatsappVencimiento({
+            nombre: clienteNombre,
+            placa,
+            servicio,
+            dias,
+            fechaVencimiento,
+            negocioNombre,
+          });
+          const r = await this.whatsappService.enviarTexto(
+            clienteTelefono,
+            msg,
+          );
+          if (r.success) enviados++;
+          else
+            this.logger.warn(`WhatsApp cliente contrato ${c.id}: ${r.error}`);
+        } catch (e: any) {
+          this.logger.error(
+            `WhatsApp cliente contrato ${c.id}: ${e?.message || e}`,
+          );
+        }
+      }
+
+      // 2) Administradores de la empresa.
+      const admins = await getAdmins(c.empresa?.id ?? c.empresaId);
+      for (const a of admins) {
+        if (!a.email) continue;
+        try {
+          await this.enviarCorreoVencimiento(a.email, {
+            destinatarioNombre: a.nombre || 'Administrador',
+            esCliente: false,
+            placa,
+            vehiculoDesc,
+            servicio,
+            diasRestantes: dias,
+            fechaVencimiento,
+            negocioNombre,
+            appName,
+            ctaUrl: `${appUrl}/administrador/vehiculos/contratos`,
+          });
+          enviados++;
+        } catch (e: any) {
+          this.logger.error(
+            `Correo empresa contrato ${c.id}: ${e?.message || e}`,
+          );
+        }
+      }
+    }
+
+    if (enviados)
+      this.logger.log(
+        `🔔 Recordatorios de vencimiento enviados (correo + WhatsApp): ${enviados}`,
+      );
+  }
+
+  // Mensaje de WhatsApp (texto) para el cliente sobre el vencimiento de su contrato.
+  private mensajeWhatsappVencimiento(p: {
+    nombre: string;
+    placa: string;
+    servicio?: string;
+    dias: number;
+    fechaVencimiento: string;
+    negocioNombre?: string;
+  }): string {
+    const cuando =
+      p.dias === 0
+        ? 'vence HOY'
+        : p.dias === 1
+          ? 'vence MAÑANA'
+          : `vence en ${p.dias} días`;
+    const servicioTxt = p.servicio ? ` (${p.servicio})` : '';
+    const firma = p.negocioNombre ? `\n\n— ${p.negocioNombre}` : '';
+    return (
+      `Hola ${p.nombre} 👋\n\n` +
+      `Te recordamos que el servicio de tu vehículo *${p.placa}*${servicioTxt} ${cuando}.\n` +
+      `📅 Vencimiento: ${p.fechaVencimiento}.\n\n` +
+      `Renuévalo a tiempo para no perder el servicio.` +
+      firma
+    );
+  }
+
+  // Renderiza y envía el correo de vencimiento con Resend (mismo patrón del proyecto).
+  private async enviarCorreoVencimiento(to: string, props: any): Promise<void> {
+    const resendKey = process.env.RESEND_API_KEY;
+    if (!resendKey) return;
+    const { Resend } = await import('resend');
+    const { render } = await import('@react-email/render');
+    const { VencimientoContratoEmail } = await import(
+      '../empresa/emails/VencimientoContratoEmail.js'
+    );
+    const resend = new Resend(resendKey);
+    const fromEmail =
+      process.env.RESEND_FROM_EMAIL ||
+      process.env.MAIL_FROM ||
+      'noreply@vendify.pe';
+    const html = await render((VencimientoContratoEmail as any)(props));
+    const asunto =
+      props.diasRestantes === 0
+        ? `Vence hoy: contrato del vehículo ${props.placa}`
+        : props.diasRestantes === 1
+          ? `Vence mañana: contrato del vehículo ${props.placa}`
+          : `Vence en ${props.diasRestantes} días: contrato del vehículo ${props.placa}`;
+    const { error } = await resend.emails.send({
+      from: `${props.appName} <${fromEmail}>`,
+      to,
+      subject: asunto,
+      html,
+    });
+    if (error) throw new Error(error.message);
   }
 }

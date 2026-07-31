@@ -16,12 +16,11 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ExtensionesController {
   constructor(private readonly prisma: PrismaService) {}
 
-  private normalizeProducto(value?: string | null): 'facturacion' | 'hotel' {
-    return String(value ?? '')
-      .trim()
-      .toLowerCase() === 'hotel'
-      ? 'hotel'
-      : 'facturacion';
+  private normalizeProducto(value?: string | null): 'facturacion' | 'hotel' | 'restaurante' {
+    const v = String(value ?? '').trim().toLowerCase();
+    if (v === 'hotel') return 'hotel';
+    if (v === 'restaurante') return 'restaurante';
+    return 'facturacion';
   }
 
   private normalizePlataforma(value?: string | null): string {

@@ -1,0 +1,75 @@
+{
+  "B1_contado_dni": {
+    "status": 201,
+    "msg": "Comprobante registrado correctamente. SUNAT no está disponible en este momento; la confirmación llegará automáticamente cuando el servicio se restablezca.",
+    "id": 106
+  },
+  "B2_clientes_varios": {
+    "status": 201,
+    "ok": true,
+    "code": "0",
+    "msg": "La Boleta numero B001-00000025, ha sido aceptada",
+    "id": 107,
+    "notes": null
+  },
+  "B3_mix_afectaciones": {
+    "status": 201,
+    "ok": true,
+    "code": "0",
+    "msg": "La Boleta numero B001-00000026, ha sido aceptada",
+    "id": 109,
+    "notes": null
+  },
+  "B4_gratuita": {
+    "status": 201,
+    "ok": true,
+    "code": "0",
+    "msg": "La Boleta numero B001-00000027, ha sido aceptada",
+    "id": 112,
+    "notes": null
+  },
+  "FX1_exonerada": {
+    "status": 201,
+    "ok": true,
+    "code": "0",
+    "msg": "La Factura numero F001-00000035, ha sido aceptada",
+    "id": 113,
+    "notes": null
+  },
+  "FX2_inafecta": {
+    "status": 201,
+    "ok": true,
+    "code": "0",
+    "msg": "La Factura numero F001-00000036, ha sido aceptada",
+    "id": 114,
+    "notes": null
+  },
+  "FX3_exportacion": {
+    "status": 502,
+    "msg": "Error al emitir el comprobante: QPSE rechazó el documento: El dato ingresado en el tipo de documento de identidad del receptor no esta permitido. - Detalle: xxx.xxx.xxx value='tick"
+  },
+  "FX4_descuento_global": {
+    "status": 201,
+    "ok": true,
+    "code": "0",
+    "msg": "La Factura numero F001-00000038, ha sido aceptada",
+    "id": 116,
+    "notes": null
+  },
+  "FX5_mixto_ok": {
+    "status": 201,
+    "ok": true,
+    "code": "0",
+    "msg": "La Factura numero F001-00000039, ha sido aceptada",
+    "id": 117,
+    "notes": null
+  },
+  "FX6_sobrepago": {
+    "status": 201,
+    "ok": true,
+    "code": "0",
+    "msg": "La Factura numero F001-00000040, ha sido aceptada",
+    "id": 118,
+    "notes": null
+  }
+}

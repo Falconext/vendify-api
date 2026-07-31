@@ -106,6 +106,15 @@ export class ResellerController {
     );
   }
 
+  @Roles('ADMIN_SISTEMA')
+  @Patch(':id/saldo')
+  ajustarSaldo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { nuevoSaldo: number; motivo: string },
+  ) {
+    return this.resellerService.ajustarSaldo(id, Number(body.nuevoSaldo), body.motivo);
+  }
+
   @Roles('ADMIN_SISTEMA', 'RESELLER')
   @Get(':id/dashboard')
   async getDashboard(

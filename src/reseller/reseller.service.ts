@@ -19,7 +19,21 @@ import { S3Service } from 'src/s3/s3.service';
 import * as bcrypt from 'bcrypt';
 import { resolveBillingProvider } from 'src/common/utils/billing-provider';
 import { QpseClient } from 'src/common/utils/qpse.client';
+import { EmpresaService } from 'src/empresa/empresa.service';
 import axios from 'axios';
+
+// Sistema/producto que corre la empresa. 'facturacion' vive en este mismo POS;
+// 'restaurante' y 'hotel' se aprovisionan (sync M2M) en sus backends dedicados.
+function normalizeProducto(
+  value?: string | null,
+): 'facturacion' | 'hotel' | 'restaurante' {
+  const v = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  if (v === 'hotel') return 'hotel';
+  if (v === 'restaurante') return 'restaurante';
+  return 'facturacion';
+}
 
 // Vendify volume-based reseller pricing (cost the platform charges the reseller per active client/month).
 // Tiers: [1-5 clients, 6-15 clients, 16-30 clients, 31+ clients]
@@ -80,6 +94,7 @@ export class ResellerService {
     private readonly sedeService: SedeService,
     private readonly s3: S3Service,
     private readonly qpseClient: QpseClient,
+    private readonly empresaService: EmpresaService,
   ) {}
 
   async uploadLogo(
@@ -1107,6 +1122,7 @@ export class ResellerService {
       precioClienteFinal?: number | string | null;
       esWhiteLabel?: boolean;
       cicloFacturacion?: string;
+      producto?: string; // 'facturacion' | 'restaurante' | 'hotel'
       email: string;
       password?: string;
       representa?: string;
@@ -1137,6 +1153,13 @@ export class ResellerService {
     const inputUbigeo = this.normalizeUbigeo(data.ubigeo);
     if (!inputRuc) throw new BadRequestException('El RUC es obligatorio.');
     if (!inputEmail) throw new BadRequestException('El email es obligatorio.');
+
+    // Sistema/producto que correrá la empresa. Si es restaurante/hotel, tras
+    // crear la empresa (fuente de verdad aquí) se aprovisiona su tenant en el
+    // backend dedicado vía sync M2M. Se captura el cobro para poder reembolsarlo
+    // si ese sync falla (rollback total, igual que el flujo admin).
+    const productoEmpresa = normalizeProducto(data.producto);
+    let cobroAplicado = 0;
 
     const empresa = await this.prisma
       .$transaction(async (tx) => {
@@ -1218,6 +1241,7 @@ export class ResellerService {
             where: { id: resellerId },
             data: { saldo: { decrement: costoFinal } },
           });
+          cobroAplicado = costoFinal;
 
           const usaPrecioPorVolumen =
             getVolumeTierPrice(plan.nombre, clientesConNuevo) !== null;
@@ -1287,6 +1311,7 @@ export class ResellerService {
         const empresa = await tx.empresa.create({
           data: {
             ruc: inputRuc, // RUC logic
+            producto: productoEmpresa,
             razonSocial: data.razonSocial,
             nombreComercial: data.nombreComercial || data.razonSocial,
             direccion: data.direccion || '-',
@@ -1473,6 +1498,58 @@ export class ResellerService {
         create: { usuarioId: adminEmpresa.id, sedeId: sedePrincipal.id },
         update: {},
       });
+    }
+
+    // Aprovisionamiento del producto en su backend dedicado (restaurante/hotel).
+    // Fuera de la transacción (llamada HTTP M2M). Si falla, se hace rollback
+    // total: se elimina la empresa recién creada y se reembolsa el saldo cobrado.
+    if (productoEmpresa === 'restaurante' || productoEmpresa === 'hotel') {
+      try {
+        if (productoEmpresa === 'restaurante') {
+          await this.empresaService.sincronizarRestauranteDesdeMype(
+            empresa.id,
+            null,
+            null,
+            data.password,
+          );
+        } else {
+          await this.empresaService.sincronizarHotelDesdeMype(
+            empresa.id,
+            null,
+            null,
+            data.password,
+          );
+        }
+      } catch (error: any) {
+        // Rollback: eliminar empresa y reembolsar el cobro (si hubo).
+        try {
+          await this.empresaService.eliminar(empresa.id);
+        } catch {
+          /* la empresa pudo quedar parcialmente; se limpia manualmente si aplica */
+        }
+        if (cobroAplicado > 0) {
+          try {
+            await this.prisma.reseller.update({
+              where: { id: resellerId },
+              data: { saldo: { increment: cobroAplicado } },
+            });
+            await this.prisma.resellerMovimiento.create({
+              data: {
+                resellerId,
+                tipo: 'DEVOLUCION',
+                monto: cobroAplicado,
+                descripcion: `Reverso por fallo de sincronización con el sistema ${productoEmpresa}: ${data.razonSocial}`,
+              },
+            });
+          } catch {
+            /* el reembolso se puede reconciliar manualmente si esto falla */
+          }
+        }
+        throw new BadRequestException(
+          error?.message ||
+            `No se pudo crear la empresa en el sistema ${productoEmpresa}.`,
+        );
+      }
     }
 
     return empresa;

@@ -275,6 +275,22 @@ export class PdfGeneratorService {
   }
 
   /**
+   * Genera un PDF A4 a partir de un documento HTML autocontenido.
+   * Útil para documentos que ya traen su propio HTML/estilos (p. ej. contratos).
+   */
+  async generarPdfDesdeHtml(html: string): Promise<Buffer> {
+    return this.renderPdfBuffer(
+      html,
+      {
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '0', right: '0', bottom: '0', left: '0' },
+      },
+      '✅ PDF generado desde HTML',
+    );
+  }
+
+  /**
    * Genera PDF de comprobante personalizado del sistema
    */
   async generarPDFComprobante(data: {
@@ -294,6 +310,8 @@ export class PdfGeneratorService {
     correlativo: string;
     fecha: string;
     hora: string;
+    tipoMoneda?: string; // 'PEN' | 'USD' — define el símbolo mostrado
+    tipoCambio?: number | string;
 
     // Cliente
     clienteNombre: string;
@@ -348,6 +366,14 @@ export class PdfGeneratorService {
         throw new Error('Template no cargado');
       }
 
+      // Moneda para la plantilla (S/ / SOLES por defecto; US$ / DÓLARES en dólares).
+      {
+        const esUSD =
+          String((data as any).tipoMoneda || 'PEN').toUpperCase() === 'USD';
+        (data as any).simboloMoneda = esUSD ? 'US$' : 'S/';
+        (data as any).monedaNombre = esUSD ? 'DÓLARES' : 'SOLES';
+      }
+
       // Generar HTML desde template
       const html = this.template(data);
 
@@ -381,6 +407,12 @@ export class PdfGeneratorService {
     try {
       if (!this.template) {
         throw new Error('Template no cargado');
+      }
+
+      {
+        const esUSD = String(data?.tipoMoneda || 'PEN').toUpperCase() === 'USD';
+        data.simboloMoneda = esUSD ? 'US$' : 'S/';
+        data.monedaNombre = esUSD ? 'DÓLARES' : 'SOLES';
       }
 
       const html = this.template(data);

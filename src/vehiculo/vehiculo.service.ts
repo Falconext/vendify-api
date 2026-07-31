@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
+import { UpdateVehiculoDto } from './dto/update-vehiculo.dto';
 import { CreateActaDto } from './dto/create-acta.dto';
 
 @Injectable()
@@ -41,13 +42,32 @@ export class VehiculoService {
         orderBy: { creadoEn: 'desc' },
         include: {
           cliente: {
-            select: { id: true, nombre: true, nroDoc: true, telefono: true },
+            select: {
+              id: true,
+              nombre: true,
+              nroDoc: true,
+              telefono: true,
+              email: true,
+            },
           },
           contratos: {
             where: { estado: { in: ['VIGENTE', 'POR_VENCER'] } },
             orderBy: { fechaFin: 'asc' },
             take: 1,
             include: { producto: { select: { id: true, descripcion: true } } },
+          },
+          // Contratos donde el vehículo participa como unidad (multi-vehículo).
+          contratoItems: {
+            where: { contrato: { estado: { in: ['VIGENTE', 'POR_VENCER'] } } },
+            orderBy: { contrato: { fechaFin: 'asc' } },
+            take: 1,
+            include: {
+              contrato: {
+                include: {
+                  producto: { select: { id: true, descripcion: true } },
+                },
+              },
+            },
           },
           actas: {
             orderBy: { creadoEn: 'desc' },
@@ -96,6 +116,19 @@ export class VehiculoService {
             },
           },
         },
+        // Contratos donde el vehículo participa como unidad (multi-vehículo).
+        contratoItems: {
+          orderBy: { contrato: { fechaFin: 'desc' } },
+          include: {
+            contrato: {
+              include: {
+                producto: {
+                  select: { id: true, descripcion: true, precioUnitario: true },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -103,7 +136,7 @@ export class VehiculoService {
     return vehiculo;
   }
 
-  async create(empresaId: number, dto: CreateVehiculoDto) {
+  async create(empresaId: number, dto: CreateVehiculoDto, sedeId?: number) {
     const placa = dto.placa.toUpperCase().trim();
 
     const exists = await this.prisma.vehiculo.findUnique({
@@ -122,17 +155,27 @@ export class VehiculoService {
         modelo: dto.modelo,
         color: dto.color,
         anio: dto.anio,
+        kilometraje: dto.kilometraje,
+        nivelCombustible: dto.nivelCombustible,
         clienteId: dto.clienteId,
-        sedeId: dto.sedeId,
+        sedeId: dto.sedeId ?? sedeId,
         observaciones: dto.observaciones,
       },
       include: {
-        cliente: { select: { id: true, nombre: true, nroDoc: true } },
+        cliente: {
+          select: {
+            id: true,
+            nombre: true,
+            nroDoc: true,
+            telefono: true,
+            email: true,
+          },
+        },
       },
     });
   }
 
-  async update(id: number, empresaId: number, dto: Partial<CreateVehiculoDto>) {
+  async update(id: number, empresaId: number, dto: UpdateVehiculoDto) {
     const vehiculo = await this.prisma.vehiculo.findFirst({
       where: { id, empresaId },
     });
@@ -159,12 +202,22 @@ export class VehiculoService {
         modelo: dto.modelo,
         color: dto.color,
         anio: dto.anio,
+        kilometraje: dto.kilometraje,
+        nivelCombustible: dto.nivelCombustible,
         clienteId: dto.clienteId,
         sedeId: dto.sedeId,
         observaciones: dto.observaciones,
       },
       include: {
-        cliente: { select: { id: true, nombre: true, nroDoc: true } },
+        cliente: {
+          select: {
+            id: true,
+            nombre: true,
+            nroDoc: true,
+            telefono: true,
+            email: true,
+          },
+        },
       },
     });
   }

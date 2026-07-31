@@ -162,6 +162,25 @@ export class EmpresaController {
     return result;
   }
 
+  @Post(':id/sync-restaurante')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN_SISTEMA')
+  async sincronizarRestaurante(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { adminPassword?: string },
+    @User() user: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.empresaService.sincronizarRestauranteDesdeMype(
+      id,
+      user.sistemaNegocio,
+      user.sistemaProducto,
+      body?.adminPassword,
+    );
+    res.locals.message = 'Empresa sincronizada con el sistema Restaurante';
+    return result;
+  }
+
   @Get(':id/series')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN_SISTEMA')
