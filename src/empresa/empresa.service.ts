@@ -1756,6 +1756,23 @@ export class EmpresaService {
         'No se pudo determinar la empresa del usuario',
       );
     const empresa = await this.obtenerPorId(empresaId);
+
+    // Cliente de un reseller: el precio visible en su Perfil es el que SU
+    // reseller le cobra (precioClienteFinal; si no lo definió, el precio de
+    // lista del plan) — nunca el precio base que el sistema cobra al reseller.
+    const facturacionReseller = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { resellerId: true, precioClienteFinal: true },
+    });
+    if (facturacionReseller?.resellerId && (empresa as any)?.plan) {
+      (empresa as any).plan = {
+        ...(empresa as any).plan,
+        costo:
+          facturacionReseller.precioClienteFinal != null
+            ? Number(facturacionReseller.precioClienteFinal)
+            : Number((empresa as any).plan.costo),
+      };
+    }
     return empresa;
   }
 
