@@ -13,12 +13,11 @@ import { UpdateSubModuloDto } from './dto/update-submodulo.dto';
 export class ModulosService {
   constructor(private prisma: PrismaService) {}
 
-  private normalizeProducto(value?: string | null): 'facturacion' | 'hotel' {
-    return String(value ?? '')
-      .trim()
-      .toLowerCase() === 'hotel'
-      ? 'hotel'
-      : 'facturacion';
+  private normalizeProducto(value?: string | null): 'facturacion' | 'hotel' | 'restaurante' {
+    const v = String(value ?? '').trim().toLowerCase();
+    if (v === 'hotel') return 'hotel';
+    if (v === 'restaurante') return 'restaurante';
+    return 'facturacion';
   }
 
   private buildProductoWhere(producto?: string) {

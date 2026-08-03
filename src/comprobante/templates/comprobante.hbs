@@ -243,15 +243,15 @@
         <span class="lbl">HORA:</span>
         <span class="val">{{hora}}</span>
         <span class="lbl">MONEDA:</span>
-        <span class="val">SOLES</span>
+        <span class="val">{{monedaNombre}}</span>
         <span class="lbl">FORMA PAGO:</span>
         <span class="val">{{formaPago}}</span>
         <span class="lbl">MEDIO PAGO:</span>
-        <span class="val">{{medioPago}} S/ {{mtoImpVenta}}</span>
+        <span class="val">{{medioPago}} {{simboloMoneda}} {{mtoImpVenta}}</span>
         <span class="lbl">VUELTO:</span>
-        <span class="val">S/ {{vuelto}}</span>
+        <span class="val">{{simboloMoneda}} {{vuelto}}</span>
         <span class="lbl">PAGADO:</span>
-        <span class="val">S/ {{pagado}}</span>
+        <span class="val">{{simboloMoneda}} {{pagado}}</span>
         <span class="lbl">VENDEDOR:</span>
         <span class="val">{{vendedor}}</span>
       </div>
@@ -265,7 +265,7 @@
       {{#each cuotas}}
       <div class="cuota-item">
         <span>Cuota {{inc @index}} ({{this.fechaVencimiento}}):</span>
-        <span>S/ {{this.monto}}</span>
+        <span>{{../simboloMoneda}} {{this.monto}}</span>
       </div>
       {{/each}}
     </div>
@@ -287,7 +287,7 @@
       </div>
       <div class="det-row">
         <span class="det-lbl">Monto Detracción:</span>
-        <span class="det-val">S/ {{montoDetraccion}}</span>
+        <span class="det-val">{{simboloMoneda}} {{montoDetraccion}}</span>
       </div>
       {{#if medioPagoDetraccion}}
       <div class="det-row">
@@ -323,7 +323,7 @@
         {{/each}}
         {{/if}}
       </div>
-      <div class="c-moneda">S/</div>
+      <div class="c-moneda">{{../simboloMoneda}}</div>
       <div class="c-pu">{{this.precioUnitario}}</div>
       <div class="c-tot">{{this.total}}</div>
     </div>
@@ -347,25 +347,25 @@
       </div>
       <div class="footer-totals">
         {{#if isDocumentoFiscal}}
-        <div class="tot-row bold"><span>OP. GRAVADAS:</span><span>S/ {{mtoOperGravadas}}</span></div>
-        <div class="tot-row bold"><span>OP. EXONERADAS:</span><span>S/ {{mtoOperExoneradas}}</span></div>
-        <div class="tot-row bold"><span>OP. INAFECTAS:</span><span>S/ {{mtoOperInafectas}}</span></div>
-        <div class="tot-row bold"><span>OP. GRATUITAS:</span><span>S/ 0.00</span></div>
-        <div class="tot-row bold"><span>ICBPER:</span><span>S/ 0.00</span></div>
-        <div class="tot-row bold"><span>SUB TOTAL:</span><span>S/ {{mtoOperGravadas}}</span></div>
-        <div class="tot-row"><span>DESCUENTOS TOTAL:</span><span>S/ {{descuento}}</span></div>
-        <div class="tot-row bold"><span>IGV 18%:</span><span>S/ {{mtoIGV}}</span></div>
+        <div class="tot-row bold"><span>OP. GRAVADAS:</span><span>{{simboloMoneda}} {{mtoOperGravadas}}</span></div>
+        <div class="tot-row bold"><span>OP. EXONERADAS:</span><span>{{simboloMoneda}} {{mtoOperExoneradas}}</span></div>
+        <div class="tot-row bold"><span>OP. INAFECTAS:</span><span>{{simboloMoneda}} {{mtoOperInafectas}}</span></div>
+        <div class="tot-row bold"><span>OP. GRATUITAS:</span><span>{{simboloMoneda}} 0.00</span></div>
+        <div class="tot-row bold"><span>ICBPER:</span><span>{{simboloMoneda}} 0.00</span></div>
+        <div class="tot-row bold"><span>SUB TOTAL:</span><span>{{simboloMoneda}} {{mtoOperGravadas}}</span></div>
+        <div class="tot-row"><span>DESCUENTOS TOTAL:</span><span>{{simboloMoneda}} {{descuento}}</span></div>
+        <div class="tot-row bold"><span>IGV 18%:</span><span>{{simboloMoneda}} {{mtoIGV}}</span></div>
         {{/if}}
         {{#unless isDocumentoFiscal}}{{#if descuento}}
-        <div class="tot-row"><span>DESCUENTO:</span><span>- S/ {{descuento}}</span></div>
+        <div class="tot-row"><span>DESCUENTO:</span><span>- {{simboloMoneda}} {{descuento}}</span></div>
         {{/if}}{{/unless}}
         <div class="tot-final">
           <span>MONTO TOTAL:</span>
-          <span>S/ {{mtoImpVenta}}</span>
+          <span>{{simboloMoneda}} {{mtoImpVenta}}</span>
         </div>
         {{#if shouldShowRetention}}
-        <div class="tot-row tot-retention"><span>RETENCIÓN (3%):</span><span>S/ {{retencionMonto}}</span></div>
-        <div class="tot-neto"><span>IMPORTE NETO:</span><span>S/ {{importeNeto}}</span></div>
+        <div class="tot-row tot-retention"><span>RETENCIÓN (3%):</span><span>{{simboloMoneda}} {{retencionMonto}}</span></div>
+        <div class="tot-neto"><span>IMPORTE NETO:</span><span>{{simboloMoneda}} {{importeNeto}}</span></div>
         {{/if}}
       </div>
     </div>

@@ -1,0 +1,46 @@
+{
+  "case2": {
+    "status": 400,
+    "msg": "La suma de cuotas (S/ 1180.00) debe ser igual al saldo a crédito (S/ 1000.00)"
+  },
+  "case3": {
+    "status": 400,
+    "msg": "La suma de cuotas (S/ 1180.00) debe ser igual al saldo a crédito (S/ 1000.00)"
+  },
+  "case4": {
+    "status": 201,
+    "sunat_success": true,
+    "code": "0",
+    "msg": "La Factura numero F001-00000031, ha sido aceptada",
+    "comprobanteId": 105,
+    "errors": null,
+    "notes": null
+  },
+  "case5": {
+    "status": 201,
+    "sunat_success": true,
+    "code": "0",
+    "msg": "La Factura numero F001-00000032, ha sido aceptada",
+    "comprobanteId": 108,
+    "errors": null,
+    "notes": [
+      "4265 - El XML no contiene el codigo de leyenda 2006 para tipo de operación de detracciones - INFO : 4265 (nodo: \"/\" valor: \"\")"
+    ]
+  },
+  "case5b": {
+    "status": 400,
+    "msg": "Las operaciones con detracción no admiten ítems libres: cada línea debe ser un producto con Código de Producto SUNAT (UNSPSC)."
+  },
+  "case5c": {
+    "status": 400,
+    "msg": "Para emitir con detracción, estos productos necesitan Código de Producto SUNAT (UNSPSC): SERVICIO SIN COD SUNAT QA."
+  },
+  "case6": {
+    "status": 502,
+    "msg": "Error al emitir el comprobante: QPSE rechazó el documento: El Importe de la retencion no tiene el valor correcto - Detalle: xxx.xxx.xxx value='ticket: 1784930873509 error: Error Cargo/Descuento 62: 3263 (nodo: \"cac:AllowanceCharge/cbc:Amount\" valor: \"35.4\")'"
+  },
+  "case7": {
+    "status": 502,
+    "msg": "Error al emitir el comprobante: QPSE: errors.unauthenticated"
+  }
+}

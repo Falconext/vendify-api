@@ -133,12 +133,25 @@ function resolverEstadoPagoComprobante(
 export class VentasService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // El "por cobrar global" no depende de la fecha del panel, así que lo cacheamos
+  // por (empresa, sede, usuario) con TTL corto para no recalcular en cada cambio de día.
+  private readonly porCobrarCache = new Map<
+    string,
+    { expira: number; valor: { cantidad: number; total: number } }
+  >();
+  private static readonly POR_COBRAR_TTL_MS = 60_000;
+
   private async resumenPorCobrarGlobal(params: {
     empresaId: number;
     sedeId?: number;
     usuarioId?: number;
   }) {
     const { empresaId, sedeId, usuarioId } = params;
+
+    const cacheKey = `${empresaId}:${sedeId ?? 'all'}:${usuarioId ?? 'all'}`;
+    const cached = this.porCobrarCache.get(cacheKey);
+    if (cached && cached.expira > Date.now()) return cached.valor;
+
     const sedeFilter = sedeId ? { sedeId } : {};
     const comprobanteUsuarioFilter = usuarioId ? { usuarioId } : {};
     const pedidoUsuarioFilter = usuarioId ? { vendedorId: usuarioId } : {};
@@ -194,24 +207,32 @@ export class VentasService {
       .filter((saldo) => saldo > 0.01);
 
     const pendientes = [...comprobantesPendientes, ...saldosPedidos];
-    return {
+    const valor = {
       cantidad: pendientes.length,
       total: Number(
         pendientes.reduce((sum, saldo) => sum + saldo, 0).toFixed(2),
       ),
     };
+
+    this.porCobrarCache.set(cacheKey, {
+      expira: Date.now() + VentasService.POR_COBRAR_TTL_MS,
+      valor,
+    });
+    return valor;
   }
 
   async panelVentas(params: {
     empresaId: number;
     fecha: string;
+    // Fin del rango (inclusive). Si se omite, el panel es de un solo día.
+    fechaFin?: string;
     sedeId?: number;
     usuarioId?: number;
   }) {
     const { empresaId, fecha, sedeId, usuarioId } = params;
 
     const inicioLima = new Date(`${fecha}T00:00:00-05:00`);
-    const finLima = new Date(`${fecha}T23:59:59-05:00`);
+    const finLima = new Date(`${params.fechaFin || fecha}T23:59:59-05:00`);
 
     const sedeFilter = sedeId ? { sedeId } : {};
     const comprobanteUsuarioFilter = usuarioId ? { usuarioId } : {};
@@ -246,7 +267,7 @@ export class VentasService {
           porcentajeDetraccion: true,
           cuotas: true,
           observaciones: true,
-          cliente: { select: { nombre: true, nroDoc: true } },
+          cliente: { select: { nombre: true, nroDoc: true, telefono: true, email: true } },
           usuario: { select: { nombre: true } },
           sede: { select: { nombre: true } },
           productoSeries: { select: { numeroSerie: true } },
@@ -353,6 +374,8 @@ export class VentasService {
         referencia: `${c.serie}-${String(c.correlativo).padStart(8, '0')}`,
         fecha: c.fechaEmision.toISOString(),
         clienteDoc: c.cliente?.nroDoc ?? '',
+        clienteTelefono: c.cliente?.telefono ?? '',
+        clienteEmail: c.cliente?.email ?? '',
         cliente: c.cliente?.nombre ?? '—',
         seriesGarantia: (c.productoSeries ?? []).map((s) => s.numeroSerie),
         total: Number(c.mtoImpVenta ?? 0),
@@ -419,6 +442,8 @@ export class VentasService {
         referencia: p.codigoSeguimiento,
         fecha: p.creadoEn.toISOString(),
         clienteDoc: '',
+        clienteTelefono: p.clienteTelefono ?? '',
+        clienteEmail: '',
         seriesGarantia: [],
         cliente: p.clienteNombre ?? '—',
         total,

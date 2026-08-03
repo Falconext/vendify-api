@@ -1,0 +1,41 @@
+{
+  "paso1_np_sin_stock": {
+    "npId": 100,
+    "emit_status": 201,
+    "s0": 115,
+    "s1": 115,
+    "PASS": true
+  },
+  "paso2_conversion_sin_stock": {
+    "origenId": 100,
+    "status": 201,
+    "sunat_success": true,
+    "doc": "B001-22",
+    "s1": 115,
+    "s2": 111,
+    "esperado": 111,
+    "PASS": true
+  },
+  "paso3_anular_np_sin_stock": {
+    "npId": 102,
+    "emit_status": 201,
+    "anular": {
+      "status": 200,
+      "msg": "OK"
+    },
+    "s3": 111,
+    "s4": 111,
+    "PASS": true
+  },
+  "paso4_np_con_stock_convert": {
+    "npId": 103,
+    "s4": 111,
+    "s5": 108,
+    "descuento_al_crear_NP": 3,
+    "conv_status": 201,
+    "conv_ok": true,
+    "s6": 108,
+    "esperado_igual_s5": 108,
+    "PASS": true
+  }
+}

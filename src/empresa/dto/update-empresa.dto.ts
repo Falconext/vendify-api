@@ -32,6 +32,11 @@ export class UpdateEmpresaDto {
   @IsString()
   tipoEmpresa?: 'FORMAL' | 'INFORMAL';
 
+  // Régimen tributario SUNAT. En RUS solo se permiten boletas (no factura).
+  @IsOptional()
+  @IsIn(['GENERAL', 'RER', 'MYPE', 'RUS'])
+  regimenTributario?: 'GENERAL' | 'RER' | 'MYPE' | 'RUS';
+
   @IsOptional()
   @IsString()
   departamento?: string;
@@ -112,6 +117,11 @@ export class UpdateEmpresaDto {
   @IsBoolean()
   usarPrecioLoteFefo?: boolean;
 
+  // Sobreventa: permitir vender aunque no haya stock suficiente.
+  @IsOptional()
+  @IsBoolean()
+  permitirVentaSinStock?: boolean;
+
   @IsOptional()
   @IsString()
   directorTecnico?: string;
@@ -188,7 +198,7 @@ export class UpdateEmpresaDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['facturacion', 'hotel'])
+  @IsIn(['facturacion', 'hotel', 'restaurante'])
   producto?: string;
 
   @IsOptional()

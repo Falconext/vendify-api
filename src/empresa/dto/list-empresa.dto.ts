@@ -36,6 +36,22 @@ export class ListEmpresaDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['facturacion', 'hotel'])
+  @IsIn(['facturacion', 'hotel', 'restaurante'])
   producto?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['ACTIVO', 'INACTIVO', 'TODOS'])
+  estado?: 'ACTIVO' | 'INACTIVO' | 'TODOS';
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['FORMAL', 'INFORMAL', ''])
+  tipoEmpresa?: 'FORMAL' | 'INFORMAL' | '';
+
+  // Solo para exportación del listado
+  @IsOptional()
+  @IsString()
+  @IsIn(['pdf', 'excel'])
+  formato?: 'pdf' | 'excel';
 }

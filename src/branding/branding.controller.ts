@@ -6,6 +6,16 @@ import { BrandingService } from './branding.service';
 export class BrandingController {
   constructor(private readonly brandingService: BrandingService) {}
 
+  // Lista pública de resellers con marca blanca activa. Devuelve solo campos
+  // seguros de marca (nombre, dominio, logo, colores) para poblar vitrinas de
+  // prueba social como el "brand strip" del landing de partners. Sin auth.
+  @Get('showcase')
+  async getShowcase(@Res({ passthrough: true }) res: Response) {
+    const brands = await this.brandingService.getShowcase();
+    res.locals.message = 'Marcas cargadas';
+    return brands;
+  }
+
   @Get('public')
   async getPublicBranding(
     @Query('host') host: string | undefined,

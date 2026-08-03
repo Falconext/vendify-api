@@ -4,7 +4,7 @@ const prisma = new PrismaClient();
 
 const disenosPorRubro = [
     {
-        rubroNombre: 'Restauración y alimentos', // ID 5
+        rubroNombre: 'Restaurantes y comida', // alineado con seeds/rubros.ts
         colorPrimario: '#FF6B6B',
         colorSecundario: '#FFE66D',
         colorAccento: '#4ECDC4',
@@ -16,7 +16,7 @@ const disenosPorRubro = [
         vistaProductos: 'cards',
     },
     {
-        rubroNombre: 'Venta de materiales de construcción', // ID 1
+        rubroNombre: 'Construcción y obras', // alineado con seeds/rubros.ts
         colorPrimario: '#2C3E50',
         colorSecundario: '#E74C3C',
         colorAccento: '#3498DB',
@@ -28,7 +28,7 @@ const disenosPorRubro = [
         vistaProductos: 'tabla',
     },
     {
-        rubroNombre: 'Comercio minorista', // ID 2
+        rubroNombre: 'Retail y comercio', // alineado con seeds/rubros.ts
         colorPrimario: '#27AE60',
         colorSecundario: '#F39C12',
         colorAccento: '#E67E22',
@@ -40,7 +40,7 @@ const disenosPorRubro = [
         vistaProductos: 'lista',
     },
     {
-        rubroNombre: 'Artesanía y decoración', // ID 11
+        rubroNombre: 'Arte y diseño', // alineado con seeds/rubros.ts
         colorPrimario: '#E91E63',
         colorSecundario: '#FFF9C4',
         colorAccento: '#9C27B0',

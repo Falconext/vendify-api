@@ -19,7 +19,21 @@ import { S3Service } from 'src/s3/s3.service';
 import * as bcrypt from 'bcrypt';
 import { resolveBillingProvider } from 'src/common/utils/billing-provider';
 import { QpseClient } from 'src/common/utils/qpse.client';
+import { EmpresaService } from 'src/empresa/empresa.service';
 import axios from 'axios';
+
+// Sistema/producto que corre la empresa. 'facturacion' vive en este mismo POS;
+// 'restaurante' y 'hotel' se aprovisionan (sync M2M) en sus backends dedicados.
+function normalizeProducto(
+  value?: string | null,
+): 'facturacion' | 'hotel' | 'restaurante' {
+  const v = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  if (v === 'hotel') return 'hotel';
+  if (v === 'restaurante') return 'restaurante';
+  return 'facturacion';
+}
 
 // Vendify volume-based reseller pricing (cost the platform charges the reseller per active client/month).
 // Tiers: [1-5 clients, 6-15 clients, 16-30 clients, 31+ clients]
@@ -80,6 +94,7 @@ export class ResellerService {
     private readonly sedeService: SedeService,
     private readonly s3: S3Service,
     private readonly qpseClient: QpseClient,
+    private readonly empresaService: EmpresaService,
   ) {}
 
   async uploadLogo(
@@ -186,6 +201,7 @@ export class ResellerService {
         billingProvider: true,
         usuarioPse: true,
         contrasenaPse: true,
+        qpseExternalId: true,
       },
     });
     if (!empresa) return { ok: false, message: 'Empresa no encontrada' };
@@ -198,37 +214,274 @@ export class ResellerService {
         message: 'La plataforma no tiene configurado el token maestro de QPSE',
       };
     }
+    const usaDemo = Boolean(empresa.usaDemo);
     if (empresa.usuarioPse && empresa.contrasenaPse && !opts?.forzar) {
+      // Ya tiene credenciales. Si falta el external_id (lo necesita el paso de
+      // "pasar a producción"), intentamos rellenarlo sin fallar si no se puede.
+      if (!empresa.qpseExternalId) {
+        const externalId = await this.obtenerExternalIdQpse(
+          empresa.ruc,
+          usaDemo,
+        );
+        if (externalId) {
+          await this.prisma.empresa.update({
+            where: { id: empresaId },
+            data: { qpseExternalId: externalId },
+          });
+        }
+      }
       return {
         ok: true,
         message: 'La empresa ya tiene credenciales QPSE configuradas',
         provisionado: false,
       };
     }
+    let username: string | undefined;
+    let password: string | undefined;
+    let externalId: string | undefined;
     try {
       const prov = await this.qpseClient.crearEmpresa({
         ruc: empresa.ruc,
-        usaDemo: Boolean(empresa.usaDemo),
+        usaDemo,
       });
-      await this.prisma.empresa.update({
-        where: { id: empresaId },
-        data: { usuarioPse: prov.username, contrasenaPse: prov.password },
-      });
-      console.log(
-        `[QPSE] Empresa aprovisionada: ${empresa.ruc} → usuario ${prov.username}`,
+      username = prov.username;
+      password = prov.password;
+      externalId = prov.external_id;
+    } catch (e) {
+      // Caso típico: "La empresa ya se encuentra registrada en su cuenta". QPSE
+      // no devuelve las credenciales al fallar el crear, así que las recuperamos
+      // desde el listado de la cuenta maestra (GET /api/empresas).
+      try {
+        const existente = await this.qpseClient.buscarEmpresaPorRuc(
+          empresa.ruc,
+          usaDemo,
+        );
+        if (existente?.username && existente?.password) {
+          username = existente.username;
+          password = existente.password;
+          externalId = existente.external_id;
+        }
+      } catch (lookupErr) {
+        console.error(
+          `[QPSE] No se pudo recuperar credenciales de ${empresa.ruc}: ${(lookupErr as Error)?.message}`,
+        );
+      }
+      if (!username || !password) {
+        const message = (e as Error)?.message || 'Error al aprovisionar en QPSE';
+        console.error(
+          `[QPSE] Auto-aprovisionamiento falló para ${empresa.ruc}: ${message}`,
+        );
+        return { ok: false, message };
+      }
+    }
+    // crear no devuelve external_id; lo obtenemos del listado si aún falta.
+    if (!externalId) {
+      externalId = await this.obtenerExternalIdQpse(empresa.ruc, usaDemo);
+    }
+    await this.prisma.empresa.update({
+      where: { id: empresaId },
+      data: {
+        usuarioPse: username,
+        contrasenaPse: password,
+        ...(externalId ? { qpseExternalId: externalId } : {}),
+      },
+    });
+    console.log(
+      `[QPSE] Empresa aprovisionada: ${empresa.ruc} → usuario ${username}`,
+    );
+    return {
+      ok: true,
+      message: 'Credenciales QPSE generadas correctamente',
+      provisionado: true,
+    };
+  }
+
+  /** Obtiene el external_id de QPSE para un RUC sin lanzar excepción. */
+  private async obtenerExternalIdQpse(
+    ruc: string,
+    usaDemo: boolean,
+  ): Promise<string | undefined> {
+    try {
+      const encontrada = await this.qpseClient.buscarEmpresaPorRuc(ruc, usaDemo);
+      return encontrada?.external_id;
+    } catch (err) {
+      console.error(
+        `[QPSE] No se pudo obtener external_id de ${ruc}: ${(err as Error)?.message}`,
       );
+      return undefined;
+    }
+  }
+
+  /**
+   * Migra la empresa de un cliente de demo a PRODUCCIÓN en QPSE (irreversible).
+   * Requiere que ya tenga credenciales QPSE y que en QPSE tenga cargado el
+   * certificado digital + OSE. Al éxito, marca la empresa como no-demo.
+   */
+  async pasarClienteAProduccion(
+    resellerId: number,
+    empresaId: number,
+    planType: '01' | '02' = '01',
+  ): Promise<{ ok: boolean; message: string; environment?: string }> {
+    const empresa = await this.prisma.empresa.findFirst({
+      where: { id: empresaId, resellerId },
+      select: {
+        id: true,
+        ruc: true,
+        razonSocial: true,
+        usaDemo: true,
+        billingProvider: true,
+        usuarioPse: true,
+        contrasenaPse: true,
+        qpseExternalId: true,
+        cicloFacturacion: true,
+        plan: { select: { nombre: true, costo: true } },
+      },
+    });
+    if (!empresa) {
+      throw new BadRequestException(
+        'El cliente no pertenece a este distribuidor.',
+      );
+    }
+    if (String(empresa.billingProvider).toUpperCase() !== 'QPSE') {
+      return { ok: false, message: 'El proveedor de la empresa no es QPSE' };
+    }
+    if (!this.qpseClient.getIntegrationToken()) {
+      return {
+        ok: false,
+        message: 'La plataforma no tiene configurado el token maestro de QPSE',
+      };
+    }
+    if (!empresa.usuarioPse || !empresa.contrasenaPse) {
+      return {
+        ok: false,
+        message:
+          'Primero genera las credenciales QPSE del cliente antes de pasarlo a producción.',
+      };
+    }
+    if (!empresa.usaDemo) {
       return {
         ok: true,
-        message: 'Credenciales QPSE generadas correctamente',
-        provisionado: true,
+        message: 'La empresa ya se encuentra en producción.',
+        environment: 'production',
       };
+    }
+    if (planType !== '01' && planType !== '02') {
+      return {
+        ok: false,
+        message: 'El tipo de plan debe ser 01 (por comprobante) o 02 (ilimitado).',
+      };
+    }
+    // Necesitamos el external_id. Está guardado o lo buscamos en la cuenta QPSE
+    // (probando el entorno demo actual y, por si acaso, producción).
+    let externalId = empresa.qpseExternalId || undefined;
+    if (!externalId) {
+      externalId =
+        (await this.obtenerExternalIdQpse(empresa.ruc, true)) ||
+        (await this.obtenerExternalIdQpse(empresa.ruc, false));
+      if (externalId) {
+        await this.prisma.empresa.update({
+          where: { id: empresaId },
+          data: { qpseExternalId: externalId },
+        });
+      }
+    }
+    if (!externalId) {
+      return {
+        ok: false,
+        message:
+          'No se pudo obtener el identificador (external_id) de la empresa en QPSE.',
+      };
+    }
+    if (!empresa.plan) {
+      return {
+        ok: false,
+        message: 'El cliente no tiene un plan válido para activar la producción.',
+      };
+    }
+    // Pre-chequeo de saldo: pasar a producción cobra la ACTIVACIÓN del cliente
+    // al saldo del reseller (esto es el reseller pagándole a Vendify por activar
+    // al cliente; distinto del costo por comprobante, que cubre Vendify en QPSE).
+    // No migramos en QPSE si el saldo no alcanza, porque es irreversible.
+    const ciclo = empresa.cicloFacturacion || 'MENSUAL';
+    const reseller = await this.prisma.reseller.findUnique({
+      where: { id: resellerId },
+      select: { saldo: true, porcentajeDescuento: true },
+    });
+    const clientesActivos = await this.prisma.empresa.count({
+      where: { resellerId, estado: 'ACTIVO' },
+    });
+    const costoActivacion = this.resolveClientCost(
+      empresa.plan.nombre,
+      Number(empresa.plan.costo),
+      Number(reseller?.porcentajeDescuento) || 0,
+      clientesActivos + 1,
+      ciclo,
+    );
+    if (!reseller || Number(reseller.saldo) < costoActivacion) {
+      return {
+        ok: false,
+        message: `Saldo insuficiente para activar producción: cuesta S/${costoActivacion.toFixed(2)} y tienes S/${Number(reseller?.saldo || 0).toFixed(2)}. Recarga tu saldo e inténtalo de nuevo.`,
+      };
+    }
+
+    // 1) Migración en QPSE (la afiliación/plan de QPSE es a nivel de la cuenta
+    // maestra de Vendify; no hay certificado por empresa). Idempotente: si QPSE
+    // responde que ya estaba en producción, continuamos para cobrar y marcar.
+    let migracionMsg = '';
+    let environment = 'production';
+    try {
+      const result = await this.qpseClient.pasarAProduccion({
+        externalId,
+        planType,
+        usaDemo: true,
+      });
+      migracionMsg = result?.message || '';
+      environment = result?.data?.environment || 'production';
     } catch (e) {
-      const message = (e as Error)?.message || 'Error al aprovisionar en QPSE';
+      const message = (e as Error)?.message || '';
+      if (!/ya se encuentra en produc/i.test(message)) {
+        console.error(
+          `[QPSE] Pasar a producción falló para ${empresa.ruc}: ${message}`,
+        );
+        return {
+          ok: false,
+          message: message || 'Error al pasar la empresa a producción en QPSE',
+        };
+      }
+      migracionMsg = 'La empresa ya estaba en producción en QPSE.';
+    }
+
+    // 2) Cobro de activación al reseller + marca local (usaDemo=false). El guard
+    // de arriba (retorna si ya no es demo) evita cobrar dos veces.
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await this.cobrarActivacionCliente(
+          tx,
+          resellerId,
+          { razonSocial: empresa.razonSocial, plan: empresa.plan! },
+          ciclo,
+        );
+        await tx.empresa.update({
+          where: { id: empresaId },
+          data: { usaDemo: false, qpseExternalId: externalId },
+        });
+      });
+    } catch (e) {
+      const message =
+        (e as Error)?.message || 'Error al cobrar/activar la producción';
       console.error(
-        `[QPSE] Auto-aprovisionamiento falló para ${empresa.ruc}: ${message}`,
+        `[QPSE] Cobro/activación falló para ${empresa.ruc}: ${message}`,
       );
       return { ok: false, message };
     }
+    console.log(
+      `[QPSE] Empresa pasada a producción: ${empresa.ruc} (external_id ${externalId})`,
+    );
+    return {
+      ok: true,
+      message: migracionMsg || 'Empresa actualizada a producción correctamente.',
+      environment,
+    };
   }
 
   /** Valida que la empresa pertenezca al reseller y aprovisiona QPSE. */
@@ -869,6 +1122,7 @@ export class ResellerService {
       precioClienteFinal?: number | string | null;
       esWhiteLabel?: boolean;
       cicloFacturacion?: string;
+      producto?: string; // 'facturacion' | 'restaurante' | 'hotel'
       email: string;
       password?: string;
       representa?: string;
@@ -899,6 +1153,13 @@ export class ResellerService {
     const inputUbigeo = this.normalizeUbigeo(data.ubigeo);
     if (!inputRuc) throw new BadRequestException('El RUC es obligatorio.');
     if (!inputEmail) throw new BadRequestException('El email es obligatorio.');
+
+    // Sistema/producto que correrá la empresa. Si es restaurante/hotel, tras
+    // crear la empresa (fuente de verdad aquí) se aprovisiona su tenant en el
+    // backend dedicado vía sync M2M. Se captura el cobro para poder reembolsarlo
+    // si ese sync falla (rollback total, igual que el flujo admin).
+    const productoEmpresa = normalizeProducto(data.producto);
+    let cobroAplicado = 0;
 
     const empresa = await this.prisma
       .$transaction(async (tx) => {
@@ -980,6 +1241,7 @@ export class ResellerService {
             where: { id: resellerId },
             data: { saldo: { decrement: costoFinal } },
           });
+          cobroAplicado = costoFinal;
 
           const usaPrecioPorVolumen =
             getVolumeTierPrice(plan.nombre, clientesConNuevo) !== null;
@@ -1049,6 +1311,7 @@ export class ResellerService {
         const empresa = await tx.empresa.create({
           data: {
             ruc: inputRuc, // RUC logic
+            producto: productoEmpresa,
             razonSocial: data.razonSocial,
             nombreComercial: data.nombreComercial || data.razonSocial,
             direccion: data.direccion || '-',
@@ -1237,6 +1500,58 @@ export class ResellerService {
       });
     }
 
+    // Aprovisionamiento del producto en su backend dedicado (restaurante/hotel).
+    // Fuera de la transacción (llamada HTTP M2M). Si falla, se hace rollback
+    // total: se elimina la empresa recién creada y se reembolsa el saldo cobrado.
+    if (productoEmpresa === 'restaurante' || productoEmpresa === 'hotel') {
+      try {
+        if (productoEmpresa === 'restaurante') {
+          await this.empresaService.sincronizarRestauranteDesdeMype(
+            empresa.id,
+            null,
+            null,
+            data.password,
+          );
+        } else {
+          await this.empresaService.sincronizarHotelDesdeMype(
+            empresa.id,
+            null,
+            null,
+            data.password,
+          );
+        }
+      } catch (error: any) {
+        // Rollback: eliminar empresa y reembolsar el cobro (si hubo).
+        try {
+          await this.empresaService.eliminar(empresa.id);
+        } catch {
+          /* la empresa pudo quedar parcialmente; se limpia manualmente si aplica */
+        }
+        if (cobroAplicado > 0) {
+          try {
+            await this.prisma.reseller.update({
+              where: { id: resellerId },
+              data: { saldo: { increment: cobroAplicado } },
+            });
+            await this.prisma.resellerMovimiento.create({
+              data: {
+                resellerId,
+                tipo: 'DEVOLUCION',
+                monto: cobroAplicado,
+                descripcion: `Reverso por fallo de sincronización con el sistema ${productoEmpresa}: ${data.razonSocial}`,
+              },
+            });
+          } catch {
+            /* el reembolso se puede reconciliar manualmente si esto falla */
+          }
+        }
+        throw new BadRequestException(
+          error?.message ||
+            `No se pudo crear la empresa en el sistema ${productoEmpresa}.`,
+        );
+      }
+    }
+
     return empresa;
   }
 
@@ -1286,6 +1601,7 @@ export class ResellerService {
             where: { estado: 'ACTIVO' },
             select: {
               id: true,
+              usaDemo: true,
               plan: { select: { costo: true } },
             },
           },
@@ -1337,8 +1653,10 @@ export class ResellerService {
 
     return resellers.map((reseller) => {
       const clientesActivos = reseller.empresas.length;
+      // Solo clientes en PRODUCCIÓN generan MRR; los DEMO no pagan (consistente
+      // con buildEarnings). Los conteos de clientes usan _count.empresas aparte.
       const mrrBruto = reseller.empresas.reduce(
-        (acc, empresa) => acc + Number(empresa.plan.costo),
+        (acc, empresa) => acc + (empresa.usaDemo ? 0 : Number(empresa.plan.costo)),
         0,
       );
       const descuento = Number(reseller.porcentajeDescuento) || 0;
@@ -2298,6 +2616,7 @@ export class ResellerService {
     empresaId: number,
     data: {
       planId?: number;
+      ruc?: string;
       telefono?: string;
       razonSocial?: string;
       adminEmail?: string;
@@ -2402,6 +2721,27 @@ export class ResellerService {
         (updateEmpresa as any).esWhiteLabel = Boolean(data.esWhiteLabel);
       if (data.telefono !== undefined)
         updateEmpresa.whatsappTienda = data.telefono;
+
+      // Cambio de RUC (p. ej. el RUC anterior ya estaba registrado en QPSE).
+      // Valida 11 dígitos + unicidad y limpia las credenciales QPSE (atadas al
+      // RUC anterior) para poder re-aprovisionar con el nuevo RUC.
+      if (data.ruc !== undefined) {
+        const nuevoRuc = String(data.ruc || '').replace(/\D/g, '');
+        if (nuevoRuc && nuevoRuc !== empresa.ruc) {
+          if (nuevoRuc.length !== 11)
+            throw new BadRequestException('El RUC debe tener 11 dígitos.');
+          const dup = await tx.empresa.findFirst({
+            where: { ruc: nuevoRuc, id: { not: empresaId } },
+            select: { id: true },
+          });
+          if (dup)
+            throw new BadRequestException('Ya existe otra empresa con ese RUC.');
+          updateEmpresa.ruc = nuevoRuc;
+          (updateEmpresa as any).usuarioPse = null;
+          (updateEmpresa as any).contrasenaPse = null;
+          (updateEmpresa as any).qpseExternalId = null;
+        }
+      }
 
       // Cobro al pasar de DEMO a PRODUCCIÓN desde el modal de edición.
       const pasaAProduccion =

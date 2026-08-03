@@ -61,6 +61,31 @@ export interface QpseCrearEmpresaResponse {
   message?: string;
   username?: string;
   password?: string;
+  external_id?: string;
+}
+
+export interface QpseEmpresaListItem {
+  external_id: string;
+  ruc: string;
+  name?: string;
+  environment?: 'demo' | 'production' | string;
+  soap_type_id?: string;
+  username?: string;
+  password?: string;
+  is_active?: boolean;
+  created_at?: string;
+}
+
+export interface QpsePasarProduccionResponse {
+  success?: boolean;
+  message?: string;
+  data?: {
+    external_id?: string;
+    ruc?: string;
+    environment?: string;
+    soap_type_id?: string;
+    plan_type?: string;
+  };
 }
 
 @Injectable()
@@ -114,6 +139,11 @@ export class QpseClient {
 
   private getClient(usaDemo?: boolean): AxiosInstance {
     return usaDemo ? this.demoClient : this.client;
+  }
+
+  /** URL base efectiva para una empresa según su flag usaDemo (para validar coherencia de entorno). */
+  getResolvedBaseUrl(usaDemo?: boolean): string {
+    return usaDemo ? this.demoBaseUrl : this.baseUrl;
   }
 
   private getAuthBaseUrlForDemo(usaDemo?: boolean): string {
@@ -310,6 +340,94 @@ export class QpseClient {
       return data;
     } catch (error) {
       throw this.wrapError('crear empresa QPSE', error);
+    }
+  }
+
+  /**
+   * Lista todas las empresas de la cuenta maestra (autenticación por api_token).
+   * Devuelve external_id, environment (demo/production), y las credenciales SOAP
+   * (username/password) de cada empresa. Útil para recuperar credenciales de una
+   * empresa ya registrada y para obtener el external_id necesario para pasarla a
+   * producción.
+   *
+   * Doc: GET {url}/api/empresas  ·  Bearer {api_token}
+   */
+  async listarEmpresas(usaDemo?: boolean): Promise<QpseEmpresaListItem[]> {
+    if (!this.integrationToken) {
+      throw new HttpException(
+        'QPSE: falta QPSE_ACCESS_TOKEN (token maestro) para listar empresas',
+        500,
+      );
+    }
+    const base = this.getAuthBaseUrlForDemo(usaDemo);
+    const url = `${base}/api/empresas`;
+    try {
+      const { data } = await axios.get<{ data?: QpseEmpresaListItem[] }>(url, {
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${this.integrationToken}`,
+        },
+        timeout: 30000,
+      });
+      return Array.isArray(data?.data) ? data.data : [];
+    } catch (error) {
+      throw this.wrapError('listar empresas QPSE', error);
+    }
+  }
+
+  /** Busca en la cuenta maestra la empresa cuyo RUC coincide. */
+  async buscarEmpresaPorRuc(
+    ruc: string,
+    usaDemo?: boolean,
+  ): Promise<QpseEmpresaListItem | undefined> {
+    const objetivo = String(ruc).trim();
+    const empresas = await this.listarEmpresas(usaDemo);
+    return empresas.find((e) => String(e.ruc).trim() === objetivo);
+  }
+
+  /**
+   * Migra una empresa de demo a producción (acción IRREVERSIBLE). Requiere que la
+   * empresa ya tenga certificado digital + OSE configurados en QPSE. Autenticación
+   * por api_token.
+   *
+   * Doc: POST {url}/api/empresa/produccion  ·  Bearer {api_token}
+   *      body { external_id, plan_type }  →  { success, message, data:{ environment } }
+   */
+  async pasarAProduccion(input: {
+    externalId: string;
+    planType?: '01' | '02';
+    usaDemo?: boolean;
+  }): Promise<QpsePasarProduccionResponse> {
+    if (!this.integrationToken) {
+      throw new HttpException(
+        'QPSE: falta QPSE_ACCESS_TOKEN (token maestro) para pasar a producción',
+        500,
+      );
+    }
+    const base = this.getAuthBaseUrlForDemo(input.usaDemo);
+    const url = `${base}/api/empresa/produccion`;
+    try {
+      console.log(
+        `[QPSE] Pasar a producción en: ${url} | external_id: ${input.externalId}`,
+      );
+      const { data } = await axios.post<QpsePasarProduccionResponse>(
+        url,
+        {
+          external_id: input.externalId,
+          plan_type: input.planType || '01',
+        },
+        {
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.integrationToken}`,
+          },
+          timeout: 30000,
+        },
+      );
+      return data;
+    } catch (error) {
+      throw this.wrapError('pasar empresa a producción QPSE', error);
     }
   }
 

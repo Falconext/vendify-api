@@ -106,6 +106,15 @@ export class ResellerController {
     );
   }
 
+  @Roles('ADMIN_SISTEMA')
+  @Patch(':id/saldo')
+  ajustarSaldo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { nuevoSaldo: number; motivo: string },
+  ) {
+    return this.resellerService.ajustarSaldo(id, Number(body.nuevoSaldo), body.motivo);
+  }
+
   @Roles('ADMIN_SISTEMA', 'RESELLER')
   @Get(':id/dashboard')
   async getDashboard(
@@ -280,6 +289,26 @@ export class ResellerController {
     return this.resellerService.aprovisionarQpseCliente(id, empresaId, {
       forzar: Boolean(body?.forzar),
     });
+  }
+
+  @Roles('ADMIN_SISTEMA', 'RESELLER')
+  @Post(':id/clientes/:empresaId/pasar-produccion')
+  async pasarProduccion(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('empresaId', ParseIntPipe) empresaId: number,
+    @Body() body: { planType?: '01' | '02' },
+    @Request() req: any,
+  ) {
+    await this.resellerService.validateResellerAccess(
+      req.user.id,
+      req.user.rol,
+      id,
+    );
+    return this.resellerService.pasarClienteAProduccion(
+      id,
+      empresaId,
+      body?.planType === '02' ? '02' : '01',
+    );
   }
 
   @Roles('ADMIN_SISTEMA', 'RESELLER')

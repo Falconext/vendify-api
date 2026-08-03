@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -17,6 +19,8 @@ import {
 import { SedeService } from '../sede/sede.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
+import { PdfGeneratorService } from '../comprobante/pdf-generator.service';
 
 function parseDDMMYYYY(input: string): Date {
   if (!input || input.trim() === '') {
@@ -89,12 +93,15 @@ function normalizeBrand(value?: string | null): string {
   return v || 'default';
 }
 
-function normalizeProducto(value?: string | null): 'facturacion' | 'hotel' {
-  return String(value ?? '')
+function normalizeProducto(
+  value?: string | null,
+): 'facturacion' | 'hotel' | 'restaurante' {
+  const v = String(value ?? '')
     .trim()
-    .toLowerCase() === 'hotel'
-    ? 'hotel'
-    : 'facturacion';
+    .toLowerCase();
+  if (v === 'hotel') return 'hotel';
+  if (v === 'restaurante') return 'restaurante';
+  return 'facturacion';
 }
 
 function mapHotelPlanName(planNombre?: string | null): string {
@@ -193,12 +200,43 @@ interface HotelSyncPayload {
   planExpiresAt?: string;
 }
 
+interface RestauranteSyncPayload {
+  resellerEmpresaId: number;
+  resellerUsuarioId: number;
+  ruc: string;
+  razonSocial: string;
+  nombreComercial?: string;
+  direccion?: string;
+  departamento?: string;
+  provincia?: string;
+  distrito?: string;
+  ubigeo?: string;
+  tipoEmpresa?: 'FORMAL' | 'INFORMAL';
+  adminEmail: string;
+  adminPassword?: string;
+  adminNombre: string;
+  adminCelular?: string;
+  adminDni?: string;
+  isActive: boolean;
+  plan?: string;
+  planExpiresAt?: string;
+  fechaActivacion?: string;
+  // Facturación electrónica QPSE (mismo proveedor que resellers)
+  billingProvider?: string;
+  usuarioPse?: string;
+  contrasenaPse?: string;
+  qpseExternalId?: string;
+  usaDemo?: boolean;
+}
+
 @Injectable()
 export class EmpresaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sedeService: SedeService,
     private readonly whatsappService: WhatsAppService,
+    @Inject(forwardRef(() => PdfGeneratorService))
+    private readonly pdfGenerator: PdfGeneratorService,
   ) {}
 
   private async asegurarSedePrincipalPorDefecto(
@@ -414,6 +452,136 @@ export class EmpresaService {
         hotelTenantId: synced.tenantId,
         hotelAdminUserId: synced.adminUserId,
         hotelSyncAt: new Date(),
+      },
+    });
+
+    return synced;
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Gobernanza del producto RESTAURANTE (falconext-restaurante, backend aparte).
+  // Mismo patrón que hotel: resellers es la fuente de verdad y hace push del
+  // aprovisionamiento vía HTTP M2M (token compartido). Ver receptor:
+  //   POST {RESTAURANTE_BACKEND_SYNC_URL}  header x-sync-token
+  // ───────────────────────────────────────────────────────────────────────────
+
+  private getRestauranteSyncConfig() {
+    const baseUrl = (process.env.RESTAURANTE_BACKEND_SYNC_URL || '').trim();
+    const syncToken = (process.env.RESTAURANTE_BACKEND_SYNC_TOKEN || '').trim();
+    return { baseUrl, syncToken };
+  }
+
+  private async callRestauranteSync(
+    payload: RestauranteSyncPayload,
+  ): Promise<{ tenantId: string; adminUserId: string }> {
+    const { baseUrl, syncToken } = this.getRestauranteSyncConfig();
+    if (!baseUrl || !syncToken) {
+      throw new ForbiddenException(
+        'Falta configurar RESTAURANTE_BACKEND_SYNC_URL / RESTAURANTE_BACKEND_SYNC_TOKEN',
+      );
+    }
+
+    try {
+      const response = await axios.post(baseUrl, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-sync-token': syncToken,
+        },
+        timeout: 12000,
+      });
+
+      const data = response?.data?.data || response?.data || {};
+      if (!data.tenantId || !data.adminUserId) {
+        throw new Error('Respuesta inválida desde el sistema Restaurante');
+      }
+      return { tenantId: data.tenantId, adminUserId: data.adminUserId };
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Error de sincronización';
+      throw new ForbiddenException(
+        `No se pudo sincronizar con el sistema Restaurante: ${message}`,
+      );
+    }
+  }
+
+  private async buildRestauranteSyncPayload(
+    empresaId: number,
+    adminPassword?: string,
+  ): Promise<RestauranteSyncPayload> {
+    const empresa = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      include: { plan: true },
+    });
+    if (!empresa) throw new NotFoundException('Empresa no encontrada');
+    if (normalizeProducto(empresa.producto) !== 'restaurante') {
+      throw new ForbiddenException(
+        'Solo aplica para empresas de producto RESTAURANTE',
+      );
+    }
+
+    const admin = await this.prisma.usuario.findFirst({
+      where: { empresaId, rol: { in: ['ADMIN_EMPRESA', 'ADMIN_SISTEMA'] } },
+      orderBy: { id: 'asc' },
+      select: { id: true, email: true, nombre: true, celular: true, dni: true },
+    });
+    if (!admin) {
+      throw new ForbiddenException(
+        'La empresa no tiene usuario administrador para sincronizar',
+      );
+    }
+
+    return {
+      resellerEmpresaId: empresa.id,
+      resellerUsuarioId: admin.id,
+      ruc: empresa.ruc,
+      razonSocial: empresa.razonSocial,
+      nombreComercial: empresa.nombreComercial || empresa.razonSocial,
+      direccion: empresa.direccion || undefined,
+      departamento: empresa.departamento || undefined,
+      provincia: empresa.provincia || undefined,
+      distrito: empresa.distrito || undefined,
+      ubigeo: empresa.ubigeo || undefined,
+      tipoEmpresa: empresa.tipoEmpresa as 'FORMAL' | 'INFORMAL',
+      adminEmail: admin.email,
+      adminPassword: adminPassword || undefined,
+      adminNombre: admin.nombre || 'Administrador',
+      adminCelular: admin.celular || undefined,
+      adminDni: admin.dni || undefined,
+      isActive: empresa.estado === 'ACTIVO',
+      plan: empresa.plan?.nombre,
+      planExpiresAt: empresa.fechaExpiracion
+        ? empresa.fechaExpiracion.toISOString()
+        : undefined,
+      fechaActivacion: empresa.fechaActivacion
+        ? empresa.fechaActivacion.toISOString()
+        : undefined,
+      // Facturación QPSE (creds aprovisionadas por empresa desde resellers)
+      billingProvider: empresa.billingProvider || undefined,
+      usuarioPse: empresa.usuarioPse || undefined,
+      contrasenaPse: empresa.contrasenaPse || undefined,
+      qpseExternalId: empresa.qpseExternalId || undefined,
+      usaDemo: empresa.usaDemo ?? undefined,
+    };
+  }
+
+  private async sincronizarEmpresaRestaurante(
+    empresaId: number,
+    adminPassword?: string,
+  ) {
+    const payload = await this.buildRestauranteSyncPayload(
+      empresaId,
+      adminPassword,
+    );
+    const synced = await this.callRestauranteSync(payload);
+
+    await this.prisma.empresa.update({
+      where: { id: empresaId },
+      data: {
+        restauranteTenantId: synced.tenantId,
+        restauranteAdminUserId: synced.adminUserId,
+        restauranteSyncAt: new Date(),
       },
     });
 
@@ -725,6 +893,23 @@ export class EmpresaService {
       }
     }
 
+    if (productoEmpresa === 'restaurante') {
+      try {
+        await this.sincronizarEmpresaRestaurante(
+          empresa.id,
+          data.usuario.password,
+        );
+      } catch (error: any) {
+        try {
+          await this.eliminar(empresa.id);
+        } catch {}
+        throw new ForbiddenException(
+          error?.message ||
+            'No se pudo crear la empresa en el sistema Restaurante',
+        );
+      }
+    }
+
     return empresa;
   }
 
@@ -947,6 +1132,8 @@ export class EmpresaService {
       if (dto.planId !== undefined) updateData.planId = dto.planId;
       if (dto.tipoEmpresa !== undefined)
         updateData.tipoEmpresa = dto.tipoEmpresa;
+      if (dto.regimenTributario !== undefined)
+        updateData.regimenTributario = dto.regimenTributario;
       if (dto.departamento !== undefined)
         updateData.departamento = dto.departamento;
       if (dto.provincia !== undefined) updateData.provincia = dto.provincia;
@@ -997,6 +1184,8 @@ export class EmpresaService {
         updateData.ticketLogoSize = dto.ticketLogoSize;
       if (dto.usarPrecioLoteFefo !== undefined)
         updateData.usarPrecioLoteFefo = dto.usarPrecioLoteFefo;
+      if (dto.permitirVentaSinStock !== undefined)
+        updateData.permitirVentaSinStock = dto.permitirVentaSinStock;
       if (dto.directorTecnico !== undefined)
         updateData.directorTecnico = dto.directorTecnico;
       if (dto.logo !== undefined) updateData.logo = dto.logo;
@@ -1141,6 +1330,10 @@ export class EmpresaService {
         });
       }
 
+      if (productoFinal === 'restaurante') {
+        await this.sincronizarEmpresaRestaurante(dto.id, dto.usuario?.password);
+      }
+
       return this.obtenerPorId(dto.id);
     } catch (error: any) {
       if (
@@ -1169,6 +1362,9 @@ export class EmpresaService {
     });
     if (normalizeProducto(empresa.producto) === 'hotel') {
       await this.sincronizarEmpresaHotel(id);
+    }
+    if (normalizeProducto(empresa.producto) === 'restaurante') {
+      await this.sincronizarEmpresaRestaurante(id);
     }
     if (userId) {
       await this.registrarLog(
@@ -1259,6 +1455,180 @@ export class EmpresaService {
         `Error al eliminar empresa: ${error.message}. Puede tener datos relacionados que deben eliminarse primero.`,
       );
     }
+  }
+
+  /**
+   * Exporta el listado de empresas (con los mismos filtros del listado) en
+   * Excel o PDF imprimible — para el admin de sistema.
+   */
+  async exportarListado(
+    params: {
+      search?: string;
+      estado?: 'ACTIVO' | 'INACTIVO' | 'TODOS';
+      tipoEmpresa?: 'FORMAL' | 'INFORMAL' | '';
+      brand?: string;
+      producto?: string;
+      formato?: 'pdf' | 'excel';
+    },
+    adminSistemaNegocio?: string | null,
+    adminSistemaProducto?: string | null,
+  ): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
+    const { search, estado = 'TODOS', tipoEmpresa = '', formato = 'excel' } = params;
+
+    const brandFiltro = adminSistemaNegocio
+      ? normalizeBrand(adminSistemaNegocio)
+      : params.brand
+        ? normalizeBrand(params.brand)
+        : undefined;
+    const productoFiltro = adminSistemaProducto
+      ? normalizeProducto(adminSistemaProducto)
+      : params.producto
+        ? normalizeProducto(params.producto)
+        : undefined;
+
+    const filtros: any[] = [
+      ...(estado !== 'TODOS' ? [{ estado }] : []),
+      ...(tipoEmpresa ? [{ tipoEmpresa }] : []),
+      ...(brandFiltro ? [{ brand: brandFiltro }] : []),
+      ...(productoFiltro ? [{ producto: productoFiltro }] : []),
+      ...(search
+        ? [{ OR: [{ ruc: { contains: search } }, { razonSocial: { contains: search } }] }]
+        : []),
+    ];
+    const where = filtros.length ? { AND: filtros } : {};
+
+    const empresasRaw = await this.prisma.empresa.findMany({
+      where,
+      orderBy: [{ estado: 'asc' }, { fechaExpiracion: 'asc' }],
+      select: {
+        ruc: true,
+        razonSocial: true,
+        nombreComercial: true,
+        estado: true,
+        usaDemo: true,
+        fechaActivacion: true,
+        fechaExpiracion: true,
+        brand: true,
+        plan: { select: { nombre: true, esPrueba: true } },
+        rubro: { select: { nombre: true } },
+      },
+    });
+
+    // El informe es de clientes REALES: fuera demos (ambiente demo, plan de
+    // prueba o razón social "DEMO") y las empresas internas/de prueba del equipo.
+    const RUCS_EXCLUIDOS_EXPORT = ['20524076307', '10479465750'];
+    const empresas = empresasRaw.filter(
+      (e) =>
+        !e.usaDemo &&
+        !e.plan?.esPrueba &&
+        !RUCS_EXCLUIDOS_EXPORT.includes(e.ruc) &&
+        !String(e.razonSocial ?? '').toUpperCase().includes('DEMO'),
+    );
+
+    if (empresas.length === 0) {
+      throw new NotFoundException('No se encontraron empresas con los filtros seleccionados');
+    }
+
+    const fmtFecha = (d?: Date | null) =>
+      d
+        ? new Date(d).toLocaleDateString('es-PE', {
+            timeZone: 'America/Lima',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+          })
+        : '';
+    const hoy = Date.now();
+    const venceEn = (d?: Date | null) => {
+      if (!d) return '';
+      const dias = Math.ceil((new Date(d).getTime() - hoy) / 86_400_000);
+      return dias >= 0 ? `${dias} días` : `Vencida hace ${Math.abs(dias)} días`;
+    };
+
+    const mesInicio = (d?: Date | null) => {
+      if (!d) return '';
+      const txt = new Date(d).toLocaleDateString('es-PE', {
+        timeZone: 'America/Lima',
+        month: 'short',
+        year: 'numeric',
+      });
+      return txt.charAt(0).toUpperCase() + txt.slice(1);
+    };
+
+    const filas = empresas.map((e) => ({
+      ruc: e.ruc,
+      razonSocial: e.razonSocial,
+      comercial: e.nombreComercial ?? '',
+      ambiente: e.usaDemo ? 'Demo' : 'Producción',
+      rubro: e.rubro?.nombre ?? '',
+      plan: e.plan?.nombre ?? '',
+      inicio: mesInicio(e.fechaActivacion),
+      activacion: fmtFecha(e.fechaActivacion),
+      expiracion: fmtFecha(e.fechaExpiracion),
+      vence: venceEn(e.fechaExpiracion),
+      estado: e.estado === 'ACTIVO' ? 'Activo' : 'Inactivo',
+    }));
+    const activas = filas.filter((f) => f.estado === 'Activo').length;
+    const genFecha = new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' });
+
+    if (formato === 'excel') {
+      const headers = ['RUC', 'Razón Social', 'Nombre Comercial', 'Ambiente', 'Rubro', 'Plan', 'Mes de Inicio', 'Activación', 'Expiración', 'Vence en', 'Estado'];
+      const aoa = [
+        [`Empresas registradas — ${filas.length} en total (${activas} activas) · Generado: ${genFecha}`],
+        [],
+        headers,
+        ...filas.map((f) => [f.ruc, f.razonSocial, f.comercial, f.ambiente, f.rubro, f.plan, f.inicio, f.activacion, f.expiracion, f.vence, f.estado]),
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [{ wch: 13 }, { wch: 38 }, { wch: 24 }, { wch: 11 }, { wch: 22 }, { wch: 18 }, { wch: 13 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 10 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Empresas');
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+      return {
+        buffer,
+        filename: 'empresas.xlsx',
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      };
+    }
+
+    const esc = (v: string) =>
+      String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const filasHtml = filas
+      .map(
+        (f) => `
+        <tr${f.estado === 'Inactivo' ? ' style="color:#9ca3af;"' : ''}>
+          <td>${esc(f.ruc)}</td>
+          <td><strong>${esc(f.razonSocial)}</strong>${f.comercial ? `<br/><span class="sub">${esc(f.comercial)}</span>` : ''}</td>
+          <td>${esc(f.ambiente)}</td>
+          <td>${esc(f.rubro)}</td>
+          <td>${esc(f.plan)}</td>
+          <td>${esc(f.inicio)}</td>
+          <td>${esc(f.expiracion)}</td>
+          <td>${esc(f.vence)}</td>
+          <td>${esc(f.estado)}</td>
+        </tr>`,
+      )
+      .join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+      * { font-family: Arial, Helvetica, sans-serif; box-sizing: border-box; }
+      body { margin: 24px; color: #111827; font-size: 10.5px; }
+      h1 { font-size: 16px; margin: 0 0 2px; }
+      .sub { color: #6b7280; font-size: 9.5px; }
+      .meta { color: #6b7280; margin-bottom: 14px; }
+      table { width: 100%; border-collapse: collapse; }
+      th { background: #f3f4f6; text-align: left; padding: 6px 8px; border-bottom: 2px solid #d1d5db; font-size: 9.5px; text-transform: uppercase; }
+      td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    </style></head><body>
+      <h1>Empresas registradas</h1>
+      <div class="meta">${filas.length} empresa(s) · ${activas} activas · Generado: ${esc(genFecha)}</div>
+      <table>
+        <thead><tr><th>RUC</th><th>Razón Social</th><th>Ambiente</th><th>Rubro</th><th>Plan</th><th>Mes de Inicio</th><th>Expiración</th><th>Vence en</th><th>Estado</th></tr></thead>
+        <tbody>${filasHtml}</tbody>
+      </table>
+    </body></html>`;
+
+    const buffer = await this.pdfGenerator.generarPdfDesdeHtml(html);
+    return { buffer, filename: 'empresas.pdf', contentType: 'application/pdf' };
   }
 
   async listarSeries(
@@ -1386,6 +1756,23 @@ export class EmpresaService {
         'No se pudo determinar la empresa del usuario',
       );
     const empresa = await this.obtenerPorId(empresaId);
+
+    // Cliente de un reseller: el precio visible en su Perfil es el que SU
+    // reseller le cobra (precioClienteFinal; si no lo definió, el precio de
+    // lista del plan) — nunca el precio base que el sistema cobra al reseller.
+    const facturacionReseller = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { resellerId: true, precioClienteFinal: true },
+    });
+    if (facturacionReseller?.resellerId && (empresa as any)?.plan) {
+      (empresa as any).plan = {
+        ...(empresa as any).plan,
+        costo:
+          facturacionReseller.precioClienteFinal != null
+            ? Number(facturacionReseller.precioClienteFinal)
+            : Number((empresa as any).plan.costo),
+      };
+    }
     return empresa;
   }
 
@@ -1420,6 +1807,43 @@ export class EmpresaService {
       empresaId,
       hotelTenantId: synced.tenantId,
       hotelAdminUserId: synced.adminUserId,
+    };
+  }
+
+  async sincronizarRestauranteDesdeMype(
+    empresaId: number,
+    adminSistemaNegocio?: string | null,
+    adminSistemaProducto?: string | null,
+    adminPassword?: string,
+  ) {
+    const empresa = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+    });
+    if (!empresa) throw new NotFoundException('Empresa no encontrada');
+
+    if (
+      adminSistemaNegocio &&
+      normalizeBrand(empresa.brand) !== normalizeBrand(adminSistemaNegocio)
+    ) {
+      throw new ForbiddenException('No tienes acceso a esta empresa');
+    }
+    if (
+      adminSistemaProducto &&
+      normalizeProducto(empresa.producto) !==
+        normalizeProducto(adminSistemaProducto)
+    ) {
+      throw new ForbiddenException('No tienes acceso a esta empresa');
+    }
+
+    const synced = await this.sincronizarEmpresaRestaurante(
+      empresaId,
+      adminPassword,
+    );
+    return {
+      ok: true,
+      empresaId,
+      restauranteTenantId: synced.tenantId,
+      restauranteAdminUserId: synced.adminUserId,
     };
   }
 
