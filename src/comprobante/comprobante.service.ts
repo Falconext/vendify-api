@@ -387,8 +387,14 @@ export class ComprobanteService {
           : {}),
         ...(String(params.soloPendientesSunat) === 'true'
           ? {
+              // Debe coincidir con el conteo del dashboard (dashboard.service):
+              // pendientes = PENDIENTE + FALLIDO_ENVIO + RECHAZADO.
               estadoEnvioSunat: {
-                in: [EstadoSunat.PENDIENTE, EstadoSunat.FALLIDO_ENVIO],
+                in: [
+                  EstadoSunat.PENDIENTE,
+                  EstadoSunat.FALLIDO_ENVIO,
+                  EstadoSunat.RECHAZADO,
+                ],
               },
             }
           : {}),
