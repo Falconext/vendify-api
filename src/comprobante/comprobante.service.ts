@@ -251,6 +251,7 @@ export class ComprobanteService {
     estado?: string;
     tipoDoc?: string;
     estadoPago?: string;
+    soloPendientesSunat?: string | boolean;
   }) {
     const {
       empresaId,
@@ -383,6 +384,13 @@ export class ComprobanteService {
           : {}),
         ...(['INFORMAL', 'TODOS'].includes(tipoComprobante) && estadoPago
           ? { estadoPago: estadoPago as any }
+          : {}),
+        ...(String(params.soloPendientesSunat) === 'true'
+          ? {
+              estadoEnvioSunat: {
+                in: [EstadoSunat.PENDIENTE, EstadoSunat.FALLIDO_ENVIO],
+              },
+            }
           : {}),
       };
 
