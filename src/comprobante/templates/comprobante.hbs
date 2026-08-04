@@ -247,11 +247,15 @@
         <span class="lbl">FORMA PAGO:</span>
         <span class="val">{{formaPago}}</span>
         <span class="lbl">MEDIO PAGO:</span>
-        <span class="val">{{medioPago}} {{simboloMoneda}} {{mtoImpVenta}}</span>
+        <span class="val">{{medioPago}} {{simboloMoneda}} {{pagado}}</span>
         <span class="lbl">VUELTO:</span>
         <span class="val">{{simboloMoneda}} {{vuelto}}</span>
         <span class="lbl">PAGADO:</span>
         <span class="val">{{simboloMoneda}} {{pagado}}</span>
+        {{#if saldoPendiente}}
+        <span class="lbl">SALDO:</span>
+        <span class="val">{{simboloMoneda}} {{saldoPendiente}}</span>
+        {{/if}}
         <span class="lbl">VENDEDOR:</span>
         <span class="val">{{vendedor}}</span>
       </div>
