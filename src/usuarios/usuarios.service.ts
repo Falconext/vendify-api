@@ -223,6 +223,7 @@ export class UsersService {
       email,
       dni,
       celular,
+      password,
       permisos,
       sedeIds,
       subModuloIds,
@@ -236,6 +237,12 @@ export class UsersService {
     if (usuario.empresaId !== empresaId)
       throw new ForbiddenException('Empresa no identificada');
 
+    // Solo se cambia la contraseña si viene una nueva no vacía; si no, se deja igual.
+    const nuevaPasswordHash =
+      typeof password === 'string' && password.trim() !== ''
+        ? await bcrypt.hash(password, 10)
+        : undefined;
+
     const updated = await this.prisma.usuario.update({
       where: { id },
       data: {
@@ -243,6 +250,7 @@ export class UsersService {
         email,
         dni,
         celular,
+        ...(nuevaPasswordHash ? { password: nuevaPasswordHash } : {}),
         permisos: permisos ? JSON.stringify(permisos) : undefined,
         comisionGlobal:
           comisionGlobal !== undefined ? comisionGlobal : undefined,
@@ -515,6 +523,7 @@ export class UsersService {
       email: string;
       dni: string;
       celular: string;
+      password: string;
       sistemaNegocio: string | null;
       sistemaProducto: string | null;
     }>,
@@ -532,6 +541,11 @@ export class UsersService {
     });
     if (!usuario) throw new NotFoundException('Administrador no encontrado');
 
+    const nuevaPasswordHash =
+      typeof data.password === 'string' && data.password.trim() !== ''
+        ? await bcrypt.hash(data.password, 10)
+        : undefined;
+
     const sistemaNegocioFinal =
       actorScope?.sistemaNegocio !== undefined
         ? actorScope.sistemaNegocio
@@ -548,6 +562,7 @@ export class UsersService {
         email: data.email,
         dni: data.dni,
         celular: data.celular,
+        ...(nuevaPasswordHash ? { password: nuevaPasswordHash } : {}),
         ...(sistemaNegocioFinal !== undefined
           ? { sistemaNegocio: sistemaNegocioFinal }
           : {}),
