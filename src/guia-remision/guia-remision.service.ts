@@ -313,6 +313,12 @@ export class GuiaRemisionService {
       );
     }
 
+    // Validar el RESULTADO de la edición (guía existente + cambios) para no
+    // reenviar a SUNAT datos inválidos (p. ej. transportista = remitente en
+    // transporte público → error 2560). Se valida el merge porque updateDto
+    // es parcial.
+    this.validateGuiaRemision({ ...guia, ...updateDto } as any);
+
     // Si se actualizan detalles, eliminar los anteriores y crear los nuevos
     const { detalles, ...guiaData } = updateDto;
 
@@ -465,21 +471,26 @@ export class GuiaRemisionService {
         usaDemo,
       );
 
-      // Auto-avance de correlativo cuando SUNAT reporta numeración repetida
-      if (resultado.numeracionRepetida) {
-        this.logger.warn(
-          `Numeración repetida (${guia.serie}-${guia.correlativo}). ` +
-            `Buscando siguiente correlativo disponible…`,
-        );
+      // Auto-avance de correlativo cuando SUNAT reporta numeración repetida.
+      // Se repite MIENTRAS siga chocando: si SUNAT tiene correlativos que la BD
+      // local no registra (p. ej. un número aceptado cuyo registro local se
+      // perdió), un solo avance volvería a colisionar. Acotado a 10 intentos.
+      let intentosAvance = 0;
+      while (resultado.numeracionRepetida && intentosAvance < 10) {
+        intentosAvance++;
 
         const ultimaGuia = await this.prisma.guiaRemision.findFirst({
           where: { empresaId, serie: guia.serie },
           orderBy: { correlativo: 'desc' },
           select: { correlativo: true },
         });
-        const nuevoCorrelativo = (ultimaGuia?.correlativo ?? 0) + 1;
-        this.logger.log(
-          `Nuevo correlativo asignado a guía ${id}: ${guia.serie}-${nuevoCorrelativo}`,
+        // Avanza siempre por encima del propio correlativo actual para garantizar
+        // progreso aunque el MAX de BD ya lo incluya.
+        const nuevoCorrelativo =
+          Math.max(ultimaGuia?.correlativo ?? 0, guiaParaEnviar.correlativo) + 1;
+        this.logger.warn(
+          `Numeración repetida (${guia.serie}-${guiaParaEnviar.correlativo}). ` +
+            `Auto-avanzando a ${guia.serie}-${nuevoCorrelativo} (intento ${intentosAvance}/10).`,
         );
 
         const guiaConNuevoCorrelativo = await this.prisma.guiaRemision.update({
@@ -501,11 +512,22 @@ export class GuiaRemisionService {
         );
       }
 
+      // Rechazo DEFINITIVO de SUNAT: recibió y procesó la guía y la rechazó
+      // (devuelve CDR). Reintentar los mismos datos inválidos siempre volverá
+      // a fallar → RECHAZADO (sin reintentos). FALLIDO_ENVIO se reserva para
+      // fallos transitorios (no se pudo enviar / SUNAT caída), que sí reintentan.
+      const esRechazoDefinitivo =
+        !resultado.success &&
+        !resultado.pendienteVerificacion &&
+        !!resultado.cdrResponse;
+
       const nuevoEstado = resultado.success
         ? 'EMITIDO'
         : resultado.pendienteVerificacion
           ? 'PENDIENTE'
-          : 'FALLIDO_ENVIO';
+          : esRechazoDefinitivo
+            ? 'RECHAZADO'
+            : 'FALLIDO_ENVIO';
 
       const guiaActualizada = await this.prisma.guiaRemision.update({
         where: { id },
@@ -516,11 +538,12 @@ export class GuiaRemisionService {
           sunatCdrZip: resultado.cdrZip || null,
           sunatErrorMsg: resultado.error || null,
           documentoId: resultado.documentoId || null,
-          // Resetear reintentos si hubo éxito
+          // Éxito o rechazo definitivo: cortar reintentos.
           ...(resultado.success && {
             sunatRetriesCount: 0,
             sunatNextRetryAt: null,
           }),
+          ...(esRechazoDefinitivo && { sunatNextRetryAt: null }),
         },
       });
 
@@ -727,6 +750,20 @@ export class GuiaRemisionService {
       if (!dto.transportistaRuc || !dto.transportistaRazonSocial) {
         throw new BadRequestException(
           'Para transporte público se requieren los datos del transportista',
+        );
+      }
+      // SUNAT (cód. 2560): en transporte público el transportista debe ser un
+      // TERCERO distinto al remitente. Si el propio remitente traslada su
+      // mercadería, debe usar Transporte Privado (02) con placa y conductor.
+      const transportistaRucPublico = String(dto.transportistaRuc || '').trim();
+      if (
+        remitenteRuc &&
+        transportistaRucPublico &&
+        transportistaRucPublico === remitenteRuc
+      ) {
+        throw new BadRequestException(
+          'En transporte público el transportista debe ser un tercero distinto al remitente. ' +
+            'Si tú mismo trasladas la mercadería, usa Transporte Privado (indica placa y conductor del vehículo).',
         );
       }
     }

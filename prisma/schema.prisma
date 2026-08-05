@@ -122,6 +122,7 @@ model Empresa {
   cotizMostrarRazonSocial Boolean                       @default(true)
   cotizMostrarDetraccion  Boolean                       @default(true)
   cotizFormatoConfig      Json?
+  notaVentaFormatoConfig  Json?
   rubroId                 Int?
   providerId              String?
   tipoEmpresa             TipoEmpresa                   @default(FORMAL)
@@ -159,6 +160,10 @@ model Empresa {
   // (se registra la salida aunque el stock quede en 0/negativo). Default false = mantiene
   // el bloqueo por stock insuficiente.
   permitirVentaSinStock   Boolean                       @default(false)
+  // Cobranza con vendedores de campo: cuando es true, "Registrar Pago" pide el vendedor de
+  // campo que envió el comprobante, a quién se dirigió el pago y permite adjuntar el comprobante.
+  // Default false = flujo de cobro estándar (la mayoría de negocios).
+  cobranzaCampo           Boolean                       @default(false)
   costoActivacionReseller Decimal?                      @default(0)
   precioClienteFinal      Decimal?                      @db.Decimal(10, 2) // Precio mensual que el reseller le cobra a este cliente (para calcular ganancia). Null = usar precio de lista del plan.
   esWhiteLabel            Boolean                       @default(false) // Cliente bajo la marca blanca del reseller vs. marca estándar.
@@ -930,6 +935,13 @@ model Pago {
   medioPago          String
   observacion        String?
   referencia         String?
+  // Imagen del comprobante de pago que el vendedor en campo envía a la encargada (opcional).
+  comprobanteUrl     String?
+  // A quién fue dirigido el pago: ADMINISTRADOR | EMPRESA | VENDEDOR (obligatorio en el registro manual).
+  dirigidoA          String?
+  // Si dirigidoA = VENDEDOR, a la cuenta de qué vendedor llegó el dinero (denormalizado, sin FK).
+  vendedorId         Int?
+  vendedorNombre     String?
   creadoEn           DateTime         @default(now())
   empresaId          Int?
   usuarioId          Int?
@@ -943,6 +955,7 @@ model Pago {
   @@index([usuarioId])
   @@index([empresaId])
   @@index([cuentaBancariaId])
+  @@index([vendedorId])
 }
 
 model CuentaBancaria {
