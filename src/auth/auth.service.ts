@@ -640,6 +640,9 @@ export class AuthService {
             fechaActivacion: true,
             fechaExpiracion: true,
             tipoEmpresa: true,
+            // Precio mensual que el reseller le cobra a este cliente (si lo definió).
+            // Se muestra en "Plan Actual → Precio" en vez del costo base del plan.
+            precioClienteFinal: true,
             rubroId: true,
             departamento: true,
             provincia: true,
