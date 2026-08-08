@@ -97,6 +97,11 @@ export class CrearCompraDto {
   @Type(() => DetalleCompraDto)
   detalles: DetalleCompraDto[];
 
+  // Sede/almacén destino del stock de la compra.
+  @IsOptional()
+  @IsNumber()
+  sedeId?: number;
+
   @IsOptional()
   @IsNumber()
   montoPagadoInicial?: number;
@@ -104,6 +109,15 @@ export class CrearCompraDto {
   @IsOptional()
   @IsString()
   metodoPagoInicial?: string;
+
+  // Pago por banco (pago inicial): cuenta bancaria usada y N° de operación.
+  @IsOptional()
+  @IsNumber()
+  cuentaBancariaIdInicial?: number;
+
+  @IsOptional()
+  @IsString()
+  referenciaInicial?: string;
 
   @IsOptional()
   @IsString()
