@@ -205,9 +205,9 @@ export class ComprasService {
           tipoDoc: data.tipoDoc || 'FACTURA',
           serie: data.serie,
           numero: data.numero,
-          fechaEmision: new Date(data.fechaEmision),
+          fechaEmision: parseFechaSoloDia(data.fechaEmision),
           fechaVencimiento: data.fechaVencimiento
-            ? new Date(data.fechaVencimiento)
+            ? parseFechaSoloDia(data.fechaVencimiento)
             : null,
           moneda: data.moneda || 'PEN',
           tipoCambio: data.tipoCambio,
@@ -720,9 +720,9 @@ export class ComprasService {
           tipoDoc: data.tipoDoc || existente.tipoDoc,
           serie: data.serie,
           numero: data.numero,
-          fechaEmision: new Date(data.fechaEmision),
+          fechaEmision: parseFechaSoloDia(data.fechaEmision),
           fechaVencimiento: data.fechaVencimiento
-            ? new Date(data.fechaVencimiento)
+            ? parseFechaSoloDia(data.fechaVencimiento)
             : null,
           moneda: data.moneda || existente.moneda,
           tipoCambio: data.tipoCambio,
