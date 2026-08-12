@@ -994,7 +994,7 @@ export class ResellerService {
             usuarios: {
               where: { rol: 'ADMIN_EMPRESA' },
               take: 1,
-              select: { id: true, email: true, nombre: true },
+              select: { id: true, email: true, nombre: true, celular: true },
             },
           },
         },

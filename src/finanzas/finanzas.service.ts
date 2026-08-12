@@ -500,9 +500,15 @@ export class FinanzasService {
       monto: number;
       fecha: string;
       descripcion?: string;
+      // Pago en moneda extranjera / por cuenta bancaria (opcional).
+      moneda?: string;
+      tipoCambio?: number;
+      cuentaBancariaId?: number;
+      medioPago?: string;
     },
   ) {
     const fechaDate = new Date(`${body.fecha}T12:00:00.000-05:00`);
+    const monedaNorm = (body.moneda || 'PEN').toUpperCase() === 'USD' ? 'USD' : 'PEN';
     return this.prisma.gastoOperativo.create({
       data: {
         empresaId,
@@ -513,6 +519,11 @@ export class FinanzasService {
         etiqueta: body.etiqueta,
         monto: body.monto,
         descripcion: body.descripcion,
+        moneda: monedaNorm,
+        // TC solo aplica a USD; en PEN se ignora.
+        tipoCambio: monedaNorm === 'USD' && body.tipoCambio ? body.tipoCambio : null,
+        cuentaBancariaId: body.cuentaBancariaId || null,
+        medioPago: body.medioPago ? body.medioPago.toUpperCase() : null,
       },
     });
   }
@@ -526,6 +537,10 @@ export class FinanzasService {
       monto: number;
       fecha: string;
       descripcion: string;
+      moneda: string;
+      tipoCambio: number;
+      cuentaBancariaId: number;
+      medioPago: string;
     }>,
   ) {
     const extraDate = body.fecha
@@ -535,6 +550,13 @@ export class FinanzasService {
           fecha: new Date(`${body.fecha}T12:00:00.000-05:00`),
         }
       : {};
+    // Si se cambia la moneda a PEN, se limpia el TC (no aplica en soles).
+    const monedaNorm =
+      body.moneda !== undefined
+        ? body.moneda.toUpperCase() === 'USD'
+          ? 'USD'
+          : 'PEN'
+        : undefined;
     return this.prisma.gastoOperativo.updateMany({
       where: { id, empresaId },
       data: {
@@ -546,6 +568,21 @@ export class FinanzasService {
         ...(body.monto !== undefined ? { monto: body.monto } : {}),
         ...(body.descripcion !== undefined
           ? { descripcion: body.descripcion }
+          : {}),
+        ...(monedaNorm !== undefined
+          ? {
+              moneda: monedaNorm,
+              tipoCambio:
+                monedaNorm === 'USD' && body.tipoCambio ? body.tipoCambio : null,
+            }
+          : body.tipoCambio !== undefined
+            ? { tipoCambio: body.tipoCambio }
+            : {}),
+        ...(body.cuentaBancariaId !== undefined
+          ? { cuentaBancariaId: body.cuentaBancariaId || null }
+          : {}),
+        ...(body.medioPago !== undefined
+          ? { medioPago: body.medioPago ? body.medioPago.toUpperCase() : null }
           : {}),
       },
     });
