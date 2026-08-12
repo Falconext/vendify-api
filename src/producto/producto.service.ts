@@ -2742,9 +2742,8 @@ export class ProductoService {
       PRODUCTO: producto.descripcion,
       'U.M': producto.unidadMedida?.nombre || '',
       AFECT: producto.tipoAfectacionIGV,
-      'PRECIO UNITARIO': Number(producto.precioUnitario),
-      'COSTO COMPRA': Number((producto as any).costoPromedio ?? 0),
-      'COSTO VENTA': Number((producto as any).costoFijo ?? 0),
+      'PRECIO UNITARIO CON IGV': Number(producto.precioUnitario),
+      'COSTO COMPRA SIN IGV': Number((producto as any).costoPromedio ?? 0),
       IGV: Number(producto.igvPorcentaje),
       STOCK: sedeId
         ? Number((producto as any).stocks?.[0]?.stock ?? 0)
@@ -2764,9 +2763,8 @@ export class ProductoService {
       { wch: 100 }, // PRODUCTO
       { wch: 20 }, // U.M
       { wch: 10 }, // AFECT
-      { wch: 15 }, // PRECIO UNITARIO
-      { wch: 14 }, // COSTO COMPRA
-      { wch: 12 }, // COSTO VENTA
+      { wch: 22 }, // PRECIO UNITARIO CON IGV
+      { wch: 20 }, // COSTO COMPRA SIN IGV
       { wch: 8 }, // IGV
       { wch: 10 }, // STOCK
       { wch: 13 }, // STOCK MINIMO
@@ -2785,9 +2783,8 @@ export class ProductoService {
         PRODUCTO: 'Producto sin código de barras (SKU manual)',
         'U.M': 'Unidad (bienes)',
         AFECT: '10',
-        'PRECIO UNITARIO': 10.0,
-        'COSTO COMPRA': 6.0,
-        'COSTO VENTA': 0.5,
+        'PRECIO UNITARIO CON IGV': 10.0,
+        'COSTO COMPRA SIN IGV': 6.0,
         IGV: 18,
         STOCK: 100,
         'STOCK MINIMO': 10,
@@ -2799,9 +2796,8 @@ export class ProductoService {
         PRODUCTO: 'Producto con código de barras EAN-13',
         'U.M': 'Unidad (bienes)',
         AFECT: '10',
-        'PRECIO UNITARIO': 25.5,
-        'COSTO COMPRA': 15.0,
-        'COSTO VENTA': 1.0,
+        'PRECIO UNITARIO CON IGV': 25.5,
+        'COSTO COMPRA SIN IGV': 15.0,
         IGV: 18,
         STOCK: 50,
         'STOCK MINIMO': 5,
@@ -2817,9 +2813,8 @@ export class ProductoService {
       { wch: 50 }, // PRODUCTO
       { wch: 12 }, // U.M
       { wch: 8 }, // AFECT
-      { wch: 16 }, // PRECIO UNITARIO
-      { wch: 14 }, // COSTO COMPRA
-      { wch: 12 }, // COSTO VENTA
+      { wch: 22 }, // PRECIO UNITARIO CON IGV
+      { wch: 20 }, // COSTO COMPRA SIN IGV
       { wch: 6 }, // IGV
       { wch: 8 }, // STOCK
       { wch: 13 }, // STOCK MINIMO
@@ -2846,6 +2841,9 @@ export class ProductoService {
       UND: 'NIU',
       UNID: 'NIU',
       UNIDAD: 'NIU',
+      'UNIDAD (BIENES)': 'NIU',
+      'UNIDAD (SERVICIOS)': 'ZZ',
+      SERVICIO: 'ZZ',
       ETIQ: 'NIU',
       PZA: 'NIU',
       PZ: 'NIU',
@@ -3065,21 +3063,18 @@ export class ProductoService {
           null;
         const afectRaw = row['AFECT'] ?? row['Afect'] ?? row['afect'] ?? null;
         const precioUnitarioRaw =
+          row['PRECIO UNITARIO CON IGV'] ??
           row['PRECIO UNITARIO'] ??
           row['Precio Unitario'] ??
           row['precioUnitario'] ??
           null;
         const precioCostoRaw =
+          row['COSTO COMPRA SIN IGV'] ??
           row['COSTO COMPRA'] ??
           row['Costo Compra'] ??
           row['costoCompra'] ??
           row['PRECIO COSTO'] ??
           row['Precio Costo'] ??
-          null;
-        const costoVentaRaw =
-          row['COSTO VENTA'] ??
-          row['Costo Venta'] ??
-          row['costoVenta'] ??
           null;
         const stockMinimoRaw =
           row['STOCK MINIMO'] ??
@@ -3118,7 +3113,13 @@ export class ProductoService {
           .toUpperCase()
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '');
-        const unidadMedidaId = unidadMap.get(unidadKey);
+        // 1) match directo por nombre/código; 2) fallback: normalizar a código SUNAT
+        // (ej. "Unidad (bienes)" -> NIU) y buscar por ese código.
+        let unidadMedidaId = unidadMap.get(unidadKey);
+        if (!unidadMedidaId) {
+          const codigoSunat = this.resolverUmbSunat(unidadNombre.toString());
+          unidadMedidaId = unidadMap.get(this.normClave(codigoSunat));
+        }
         if (!unidadMedidaId)
           throw new ForbiddenException(
             `Unidad de medida no válida (${unidadNombre}) en la fila ${index + 1}`,
@@ -3136,10 +3137,6 @@ export class ProductoService {
         const costoPromedio =
           precioCostoRaw != null
             ? parseFloat(precioCostoRaw.toString())
-            : undefined;
-        const costoFijo =
-          costoVentaRaw != null
-            ? parseFloat(costoVentaRaw.toString())
             : undefined;
         const stockMinimoImport =
           stockMinimoRaw != null && stockMinimoRaw.toString().trim() !== ''
@@ -3258,9 +3255,6 @@ export class ProductoService {
               ...(costoPromedio != null && !Number.isNaN(costoPromedio)
                 ? { costoPromedio: new Decimal(costoPromedio) }
                 : {}),
-              ...(costoFijo != null && !Number.isNaN(costoFijo)
-                ? { costoFijo: new Decimal(costoFijo) }
-                : {}),
               ...(stockMinimoImport != null && !Number.isNaN(stockMinimoImport)
                 ? { stockMinimo: stockMinimoImport }
                 : {}),
@@ -3294,10 +3288,6 @@ export class ProductoService {
               costoPromedio:
                 costoPromedio != null && !Number.isNaN(costoPromedio)
                   ? costoPromedio
-                  : undefined,
-              costoFijo:
-                costoFijo != null && !Number.isNaN(costoFijo)
-                  ? costoFijo
                   : undefined,
               igvPorcentaje,
               stock: stockDestino ?? 0,
