@@ -147,8 +147,10 @@ export class ResellerService {
       select: { saldo: true, porcentajeDescuento: true },
     });
     if (!reseller) throw new NotFoundException('Distribuidor no encontrado');
+    // Tier de volumen: solo cuentan clientes en PRODUCCIÓN (usaDemo:false). Las
+    // cuentas demo no pagan y no deben inflar el tramo de precio.
     const clientesActuales = await tx.empresa.count({
-      where: { resellerId, estado: 'ACTIVO' },
+      where: { resellerId, estado: 'ACTIVO', usaDemo: false },
     });
     const costoFinal = this.resolveClientCost(
       empresa.plan.nombre,
@@ -407,8 +409,10 @@ export class ResellerService {
       where: { id: resellerId },
       select: { saldo: true, porcentajeDescuento: true },
     });
+    // Tier de volumen: solo clientes en PRODUCCIÓN (usaDemo:false). La cuenta que
+    // se está activando aún es demo aquí, por eso se suma +1 aparte.
     const clientesActivos = await this.prisma.empresa.count({
-      where: { resellerId, estado: 'ACTIVO' },
+      where: { resellerId, estado: 'ACTIVO', usaDemo: false },
     });
     const costoActivacion = this.resolveClientCost(
       empresa.plan.nombre,
@@ -1210,8 +1214,9 @@ export class ResellerService {
         // 3. Calculate Cost (volume-based, percentage-based otherwise)
         const planCosto = Number(plan.costo);
         const descuento = Number((reseller as any).porcentajeDescuento) || 0;
+        // Tier de volumen: solo clientes en PRODUCCIÓN (usaDemo:false).
         const clientesActuales = await tx.empresa.count({
-          where: { resellerId, estado: 'ACTIVO' },
+          where: { resellerId, estado: 'ACTIVO', usaDemo: false },
         });
         const clientesConNuevo = clientesActuales + 1;
         const ciclo =
@@ -1907,6 +1912,12 @@ export class ResellerService {
       where: { resellerId, estado: 'ACTIVO' },
     });
 
+    // Clientes en PRODUCCIÓN (usaDemo:false): base del tier de volumen / descuento.
+    // Las cuentas demo NO cuentan para el simulador de precio por cliente.
+    const clientesProduccion = await this.prisma.empresa.count({
+      where: { resellerId, estado: 'ACTIVO', usaDemo: false },
+    });
+
     const clientesSuspendidos = await this.prisma.empresa.count({
       where: {
         resellerId,
@@ -1925,6 +1936,7 @@ export class ResellerService {
       saldo: reseller.saldo,
       totalClientes,
       clientesActivos,
+      clientesProduccion,
       clientesSuspendidos,
       // Inteligencia de ganancias
       ingresoMensual: earnings.resumen.ingresoMensual,

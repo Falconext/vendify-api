@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service'; // Assuming PrismaService exists at common or global
+import { DEMO_MAX_PRODUCTOS } from '../common/demo-limits';
 import { CreateProductoDto } from './dto/create-producto.dto'; // Use if needed, or create specific DTO
 
 import { S3Service } from '../s3/s3.service';
@@ -13,6 +14,29 @@ export class ProductoPlantillaService {
     private s3Service: S3Service,
     private geminiService: GeminiService,
   ) {}
+
+  // Bloquea importaciones que harían superar el tope de productos en cuentas DEMO.
+  private async assertLimiteImportacionDemo(
+    empresaId: number,
+    usaDemo: boolean,
+    cantidadNueva: number,
+  ) {
+    if (!usaDemo) return; // producción: sin tope
+    const actuales = await this.prisma.producto.count({
+      where: {
+        empresaId,
+        estado: { in: [EstadoType.ACTIVO, EstadoType.INACTIVO] },
+      },
+    });
+    if (actuales + cantidadNueva > DEMO_MAX_PRODUCTOS) {
+      const disponibles = Math.max(0, DEMO_MAX_PRODUCTOS - actuales);
+      throw new BadRequestException(
+        `Las cuentas demo permiten hasta ${DEMO_MAX_PRODUCTOS} productos. ` +
+          `Ya tienes ${actuales}${disponibles > 0 ? ` y solo puedes agregar ${disponibles} más` : ' (tope alcanzado)'}. ` +
+          `Pasa la empresa a producción para importar más.`,
+      );
+    }
+  }
 
   async generarPropuestaIA(rubroId: number, query: string) {
     // 1. Obtener nombre del rubro
@@ -87,6 +111,9 @@ export class ProductoPlantillaService {
         where: { id: empresaId },
       });
       if (!empresa) throw new NotFoundException('Empresa no encontrada');
+
+      // Tope anti-abuso para cuentas DEMO: no se puede importar por encima del máximo.
+      await this.assertLimiteImportacionDemo(empresaId, empresa.usaDemo, productos.length);
 
       const sedesActivasData = await this.prisma.sede.findMany({
         where: { empresaId, activo: true },
@@ -279,6 +306,9 @@ export class ProductoPlantillaService {
       });
 
       if (!empresa) throw new NotFoundException('Empresa no encontrada');
+
+      // Tope anti-abuso para cuentas DEMO: no se puede importar por encima del máximo.
+      await this.assertLimiteImportacionDemo(empresaId, empresa.usaDemo, plantillasIds.length);
 
       // Cargar sedes activas una sola vez para crear ProductoStock por cada producto nuevo
       const sedesActivas = await this.prisma.sede.findMany({

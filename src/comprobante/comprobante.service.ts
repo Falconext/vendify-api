@@ -1,4 +1,5 @@
 import { num, round3 } from '../common/utils/stock';
+import { DEMO_MAX_COMPROBANTES } from '../common/demo-limits';
 import {
   BadRequestException,
   Injectable,
@@ -1173,6 +1174,22 @@ export class ComprobanteService {
   }
 
   // Crea el comprobante con reintentos automáticos en caso de colisión de correlativo (race condition)
+  // Bloquea la emisión de más comprobantes en cuentas DEMO al alcanzar el tope.
+  private async assertLimiteComprobantesDemo(empresaId: number) {
+    const empresa = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { usaDemo: true },
+    });
+    if (!empresa?.usaDemo) return; // producción: sin tope
+    const total = await this.prisma.comprobante.count({ where: { empresaId } });
+    if (total >= DEMO_MAX_COMPROBANTES) {
+      throw new BadRequestException(
+        `Las cuentas demo permiten emitir hasta ${DEMO_MAX_COMPROBANTES} comprobantes. ` +
+          `Pasa la empresa a producción para seguir emitiendo.`,
+      );
+    }
+  }
+
   private async crearComprobanteConReintento(
     data: any,
     tipoDoc: string,
@@ -1180,6 +1197,10 @@ export class ComprobanteService {
     empresaId: number,
     maxIntentos = 5,
   ) {
+    // Tope anti-abuso para cuentas DEMO: no exceder el máximo de comprobantes
+    // (de cualquier tipo). En producción no aplica.
+    await this.assertLimiteComprobantesDemo(empresaId);
+
     let intento = 0;
     while (intento < maxIntentos) {
       const { serie, correlativo } = await this.obtenerSerieYCorrelativo(

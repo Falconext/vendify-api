@@ -1061,6 +1061,33 @@ export class EmpresaService {
       this.prisma.empresa.count({ where }),
     ]);
 
+    // Conteo de comprobantes por empresa (Boleta 03 / Factura 01 / Nota de venta NV)
+    // para ver quién está usando el sistema. Una sola consulta agrupada (sin N+1),
+    // acotada a las empresas de la página actual.
+    const empresaIds = empresas.map((e) => e.id);
+    const comprobantesPorEmpresa = new Map<
+      number,
+      { boletas: number; facturas: number; notasVenta: number; total: number }
+    >();
+    if (empresaIds.length > 0) {
+      const grupos = await this.prisma.comprobante.groupBy({
+        by: ['empresaId', 'tipoDoc'],
+        where: { empresaId: { in: empresaIds }, tipoDoc: { in: ['01', '03', 'NV'] } },
+        _count: { _all: true },
+      });
+      for (const g of grupos) {
+        const entry =
+          comprobantesPorEmpresa.get(g.empresaId) ??
+          { boletas: 0, facturas: 0, notasVenta: 0, total: 0 };
+        const cant = g._count._all;
+        if (g.tipoDoc === '03') entry.boletas += cant;
+        else if (g.tipoDoc === '01') entry.facturas += cant;
+        else if (g.tipoDoc === 'NV') entry.notasVenta += cant;
+        entry.total += cant;
+        comprobantesPorEmpresa.set(g.empresaId, entry);
+      }
+    }
+
     return {
       empresas: empresas.map((e) => ({
         id: e.id,
@@ -1085,6 +1112,9 @@ export class EmpresaService {
         rubro: e.rubro,
         reseller: e.reseller,
         usuarios: e.usuarios,
+        comprobantes:
+          comprobantesPorEmpresa.get(e.id) ??
+          { boletas: 0, facturas: 0, notasVenta: 0, total: 0 },
         plan: {
           nombre: e.plan.nombre,
           costo: e.plan.costo,
