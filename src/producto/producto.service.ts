@@ -1,5 +1,4 @@
 import { num, round3 } from '../common/utils/stock';
-import { DEMO_MAX_PRODUCTOS } from '../common/demo-limits';
 import {
   BadRequestException,
   ForbiddenException,
@@ -122,26 +121,6 @@ export class ProductoService {
     }
 
     return { porcentajeVenta: 100, porcentajeProvision: 0 };
-  }
-
-  // Bloquea el registro de más productos en cuentas DEMO al alcanzar el tope.
-  private async assertLimiteProductosDemo(empresaId: number) {
-    const empresa = await this.prisma.empresa.findUnique({
-      where: { id: empresaId },
-      select: { usaDemo: true },
-    });
-    if (!empresa?.usaDemo) return; // producción: sin tope
-    const total = await this.prisma.producto.count({
-      where: {
-        empresaId,
-        estado: { in: [EstadoType.ACTIVO, EstadoType.INACTIVO] },
-      },
-    });
-    if (total >= DEMO_MAX_PRODUCTOS) {
-      throw new BadRequestException(
-        `Las cuentas demo permiten registrar hasta ${DEMO_MAX_PRODUCTOS} productos. Pasa la empresa a producción para agregar más.`,
-      );
-    }
   }
 
   async crear(
@@ -327,12 +306,6 @@ export class ProductoService {
     const rawValor = precioUnitario / divisor;
     const valorUnitario = parseFloat(rawValor.toFixed(2));
     const costoBase = costoPromedio ?? costoUnitario;
-
-    // Tope anti-abuso para cuentas DEMO: no exceder el máximo de productos.
-    // Solo aplica a productos NUEVOS (o restaurar un eliminado que vuelve a activo).
-    if (!existe || existe.estado === 'PLACEHOLDER') {
-      await this.assertLimiteProductosDemo(empresaId);
-    }
 
     let nuevo;
     if (existe && existe.estado === 'PLACEHOLDER') {
