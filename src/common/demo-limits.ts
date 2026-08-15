@@ -6,5 +6,5 @@
  * gratis permanente (llenándolo de data), se topa la cantidad de productos y de
  * comprobantes que puede registrar. Al pasar a producción estos topes no aplican.
  */
-export const DEMO_MAX_PRODUCTOS = 20;
+export const DEMO_MAX_PRODUCTOS = 500;
 export const DEMO_MAX_COMPROBANTES = 40;
