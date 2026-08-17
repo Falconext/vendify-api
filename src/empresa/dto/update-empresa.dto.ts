@@ -105,6 +105,15 @@ export class UpdateEmpresaDto {
   @IsObject()
   cotizFormatoConfig?: Record<string, { visible?: boolean; size?: number }>;
 
+  // Textos por defecto recordados para próximas cotizaciones
+  @IsOptional()
+  @IsString()
+  cotizTerminosDefault?: string;
+
+  @IsOptional()
+  @IsString()
+  cotizObservacionesDefault?: string;
+
   @IsOptional()
   @IsObject()
   notaVentaFormatoConfig?: Record<string, { visible?: boolean; size?: number }>;
