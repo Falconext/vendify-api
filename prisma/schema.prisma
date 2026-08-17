@@ -225,6 +225,9 @@ model Empresa {
   restauranteSyncAt      DateTime?
   usuarioPse          String?
   contrasenaPse       String?
+  // Credenciales de API "Consulta de Validez de CPE" de SUNAT (portal SOL).
+  sunatClientId       String?
+  sunatClientSecret   String?
   qpseExternalId      String?
   usaDemo             Boolean              @default(false)
   metodoSalidaLotes   String               @default("LIFO")
