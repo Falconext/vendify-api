@@ -1849,6 +1849,17 @@ export class ComprobanteService {
 
       const esGratProd = this.esGratuito(tipAfeIgv);
       const mtoValorVenta = valorUnitario * cantidad;
+      const mtoValorVentaRedondeado = this.round2(mtoValorVenta);
+      // Valor unitario (sin IGV) que va a cac:Price/cbc:PriceAmount. SUNAT valida
+      // (código 3271) que  cantidad × valorUnitario == valorVenta de la línea.
+      // Redondear el unitario a 2 decimales rompe la línea con cantidades altas
+      // (p. ej. 0.24×1000=240 ≠ 237.29). Por eso lo derivamos del valorVenta ya
+      // redondeado, con más decimales (SUNAT admite hasta 10 en el valor unitario).
+      const mtoValorUnitarioSunat = esGratProd
+        ? 0
+        : cantidad > 0
+          ? parseFloat((mtoValorVentaRedondeado / cantidad).toFixed(10))
+          : this.round2(valorUnitario);
       // Descuento por línea a mostrar en el ticket (monto bruto, incl. IGV). precioConIgv ya
       // viene con el descuento aplicado; precioUnitarioOriginal es el precio de lista. No
       // afecta base/IGV/total ni el XML de SUNAT: es únicamente informativo para la impresión.
@@ -1868,9 +1879,9 @@ export class ComprobanteService {
         mtoPrecioUnitario: esGratProd
           ? this.round2(valorUnitario)
           : this.round2(precioConIgv),
-        mtoValorUnitario: esGratProd ? 0 : this.round2(valorUnitario),
-        mtoValorVenta: this.round2(mtoValorVenta),
-        mtoBaseIgv: this.round2(mtoValorVenta),
+        mtoValorUnitario: mtoValorUnitarioSunat,
+        mtoValorVenta: mtoValorVentaRedondeado,
+        mtoBaseIgv: mtoValorVentaRedondeado,
         porcentajeIgv: igvPct,
         igv: this.round2(igvMonto),
         tipAfeIgv,
@@ -3163,6 +3174,41 @@ export class ComprobanteService {
       correlativo: comp.correlativo,
       observaciones: result.observaciones,
     };
+  }
+
+  /**
+   * Valida que un comprobante pueda REEMITIRSE a SUNAT. Solo se permite cuando
+   * NO fue aceptado: RECHAZADO (SUNAT devolvió CDR con error) o FALLIDO_ENVIO
+   * (nunca llegó a enviarse). En esos casos la serie-correlativo sigue libre y
+   * puede reenviarse el mismo número con el XML corregido. Un comprobante
+   * EMITIDO/aceptado NO se reemite: se corrige con nota de crédito.
+   * Devuelve los datos del comprobante; el reenvío real lo hace
+   * EnviarSunatService.execute() desde el controller.
+   */
+  async prepararReemision(id: number, empresaId: number) {
+    const comp = await this.prisma.comprobante.findFirst({
+      where: { id, empresaId },
+      select: {
+        id: true,
+        estadoEnvioSunat: true,
+        serie: true,
+        correlativo: true,
+        tipoDoc: true,
+      },
+    });
+    if (!comp) throw new NotFoundException('Comprobante no encontrado');
+    const reemitibles: EstadoSunat[] = [
+      EstadoSunat.RECHAZADO,
+      EstadoSunat.FALLIDO_ENVIO,
+    ];
+    if (!reemitibles.includes(comp.estadoEnvioSunat as EstadoSunat)) {
+      throw new BadRequestException(
+        `Solo se pueden reemitir comprobantes RECHAZADOS o con envío fallido. ` +
+          `Este está en estado ${comp.estadoEnvioSunat}. ` +
+          `Un comprobante aceptado por SUNAT se corrige con una nota de crédito.`,
+      );
+    }
+    return comp;
   }
 
   async conciliarComprobante(id: number, empresaId: number) {
