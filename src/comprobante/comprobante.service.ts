@@ -4138,6 +4138,7 @@ export class ComprobanteService {
       cotizAdelanto,
       cotizIncluirImagenes,
       cotizDescuento,
+      montoDescuentoGlobal,
       tipoOperacionId,
       tipoDetraccionId,
       medioPagoDetraccionId,
@@ -4190,7 +4191,12 @@ export class ComprobanteService {
       mtoOperGravadas + mtoOpExoneradas + mtoOpInafectas + mtoOperExportacion,
     );
     const subTotal = this.round2(valorVenta + totalIGV);
-    const mtoImpVenta = subTotal;
+    // Descuento global de la cotización: antes NO se aplicaba al actualizar, por eso
+    // al reabrir/imprimir desde la lista el descuento salía en 0 y el total sin rebajar.
+    const descuentoGlobal = this.round2(
+      Math.max(0, Number(montoDescuentoGlobal ?? 0)),
+    );
+    const mtoImpVenta = this.round2(Math.max(0, subTotal - descuentoGlobal));
     const fecha = new Date(fechaEmision);
 
     return this.prisma.$transaction(async (tx) => {
@@ -4222,6 +4228,7 @@ export class ComprobanteService {
           totalImpuestos: totalIGV,
           subTotal,
           mtoImpVenta,
+          mtoDescuentoGlobal: descuentoGlobal > 0 ? descuentoGlobal : 0,
           cotizVigencia: cotizVigencia ? Number(cotizVigencia) : null,
           cotizTerminos: cotizTerminos ?? null,
           // Forma de pago / firmante / adelanto / opciones de la cotización: antes NO
