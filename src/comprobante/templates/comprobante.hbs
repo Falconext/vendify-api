@@ -351,14 +351,14 @@
       </div>
       <div class="footer-totals">
         {{#if isDocumentoFiscal}}
-        <div class="tot-row bold"><span>OP. GRAVADAS:</span><span>{{simboloMoneda}} {{mtoOperGravadas}}</span></div>
-        <div class="tot-row bold"><span>OP. EXONERADAS:</span><span>{{simboloMoneda}} {{mtoOperExoneradas}}</span></div>
-        <div class="tot-row bold"><span>OP. INAFECTAS:</span><span>{{simboloMoneda}} {{mtoOperInafectas}}</span></div>
-        <div class="tot-row bold"><span>OP. GRATUITAS:</span><span>{{simboloMoneda}} 0.00</span></div>
-        <div class="tot-row bold"><span>ICBPER:</span><span>{{simboloMoneda}} 0.00</span></div>
-        <div class="tot-row bold"><span>SUB TOTAL:</span><span>{{simboloMoneda}} {{mtoOperGravadas}}</span></div>
-        <div class="tot-row"><span>DESCUENTOS TOTAL:</span><span>{{simboloMoneda}} {{descuento}}</span></div>
-        <div class="tot-row bold"><span>IGV 18%:</span><span>{{simboloMoneda}} {{mtoIGV}}</span></div>
+        {{#if (vis fc 'opGravadas')}}<div class="tot-row bold"><span>OP. GRAVADAS:</span><span>{{simboloMoneda}} {{mtoOperGravadas}}</span></div>{{/if}}
+        {{#if (vis fc 'opExoneradas')}}<div class="tot-row bold"><span>OP. EXONERADAS:</span><span>{{simboloMoneda}} {{mtoOperExoneradas}}</span></div>{{/if}}
+        {{#if (vis fc 'opInafectas')}}<div class="tot-row bold"><span>OP. INAFECTAS:</span><span>{{simboloMoneda}} {{mtoOperInafectas}}</span></div>{{/if}}
+        {{#if (vis fc 'opGratuitas')}}<div class="tot-row bold"><span>OP. GRATUITAS:</span><span>{{simboloMoneda}} 0.00</span></div>{{/if}}
+        {{#if (vis fc 'icbper')}}<div class="tot-row bold"><span>ICBPER:</span><span>{{simboloMoneda}} 0.00</span></div>{{/if}}
+        {{#if (vis fc 'subTotal')}}<div class="tot-row bold"><span>SUB TOTAL:</span><span>{{simboloMoneda}} {{subTotal}}</span></div>{{/if}}
+        {{#if (vis fc 'descuentos')}}<div class="tot-row"><span>DESCUENTOS TOTAL:</span><span>{{simboloMoneda}} {{descuento}}</span></div>{{/if}}
+        {{#if (vis fc 'igv')}}<div class="tot-row bold"><span>IGV 18%:</span><span>{{simboloMoneda}} {{mtoIGV}}</span></div>{{/if}}
         {{/if}}
         {{#unless isDocumentoFiscal}}{{#if descuento}}
         <div class="tot-row"><span>DESCUENTO:</span><span>- {{simboloMoneda}} {{descuento}}</span></div>

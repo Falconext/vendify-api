@@ -22,7 +22,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { KardexService } from '../kardex/kardex.service';
 import { InventarioNotificacionesService } from '../notificaciones/inventario-notificaciones.service';
 import { S3Service } from '../s3/s3.service';
-import { PdfGeneratorService } from './pdf-generator.service';
+import {
+  PdfGeneratorService,
+  buildFiscalFormatoFc,
+} from './pdf-generator.service';
 import { numeroALetras } from './utils/numero-a-letras';
 import { ProductoLoteService } from '../producto/producto-lote.service';
 import { EnviarSunatService } from './enviar-sunat.service';
@@ -5526,7 +5529,21 @@ export class ComprobanteService {
       };
       buffer = await this.pdfGenerator.generarPDFCotizacion(cotizacionData);
     } else {
-      buffer = await this.pdfGenerator.generarPDFComprobante(pdfData);
+      // Formato configurable de comprobante fiscal (visibilidad por elemento).
+      // Debe reflejar lo mismo que respeta el frontend (comprobanteImprimir.tsx)
+      // para que "Ver PDF" e "Imprimir" coincidan.
+      const fcFiscal = buildFiscalFormatoFc(full.empresa, full.tipoDoc);
+      // Sub total = suma de operaciones (gravadas + exoneradas + inafectas).
+      const subTotalFiscal = (
+        Number(full.mtoOperGravadas || 0) +
+        Number((full as any).mtoOperExoneradas || 0) +
+        Number((full as any).mtoOperInafectas || 0)
+      ).toFixed(2);
+      buffer = await this.pdfGenerator.generarPDFComprobante({
+        ...pdfData,
+        fc: fcFiscal,
+        subTotal: subTotalFiscal,
+      });
     }
 
     const key = this.s3Service.generateComprobanteKey(

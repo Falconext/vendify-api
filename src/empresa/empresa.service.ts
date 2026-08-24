@@ -1185,6 +1185,10 @@ export class EmpresaService {
         updateData.cotizFormatoConfig = dto.cotizFormatoConfig as any;
       if (dto.notaVentaFormatoConfig !== undefined)
         updateData.notaVentaFormatoConfig = dto.notaVentaFormatoConfig as any;
+      if (dto.facturaFormatoConfig !== undefined)
+        updateData.facturaFormatoConfig = dto.facturaFormatoConfig as any;
+      if (dto.boletaFormatoConfig !== undefined)
+        updateData.boletaFormatoConfig = dto.boletaFormatoConfig as any;
       if (dto.cotizTerminosDefault !== undefined)
         updateData.cotizTerminosDefault = dto.cotizTerminosDefault || null;
       if (dto.cotizObservacionesDefault !== undefined)

@@ -4,6 +4,36 @@ import * as Handlebars from 'handlebars';
 import * as fs from 'fs';
 import * as path from 'path';
 
+/**
+ * Construye el objeto de formato configurable (visibilidad por elemento) para
+ * comprobantes fiscales, a partir de la empresa y el tipo de documento.
+ * Boleta ('03') usa `boletaFormatoConfig`; el resto (factura, NC, ND) usa
+ * `facturaFormatoConfig`. Por defecto todo es visible (visible !== false).
+ * Se usa en los 3 flujos que generan el PDF (impresión, emisión y reemisión)
+ * para que el documento salga idéntico en todos lados.
+ */
+export function buildFiscalFormatoFc(
+  empresa: any,
+  tipoDoc: string,
+): Record<string, { visible: boolean; size: number }> {
+  const defaults: Record<string, number> = {
+    opGravadas: 12, opExoneradas: 12, opInafectas: 12, opGratuitas: 12,
+    icbper: 12, subTotal: 12, descuentos: 12, igv: 12,
+  };
+  const raw = ((tipoDoc === '03'
+    ? empresa?.boletaFormatoConfig
+    : empresa?.facturaFormatoConfig) || {}) as Record<
+    string,
+    { visible?: boolean; size?: number }
+  >;
+  const fc: Record<string, { visible: boolean; size: number }> = {};
+  for (const [k, def] of Object.entries(defaults)) {
+    const c = raw[k] || {};
+    fc[k] = { visible: c.visible !== false, size: Number(c.size) || def };
+  }
+  return fc;
+}
+
 @Injectable()
 export class PdfGeneratorService {
   private readonly logger = new Logger(PdfGeneratorService.name);
@@ -56,6 +86,12 @@ export class PdfGeneratorService {
     Handlebars.registerHelper('or', (...args: any[]) => {
       // El último argumento es el "options" de Handlebars; se ignora.
       return args.slice(0, -1).some((v) => !!v);
+    });
+    // Visibilidad de un elemento del formato configurable (factura/boleta).
+    // Devuelve true por defecto si no hay config para ese elemento, para no
+    // afectar comprobantes/tickets que se generan sin `fc`.
+    Handlebars.registerHelper('vis', (fc: any, key: string) => {
+      return !fc || !fc[key] || fc[key].visible !== false;
     });
 
     const templateSource = fs.readFileSync(foundPath, 'utf-8');
@@ -338,7 +374,12 @@ export class PdfGeneratorService {
     mtoOperInafectas?: string;
     mtoImpVenta: string;
     descuento?: string;
+    subTotal?: string;
     totalEnLetras?: string;
+
+    // Formato configurable (visibilidad por elemento de totales). Opcional:
+    // si no se envía, todas las filas se muestran (ver helper `vis`).
+    fc?: Record<string, { visible: boolean; size: number }>;
 
     // Otros
     formaPago: string;
@@ -372,6 +413,17 @@ export class PdfGeneratorService {
           String((data as any).tipoMoneda || 'PEN').toUpperCase() === 'USD';
         (data as any).simboloMoneda = esUSD ? 'US$' : 'S/';
         (data as any).monedaNombre = esUSD ? 'DÓLARES' : 'SOLES';
+      }
+
+      // Sub total = suma de operaciones (gravadas + exoneradas + inafectas).
+      // Se calcula aquí si el caller no lo envía, para que todos los flujos
+      // (impresión, envío a SUNAT, email) muestren el mismo valor correcto.
+      if (data.subTotal === undefined || data.subTotal === null) {
+        data.subTotal = (
+          Number(data.mtoOperGravadas || 0) +
+          Number(data.mtoOperExoneradas || 0) +
+          Number(data.mtoOperInafectas || 0)
+        ).toFixed(2);
       }
 
       // Generar HTML desde template
@@ -413,6 +465,14 @@ export class PdfGeneratorService {
         const esUSD = String(data?.tipoMoneda || 'PEN').toUpperCase() === 'USD';
         data.simboloMoneda = esUSD ? 'US$' : 'S/';
         data.monedaNombre = esUSD ? 'DÓLARES' : 'SOLES';
+      }
+
+      if (data.subTotal === undefined || data.subTotal === null) {
+        data.subTotal = (
+          Number(data.mtoOperGravadas || 0) +
+          Number(data.mtoOperExoneradas || 0) +
+          Number(data.mtoOperInafectas || 0)
+        ).toFixed(2);
       }
 
       const html = this.template(data);

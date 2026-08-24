@@ -123,6 +123,8 @@ model Empresa {
   cotizMostrarDetraccion  Boolean                       @default(true)
   cotizFormatoConfig      Json?
   notaVentaFormatoConfig  Json?
+  facturaFormatoConfig    Json?
+  boletaFormatoConfig     Json?
   // Textos por defecto que el negocio decide recordar para próximas cotizaciones
   // (Términos y Condiciones / Observaciones). Se autocompletan al crear una cotización.
   cotizTerminosDefault    String?
