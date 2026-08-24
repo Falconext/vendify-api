@@ -38,14 +38,12 @@ function normalizeProducto(
 // Vendify volume-based reseller pricing (cost the platform charges the reseller per active client/month).
 // Tiers: [1-5 clients, 6-15 clients, 16-30 clients, 31+ clients]
 // Precio mayorista MENSUAL por tramos de volumen (1-5, 6-15, 16-30, 31+).
-const VENDIFY_VOLUME_PRICING: Record<
-  string,
-  [number, number, number, number]
-> = {
-  Emprendedor: [15, 14, 13, 12],
-  Negocio: [30, 29, 28, 27],
-  Corporativo: [45, 44, 43, 42],
-};
+const VENDIFY_VOLUME_PRICING: Record<string, [number, number, number, number]> =
+  {
+    Emprendedor: [15, 14, 13, 12],
+    Negocio: [30, 29, 28, 27],
+    Corporativo: [45, 44, 43, 42],
+  };
 
 // Precio mayorista ANUAL (plano, 10× base = 2 meses gratis). Sin tramos.
 const VENDIFY_ANNUAL_PRICING: Record<string, number> = {
@@ -159,15 +157,18 @@ export class ResellerService {
       clientesActuales + 1,
       ciclo,
     );
-    if (Number(reseller.saldo) < costoFinal) {
+    // Cobro atómico: descuenta el saldo SOLO si alcanza, en una única operación
+    // condicional. Evita la carrera (TOCTOU) donde dos activaciones simultáneas
+    // leen el mismo saldo, ambas pasan el chequeo y el saldo termina negativo.
+    const cobrado = await tx.reseller.updateMany({
+      where: { id: resellerId, saldo: { gte: costoFinal } },
+      data: { saldo: { decrement: costoFinal } },
+    });
+    if (cobrado.count !== 1) {
       throw new BadRequestException(
         `Saldo insuficiente. El plan cuesta S/${costoFinal.toFixed(2)} y tienes S/${Number(reseller.saldo).toFixed(2)}`,
       );
     }
-    await tx.reseller.update({
-      where: { id: resellerId },
-      data: { saldo: { decrement: costoFinal } },
-    });
     await tx.resellerMovimiento.create({
       data: {
         resellerId,
@@ -269,7 +270,8 @@ export class ResellerService {
         );
       }
       if (!username || !password) {
-        const message = (e as Error)?.message || 'Error al aprovisionar en QPSE';
+        const message =
+          (e as Error)?.message || 'Error al aprovisionar en QPSE';
         console.error(
           `[QPSE] Auto-aprovisionamiento falló para ${empresa.ruc}: ${message}`,
         );
@@ -304,7 +306,10 @@ export class ResellerService {
     usaDemo: boolean,
   ): Promise<string | undefined> {
     try {
-      const encontrada = await this.qpseClient.buscarEmpresaPorRuc(ruc, usaDemo);
+      const encontrada = await this.qpseClient.buscarEmpresaPorRuc(
+        ruc,
+        usaDemo,
+      );
       return encontrada?.external_id;
     } catch (err) {
       console.error(
@@ -370,7 +375,8 @@ export class ResellerService {
     if (planType !== '01' && planType !== '02') {
       return {
         ok: false,
-        message: 'El tipo de plan debe ser 01 (por comprobante) o 02 (ilimitado).',
+        message:
+          'El tipo de plan debe ser 01 (por comprobante) o 02 (ilimitado).',
       };
     }
     // Necesitamos el external_id. Está guardado o lo buscamos en la cuenta QPSE
@@ -397,7 +403,8 @@ export class ResellerService {
     if (!empresa.plan) {
       return {
         ok: false,
-        message: 'El cliente no tiene un plan válido para activar la producción.',
+        message:
+          'El cliente no tiene un plan válido para activar la producción.',
       };
     }
     // Pre-chequeo de saldo: pasar a producción cobra la ACTIVACIÓN del cliente
@@ -462,7 +469,7 @@ export class ResellerService {
         await this.cobrarActivacionCliente(
           tx,
           resellerId,
-          { razonSocial: empresa.razonSocial, plan: empresa.plan! },
+          { razonSocial: empresa.razonSocial, plan: empresa.plan },
           ciclo,
         );
         await tx.empresa.update({
@@ -483,7 +490,8 @@ export class ResellerService {
     );
     return {
       ok: true,
-      message: migracionMsg || 'Empresa actualizada a producción correctamente.',
+      message:
+        migracionMsg || 'Empresa actualizada a producción correctamente.',
       environment,
     };
   }
@@ -613,12 +621,49 @@ export class ResellerService {
   private readonly BASE_DOMAIN = process.env.APP_BASE_DOMAIN || 'vendify.pe';
   // Subdominios reservados: no se pueden asignar a un reseller.
   private readonly SUBDOMINIOS_RESERVADOS = new Set([
-    'app', 'www', 'api', 'admin', 'mail', 'ftp', 'smtp', 'pop', 'imap',
-    'ns', 'ns1', 'ns2', 'blog', 'shop', 'tienda', 'pay', 'pagos',
-    'staging', 'stage', 'dev', 'test', 'demo', 'soporte', 'support',
-    'vendify', 'root', 'system', 'sistema', 'panel', 'dashboard',
-    'cdn', 'assets', 'static', 'status', 'docs', 'help', 'ayuda',
-    'account', 'cuenta', 'billing', 'facturacion', 'login', 'auth',
+    'app',
+    'www',
+    'api',
+    'admin',
+    'mail',
+    'ftp',
+    'smtp',
+    'pop',
+    'imap',
+    'ns',
+    'ns1',
+    'ns2',
+    'blog',
+    'shop',
+    'tienda',
+    'pay',
+    'pagos',
+    'staging',
+    'stage',
+    'dev',
+    'test',
+    'demo',
+    'soporte',
+    'support',
+    'vendify',
+    'root',
+    'system',
+    'sistema',
+    'panel',
+    'dashboard',
+    'cdn',
+    'assets',
+    'static',
+    'status',
+    'docs',
+    'help',
+    'ayuda',
+    'account',
+    'cuenta',
+    'billing',
+    'facturacion',
+    'login',
+    'auth',
   ]);
 
   /**
@@ -643,7 +688,9 @@ export class ResellerService {
   private validarDominioReseller(dominio: string): void {
     if (!dominio) return;
     if (!/^[a-z0-9.-]+$/.test(dominio) || dominio.includes('..')) {
-      throw new BadRequestException('El dominio contiene caracteres inválidos.');
+      throw new BadRequestException(
+        'El dominio contiene caracteres inválidos.',
+      );
     }
     if (dominio === this.BASE_DOMAIN) {
       throw new BadRequestException(
@@ -1235,17 +1282,18 @@ export class ResellerService {
         // Los clientes DEMO NO cobran saldo; el cobro ocurre al pasar a producción.
         const esDemoCreacion = Boolean(data.usaDemo);
         if (!esDemoCreacion) {
-          if (Number(reseller.saldo) < costoFinal) {
+          // 4. Deduct Balance — cobro atómico condicional (anti-sobregiro):
+          // descuenta SOLO si el saldo alcanza, en una sola operación. Evita la
+          // carrera donde varias activaciones simultáneas dejan el saldo negativo.
+          const cobrado = await tx.reseller.updateMany({
+            where: { id: resellerId, saldo: { gte: costoFinal } },
+            data: { saldo: { decrement: costoFinal } },
+          });
+          if (cobrado.count !== 1) {
             throw new BadRequestException(
               `Saldo insuficiente. El plan cuesta S/${costoFinal.toFixed(2)} y tienes S/${Number(reseller.saldo).toFixed(2)}`,
             );
           }
-
-          // 4. Deduct Balance
-          await tx.reseller.update({
-            where: { id: resellerId },
-            data: { saldo: { decrement: costoFinal } },
-          });
           cobroAplicado = costoFinal;
 
           const usaPrecioPorVolumen =
@@ -1330,7 +1378,9 @@ export class ResellerService {
             usaCodigoBarrasManual: Boolean(data.usaCodigoBarrasManual),
             fechaActivacion: new Date(),
             fechaExpiracion: new Date(
-              new Date().setDate(new Date().getDate() + this.getCicloDias(ciclo)),
+              new Date().setDate(
+                new Date().getDate() + this.getCicloDias(ciclo),
+              ),
             ), // +30 (mensual) o +365 (anual)
             cicloFacturacion: ciclo,
             planId: plan.id,
@@ -1661,7 +1711,8 @@ export class ResellerService {
       // Solo clientes en PRODUCCIÓN generan MRR; los DEMO no pagan (consistente
       // con buildEarnings). Los conteos de clientes usan _count.empresas aparte.
       const mrrBruto = reseller.empresas.reduce(
-        (acc, empresa) => acc + (empresa.usaDemo ? 0 : Number(empresa.plan.costo)),
+        (acc, empresa) =>
+          acc + (empresa.usaDemo ? 0 : Number(empresa.plan.costo)),
         0,
       );
       const descuento = Number(reseller.porcentajeDescuento) || 0;
@@ -1756,12 +1807,16 @@ export class ResellerService {
 
         const planCosto = Number(empresa.plan.costo);
         const descuento = Number(reseller.porcentajeDescuento) || 0;
+        // Tramo de volumen: SOLO clientes en producción (usaDemo:false), igual que
+        // en la activación. Antes contaba también los demo (gratis), lo que dejaba
+        // que el reseller inflara con demos para renovar sus reales más barato.
         const clientesActivos = await tx.empresa.count({
-          where: { resellerId: reseller.id, estado: 'ACTIVO' },
+          where: { resellerId: reseller.id, estado: 'ACTIVO', usaDemo: false },
         });
         const cicloEmpresa =
-          String((empresa as any).cicloFacturacion || 'MENSUAL').toUpperCase() ===
-          'ANUAL'
+          String(
+            (empresa as any).cicloFacturacion || 'MENSUAL',
+          ).toUpperCase() === 'ANUAL'
             ? 'ANUAL'
             : 'MENSUAL';
         const costoFinal = this.resolveClientCost(
@@ -1781,7 +1836,18 @@ export class ResellerService {
         );
         const enGracia = diasVencida <= graceDays;
 
-        if (saldoActual >= costoFinal) {
+        // Cobro atómico condicional: descuenta SOLO si el saldo alcanza. Si otra
+        // corrida (cron + disparo manual del admin) ya gastó el saldo, count será
+        // 0 y caemos al flujo de gracia/suspensión en vez de dejar saldo negativo.
+        const cobrado =
+          saldoActual >= costoFinal
+            ? await tx.reseller.updateMany({
+                where: { id: reseller.id, saldo: { gte: costoFinal } },
+                data: { saldo: { decrement: costoFinal } },
+              })
+            : { count: 0 };
+
+        if (cobrado.count === 1) {
           const baseFecha =
             empresa.fechaExpiracion > now
               ? new Date(empresa.fechaExpiracion)
@@ -1790,11 +1856,6 @@ export class ResellerService {
           nuevaFechaExpiracion.setDate(
             nuevaFechaExpiracion.getDate() + this.getCicloDias(cicloEmpresa),
           );
-
-          await tx.reseller.update({
-            where: { id: reseller.id },
-            data: { saldo: { decrement: costoFinal } },
-          });
 
           await tx.empresa.update({
             where: { id: empresa.id },
@@ -2426,6 +2487,15 @@ export class ResellerService {
 
     if (!empresa) throw new NotFoundException('Cliente no encontrado');
 
+    // No permitir reactivar (→ ACTIVO) un cliente cuya suscripción ya venció:
+    // el estado y la fecha de vencimiento deben quedar alineados. Reactivar sin
+    // renovar dejaba "vivo" (tienda, dashboards) a un cliente impago sin cobro.
+    if (nuevoEstado === 'ACTIVO' && empresa.fechaExpiracion < new Date()) {
+      throw new BadRequestException(
+        'No puedes reactivar un cliente vencido. Renueva su suscripción primero.',
+      );
+    }
+
     return this.prisma.empresa.update({
       where: { id: empresaId },
       data: { estado: nuevoEstado as EstadoType },
@@ -2497,6 +2567,7 @@ export class ResellerService {
     const empresa = await this.prisma.empresa.findFirst({
       where: { id: empresaId, resellerId },
       include: {
+        plan: { select: { nombre: true, costo: true } },
         usuarios: {
           where: { rol: 'ADMIN_EMPRESA' },
           take: 1,
@@ -2512,6 +2583,21 @@ export class ResellerService {
 
     return this.prisma.$transaction(async (tx) => {
       const updateEmpresa: Prisma.EmpresaUpdateInput = {};
+
+      // Cobro al pasar de DEMO a PRODUCCIÓN desde la pantalla de Configuración.
+      // Paridad con updateClient/updateClientAmbiente: CUALQUIER ruta que active
+      // producción debe cobrar la activación al saldo del reseller. Sin esto, el
+      // reseller pasaba clientes a producción real (SUNAT) sin pagar.
+      const pasaAProduccion =
+        empresa.usaDemo === true && data.usaDemo === false;
+      if (pasaAProduccion) {
+        if (!empresa.plan)
+          throw new BadRequestException('El cliente no tiene un plan válido.');
+        await this.cobrarActivacionCliente(tx, resellerId, {
+          razonSocial: empresa.razonSocial,
+          plan: empresa.plan,
+        });
+      }
 
       if (data.billingProvider !== undefined) {
         const provider = String(data.billingProvider || '').toUpperCase();
@@ -2661,6 +2747,10 @@ export class ResellerService {
 
     return this.prisma.$transaction(async (tx) => {
       const updateEmpresa: Prisma.EmpresaUpdateInput = {};
+      // Si hay cambio de plan, guardamos el nuevo (nombre/costo) para cobrar el
+      // diferencial prorrateado cuando el cliente ya está en producción (#3).
+      let nuevoPlanUpgrade: { nombre: string; costo: Prisma.Decimal } | null =
+        null;
       if (data.planId !== undefined) {
         const planId = Number(data.planId);
         if (!Number.isInteger(planId) || planId <= 0)
@@ -2668,11 +2758,12 @@ export class ResellerService {
         if (planId !== empresa.planId) {
           const plan = await tx.plan.findUnique({
             where: { id: planId },
-            select: { id: true },
+            select: { id: true, nombre: true, costo: true },
           });
           if (!plan)
             throw new BadRequestException('El plan seleccionado no existe.');
           (updateEmpresa as any).planId = planId;
+          nuevoPlanUpgrade = { nombre: plan.nombre, costo: plan.costo };
         }
       }
       if (data.razonSocial !== undefined)
@@ -2747,7 +2838,9 @@ export class ResellerService {
             select: { id: true },
           });
           if (dup)
-            throw new BadRequestException('Ya existe otra empresa con ese RUC.');
+            throw new BadRequestException(
+              'Ya existe otra empresa con ese RUC.',
+            );
           updateEmpresa.ruc = nuevoRuc;
           (updateEmpresa as any).usuarioPse = null;
           (updateEmpresa as any).contrasenaPse = null;
@@ -2759,8 +2852,7 @@ export class ResellerService {
       const pasaAProduccion =
         empresa.usaDemo === true && data.usaDemo === false;
       if (pasaAProduccion) {
-        const planEfectivoId =
-          (updateEmpresa as any).planId ?? empresa.planId;
+        const planEfectivoId = (updateEmpresa as any).planId ?? empresa.planId;
         const planEfectivo = await tx.plan.findUnique({
           where: { id: planEfectivoId },
           select: { nombre: true, costo: true },
@@ -2771,6 +2863,83 @@ export class ResellerService {
           razonSocial: empresa.razonSocial,
           plan: planEfectivo,
         });
+      }
+
+      // #3 — Upgrade de plan en un cliente que YA está en producción: cobrar la
+      // diferencia prorrateada por los días que quedan del ciclo. Sin esto, subir
+      // a un plan más caro salía gratis hasta la siguiente renovación. (El caso
+      // demo→producción ya se cobra completo arriba, por eso se excluye.)
+      const vaADemo = data.usaDemo === true;
+      if (
+        nuevoPlanUpgrade &&
+        empresa.usaDemo === false &&
+        !vaADemo &&
+        !pasaAProduccion &&
+        empresa.plan
+      ) {
+        const ciclo =
+          String(
+            (empresa as any).cicloFacturacion || 'MENSUAL',
+          ).toUpperCase() === 'ANUAL'
+            ? 'ANUAL'
+            : 'MENSUAL';
+        const reseller = await tx.reseller.findUnique({
+          where: { id: resellerId },
+          select: { saldo: true, porcentajeDescuento: true },
+        });
+        if (!reseller)
+          throw new NotFoundException('Distribuidor no encontrado');
+        const descuento = Number(reseller.porcentajeDescuento) || 0;
+        const clientesActuales = await tx.empresa.count({
+          where: { resellerId, estado: 'ACTIVO', usaDemo: false },
+        });
+        const costoAnterior = this.resolveClientCost(
+          empresa.plan.nombre,
+          Number(empresa.plan.costo),
+          descuento,
+          clientesActuales,
+          ciclo,
+        );
+        const costoNuevo = this.resolveClientCost(
+          nuevoPlanUpgrade.nombre,
+          Number(nuevoPlanUpgrade.costo),
+          descuento,
+          clientesActuales,
+          ciclo,
+        );
+        const diasCiclo = this.getCicloDias(ciclo);
+        const diasRestantes = Math.max(
+          0,
+          Math.ceil(
+            (empresa.fechaExpiracion.getTime() - Date.now()) /
+              (1000 * 60 * 60 * 24),
+          ),
+        );
+        const delta = costoNuevo - costoAnterior;
+        const cargo =
+          delta > 0
+            ? Math.round(((delta * diasRestantes) / diasCiclo) * 100) / 100
+            : 0;
+        if (cargo > 0) {
+          const cobrado = await tx.reseller.updateMany({
+            where: { id: resellerId, saldo: { gte: cargo } },
+            data: { saldo: { decrement: cargo } },
+          });
+          if (cobrado.count !== 1) {
+            throw new BadRequestException(
+              `Saldo insuficiente para el cambio de plan: la diferencia prorrateada es S/${cargo.toFixed(2)} y tienes S/${Number(reseller.saldo).toFixed(2)}.`,
+            );
+          }
+          await tx.resellerMovimiento.create({
+            data: {
+              resellerId,
+              empresaId,
+              tipo: 'UPGRADE',
+              monto: -cargo,
+              descripcion: `Upgrade de plan: ${empresa.plan.nombre} → ${nuevoPlanUpgrade.nombre} (${empresa.razonSocial}). Prorrateo ${diasRestantes}/${diasCiclo} días.`,
+            },
+          });
+        }
       }
 
       if (Object.keys(updateEmpresa).length) {
@@ -2831,7 +3000,9 @@ export class ResellerService {
     return this.prisma.$transaction(async (tx) => {
       if (pasaAProduccion) {
         if (!empresa.plan)
-          throw new BadRequestException('El cliente no tiene un plan asignado.');
+          throw new BadRequestException(
+            'El cliente no tiene un plan asignado.',
+          );
         await this.cobrarActivacionCliente(tx, resellerId, empresa as any);
       }
       return tx.empresa.update({
