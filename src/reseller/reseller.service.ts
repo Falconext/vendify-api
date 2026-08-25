@@ -185,6 +185,48 @@ export class ResellerService {
     return String(ciclo).toUpperCase() === 'ANUAL' ? 365 : 30;
   }
 
+  // Mismo criterio que el frontend (Clientes.tsx): el plan "X ANUAL" es la
+  // fuente real de verdad — Plan.tipoFacturacion no se usa en la práctica
+  // (ambas variantes de un mismo tier lo guardan como 'MENSUAL').
+  private esPlanAnual(nombrePlan?: string | null): boolean {
+    return /anual\s*$/i.test(String(nombrePlan || ''));
+  }
+
+  /**
+   * Deriva el ciclo de facturación SIEMPRE del nombre del plan vigente, en vez
+   * de confiar en el campo `cicloFacturacion` guardado (que puede quedar
+   * desalineado si alguien cambia el plan de un cliente sin pasar por el
+   * flujo que lo sincroniza). `nombrePlan` ausente cae al valor guardado.
+   */
+  private derivarCiclo(
+    nombrePlan: string | undefined | null,
+    cicloGuardado?: string | null,
+  ): 'ANUAL' | 'MENSUAL' {
+    if (nombrePlan) return this.esPlanAnual(nombrePlan) ? 'ANUAL' : 'MENSUAL';
+    return String(cicloGuardado || 'MENSUAL').toUpperCase() === 'ANUAL'
+      ? 'ANUAL'
+      : 'MENSUAL';
+  }
+
+  /**
+   * Fecha de inicio/fin del ciclo pagado que arranca AHORA. Se usa en TODO
+   * flujo que pasa una empresa de demo a producción (activarProduccion,
+   * updateClient, updateClientConfig, updateClientAmbiente), para que el
+   * plan cuente desde la activación real y no desde que se creó la cuenta
+   * demo — que pudo ser días o semanas antes.
+   */
+  private calcularFechasProduccion(ciclo: string): {
+    fechaActivacion: Date;
+    fechaExpiracion: Date;
+  } {
+    const fechaActivacion = new Date();
+    const fechaExpiracion = new Date(fechaActivacion);
+    fechaExpiracion.setDate(
+      fechaExpiracion.getDate() + this.getCicloDias(ciclo),
+    );
+    return { fechaActivacion, fechaExpiracion };
+  }
+
   /**
    * Aprovisiona (o re-aprovisiona) las credenciales QPSE de una empresa usando
    * el token maestro de la plataforma. Idempotente: si ya tiene credenciales,
@@ -411,7 +453,7 @@ export class ResellerService {
     // al saldo del reseller (esto es el reseller pagándole a Vendify por activar
     // al cliente; distinto del costo por comprobante, que cubre Vendify en QPSE).
     // No migramos en QPSE si el saldo no alcanza, porque es irreversible.
-    const ciclo = empresa.cicloFacturacion || 'MENSUAL';
+    const ciclo = this.derivarCiclo(empresa.plan.nombre, empresa.cicloFacturacion);
     const reseller = await this.prisma.reseller.findUnique({
       where: { id: resellerId },
       select: { saldo: true, porcentajeDescuento: true },
@@ -464,6 +506,8 @@ export class ResellerService {
 
     // 2) Cobro de activación al reseller + marca local (usaDemo=false). El guard
     // de arriba (retorna si ya no es demo) evita cobrar dos veces.
+    const { fechaActivacion, fechaExpiracion } =
+      this.calcularFechasProduccion(ciclo);
     try {
       await this.prisma.$transaction(async (tx) => {
         await this.cobrarActivacionCliente(
@@ -474,7 +518,13 @@ export class ResellerService {
         );
         await tx.empresa.update({
           where: { id: empresaId },
-          data: { usaDemo: false, qpseExternalId: externalId },
+          data: {
+            usaDemo: false,
+            qpseExternalId: externalId,
+            fechaActivacion,
+            fechaExpiracion,
+            cicloFacturacion: ciclo,
+          },
         });
       });
     } catch (e) {
@@ -1266,11 +1316,10 @@ export class ResellerService {
           where: { resellerId, estado: 'ACTIVO', usaDemo: false },
         });
         const clientesConNuevo = clientesActuales + 1;
-        const ciclo =
-          String((data as any).cicloFacturacion || 'MENSUAL').toUpperCase() ===
-          'ANUAL'
-            ? 'ANUAL'
-            : 'MENSUAL';
+        const ciclo = this.derivarCiclo(
+          plan.nombre,
+          (data as any).cicloFacturacion,
+        );
         const costoFinal = this.resolveClientCost(
           plan.nombre,
           planCosto,
@@ -1813,12 +1862,10 @@ export class ResellerService {
         const clientesActivos = await tx.empresa.count({
           where: { resellerId: reseller.id, estado: 'ACTIVO', usaDemo: false },
         });
-        const cicloEmpresa =
-          String(
-            (empresa as any).cicloFacturacion || 'MENSUAL',
-          ).toUpperCase() === 'ANUAL'
-            ? 'ANUAL'
-            : 'MENSUAL';
+        const cicloEmpresa = this.derivarCiclo(
+          empresa.plan.nombre,
+          (empresa as any).cicloFacturacion,
+        );
         const costoFinal = this.resolveClientCost(
           empresa.plan.nombre,
           planCosto,
@@ -1862,6 +1909,7 @@ export class ResellerService {
             data: {
               fechaExpiracion: nuevaFechaExpiracion,
               estado: 'ACTIVO',
+              cicloFacturacion: cicloEmpresa,
             },
           });
 
@@ -2597,6 +2645,15 @@ export class ResellerService {
           razonSocial: empresa.razonSocial,
           plan: empresa.plan,
         });
+        const cicloEmpresa = this.derivarCiclo(
+          empresa.plan.nombre,
+          (empresa as any).cicloFacturacion,
+        );
+        const { fechaActivacion, fechaExpiracion } =
+          this.calcularFechasProduccion(cicloEmpresa);
+        updateEmpresa.fechaActivacion = fechaActivacion;
+        updateEmpresa.fechaExpiracion = fechaExpiracion;
+        (updateEmpresa as any).cicloFacturacion = cicloEmpresa;
       }
 
       if (data.billingProvider !== undefined) {
@@ -2863,6 +2920,15 @@ export class ResellerService {
           razonSocial: empresa.razonSocial,
           plan: planEfectivo,
         });
+        const cicloEmpresa = this.derivarCiclo(
+          planEfectivo.nombre,
+          (empresa as any).cicloFacturacion,
+        );
+        const { fechaActivacion, fechaExpiracion } =
+          this.calcularFechasProduccion(cicloEmpresa);
+        updateEmpresa.fechaActivacion = fechaActivacion;
+        updateEmpresa.fechaExpiracion = fechaExpiracion;
+        (updateEmpresa as any).cicloFacturacion = cicloEmpresa;
       }
 
       // #3 — Upgrade de plan en un cliente que YA está en producción: cobrar la
@@ -2877,12 +2943,16 @@ export class ResellerService {
         !pasaAProduccion &&
         empresa.plan
       ) {
-        const ciclo =
-          String(
-            (empresa as any).cicloFacturacion || 'MENSUAL',
-          ).toUpperCase() === 'ANUAL'
-            ? 'ANUAL'
-            : 'MENSUAL';
+        // Ciclo del plan ANTERIOR (para el costo que ya se venía pagando) y del
+        // NUEVO (que puede ser distinto — ej. pasar de EMPRENDEDOR a EMPRENDEDOR
+        // ANUAL). El prorrateo de días restantes usa el ciclo anterior (es el
+        // período en curso); el costo del plan nuevo debe cotizarse con SU
+        // propio ciclo, no con el viejo.
+        const ciclo = this.derivarCiclo(
+          empresa.plan.nombre,
+          (empresa as any).cicloFacturacion,
+        );
+        const cicloNuevo = this.derivarCiclo(nuevoPlanUpgrade.nombre);
         const reseller = await tx.reseller.findUnique({
           where: { id: resellerId },
           select: { saldo: true, porcentajeDescuento: true },
@@ -2905,8 +2975,11 @@ export class ResellerService {
           Number(nuevoPlanUpgrade.costo),
           descuento,
           clientesActuales,
-          ciclo,
+          cicloNuevo,
         );
+        if (cicloNuevo !== ciclo) {
+          (updateEmpresa as any).cicloFacturacion = cicloNuevo;
+        }
         const diasCiclo = this.getCicloDias(ciclo);
         const diasRestantes = Math.max(
           0,
@@ -2998,16 +3071,28 @@ export class ResellerService {
       empresa.usaDemo === true && Boolean(usaDemo) === false;
 
     return this.prisma.$transaction(async (tx) => {
+      const updateEmpresa: Prisma.EmpresaUpdateInput = {
+        usaDemo: Boolean(usaDemo),
+      };
       if (pasaAProduccion) {
         if (!empresa.plan)
           throw new BadRequestException(
             'El cliente no tiene un plan asignado.',
           );
         await this.cobrarActivacionCliente(tx, resellerId, empresa as any);
+        const cicloEmpresa = this.derivarCiclo(
+          empresa.plan.nombre,
+          (empresa as any).cicloFacturacion,
+        );
+        const { fechaActivacion, fechaExpiracion } =
+          this.calcularFechasProduccion(cicloEmpresa);
+        updateEmpresa.fechaActivacion = fechaActivacion;
+        updateEmpresa.fechaExpiracion = fechaExpiracion;
+        (updateEmpresa as any).cicloFacturacion = cicloEmpresa;
       }
       return tx.empresa.update({
         where: { id: empresaId },
-        data: { usaDemo: Boolean(usaDemo) },
+        data: updateEmpresa,
         select: { id: true, ruc: true, razonSocial: true, usaDemo: true },
       });
     });
