@@ -377,6 +377,7 @@ export class EnviarSunatService {
       include: {
         cliente: { include: { tipoDocumento: true } },
         empresa: { include: { ubicacion: true, rubro: true } },
+        sede: { select: { nombre: true, direccion: true } },
         detalles: {
           include: { producto: { select: { codigo: true, codProdSunat: true } } },
         },
@@ -2303,6 +2304,17 @@ export class EnviarSunatService {
               return { ...det, lotes: lotesParsed };
             });
 
+            // Dirección de la sede emisora: solo se muestra si tiene una
+            // dirección propia distinta a la fiscal del RUC.
+            const sedeDir = ((comp as any).sede?.direccion || '')
+              .trim()
+              .toUpperCase();
+            const fiscalDir = (comp.empresa.direccion || '')
+              .trim()
+              .toUpperCase();
+            const sedeDireccionPdf =
+              sedeDir && sedeDir !== fiscalDir ? sedeDir : '';
+
             const pdfData = {
               tipoMoneda: (comp as any)?.tipoMoneda || 'PEN',
               tipoCambio: (comp as any)?.tipoCambio ?? 1,
@@ -2313,6 +2325,7 @@ export class EnviarSunatService {
               razonSocial: comp.empresa.razonSocial.toUpperCase(),
               ruc: comp.empresa.ruc,
               direccion: (comp.empresa.direccion || '').toUpperCase(),
+              sedeDireccion: sedeDireccionPdf,
               rubro:
                 comp.empresa.rubro?.nombre?.toUpperCase() ||
                 'VENTA DE MATERIALES DE CONSTRUCCIÓN',
@@ -3400,6 +3413,7 @@ export class EnviarSunatService {
       include: {
         cliente: { include: { tipoDocumento: true } },
         empresa: { include: { ubicacion: true, rubro: true } },
+        sede: { select: { nombre: true, direccion: true } },
         detalles: true,
         tipoDetraccion: true,
         medioPagoDetraccion: true,
@@ -3439,6 +3453,12 @@ export class EnviarSunatService {
 
       const fechaEmision = new Date(comp.fechaEmision as any);
 
+      // Dirección de la sede emisora: solo se muestra si tiene una
+      // dirección propia distinta a la fiscal del RUC.
+      const sedeDir = ((comp as any).sede?.direccion || '').trim().toUpperCase();
+      const fiscalDir = (comp.empresa.direccion || '').trim().toUpperCase();
+      const sedeDireccionPdf = sedeDir && sedeDir !== fiscalDir ? sedeDir : '';
+
       const pdfData = {
         tipoMoneda: (comp as any)?.tipoMoneda || 'PEN',
         tipoCambio: (comp as any)?.tipoCambio ?? 1,
@@ -3448,6 +3468,7 @@ export class EnviarSunatService {
         razonSocial: comp.empresa.razonSocial.toUpperCase(),
         ruc: comp.empresa.ruc,
         direccion: (comp.empresa.direccion || '').toUpperCase(),
+        sedeDireccion: sedeDireccionPdf,
         rubro:
           comp.empresa.rubro?.nombre?.toUpperCase() ||
           'VENTA DE MATERIALES DE CONSTRUCCIÓN',

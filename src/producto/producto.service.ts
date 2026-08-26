@@ -407,6 +407,46 @@ export class ProductoService {
           productoPadreId: data.productoPadreId ?? undefined,
         },
       });
+
+      // Un producto ELIMINADO conserva sus filas de stock por sede
+      // (ProductoStock). Al restaurarlo como un alta nueva, ese stock viejo NO
+      // debe heredarse — causaba stock "fantasma": al borrar productos y
+      // reimportar un Excel, filas sin stock aparecían con el stock del
+      // producto que antes tenía ese código. Se limpia y se re-inicializa con
+      // el mismo criterio que un producto nuevo (stock inicial solo en la sede
+      // que lo crea; las demás en 0).
+      await this.prisma.productoStock.deleteMany({
+        where: { productoId: existe.id },
+      });
+      const sedesRevive = await this.prisma.sede.findMany({
+        where: { empresaId, activo: true },
+      });
+      if (sedesRevive.length > 0) {
+        const sedePrincipalIdRev = sedesRevive.find((s) => s.esPrincipal)?.id;
+        const sedeConStockRev = sedeId ?? sedePrincipalIdRev;
+        await this.prisma.productoStock.createMany({
+          data: sedesRevive.map((s) => ({
+            productoId: existe.id,
+            sedeId: s.id,
+            stock: !esServicio && s.id === sedeConStockRev ? (stock ?? 0) : 0,
+            stockMinimo: stockMinimo ?? 0,
+            stockMaximo: stockMaximo ?? null,
+            visibleEnSede:
+              s.id === sedeConStockRev ? (visibleEnSede ?? true) : true,
+            vendibleEnSede:
+              s.id === sedeConStockRev ? (vendibleEnSede ?? true) : true,
+            precioUnitarioOverride:
+              s.id === sedeConStockRev && precioUnitarioSede != null
+                ? new Decimal(precioUnitarioSede)
+                : null,
+            precioOfertaOverride:
+              s.id === sedeConStockRev && precioOfertaSede != null
+                ? new Decimal(precioOfertaSede)
+                : null,
+            ubicacion: s.id === sedeConStockRev ? ubicacionSede || null : null,
+          })),
+        });
+      }
     } else {
       // Crear nuevo
       nuevo = await this.prisma.producto.create({
@@ -593,6 +633,18 @@ export class ProductoService {
             { codigoBarras: { contains: searchTerm, mode: 'insensitive' } },
             { codigoDigemid: { contains: searchTerm, mode: 'insensitive' } },
             { laboratorio: { contains: searchTerm, mode: 'insensitive' } },
+            // Códigos alternos/paquetes: encontrar el producto buscando por el
+            // nombre del pack (ej. "six pack") o su código de barras alterno.
+            {
+              codigosBarras: {
+                some: {
+                  OR: [
+                    { codigo: { contains: searchTerm, mode: 'insensitive' } },
+                    { alias: { contains: searchTerm, mode: 'insensitive' } },
+                  ],
+                },
+              },
+            },
           ]
         : undefined,
     };
@@ -676,6 +728,18 @@ export class ProductoService {
           preciosMayorista: true,
           atributosTecnicos: true,
           codigoBarras: true,
+          // Códigos de PAQUETE (ej. six-pack): el POS los muestra como tarjetas
+          // propias del catálogo, además de responder al escaneo.
+          codigosBarras: {
+            where: { unidadesPorPaquete: { gt: 1 } },
+            select: {
+              codigo: true,
+              unidadesPorPaquete: true,
+              precioPaquete: true,
+              alias: true,
+              imagenUrl: true,
+            },
+          },
           codigoDigemid: true,
           codProdSunat: true,
           requiereReceta: true,
@@ -950,6 +1014,21 @@ export class ProductoService {
             : null,
           imagenUrl,
           imagenUrlDisplay: await signIfS3(imagenUrl),
+          // Paquetes (códigos alternos con unidadesPorPaquete > 1), con la
+          // imagen firmada para que el POS pueda pintar la tarjeta del pack.
+          paquetes: await Promise.all(
+            (((p as any).codigosBarras as any[]) || []).map(async (c: any) => ({
+              codigo: c.codigo,
+              unidadesPorPaquete: Number(c.unidadesPorPaquete) || 1,
+              precioPaquete:
+                c.precioPaquete != null ? Number(c.precioPaquete) : null,
+              alias: c.alias || null,
+              imagenUrl: c.imagenUrl || null,
+              imagenUrlDisplay: await signIfS3(
+                normalizePersistentImageUrl(c.imagenUrl),
+              ),
+            })),
+          ),
         };
       }),
     );
@@ -3160,6 +3239,25 @@ export class ProductoService {
       MT: 'MTR',
       MTS: 'MTR',
       METRO: 'MTR',
+      GALON: 'GLL',
+      GALONES: 'GLL',
+      GL: 'GLL',
+      KILOS: 'KGM',
+      GRAMO: 'GRM',
+      GRAMOS: 'GRM',
+      GR: 'GRM',
+      MILILITRO: 'MLT',
+      ML: 'MLT',
+      CAJA: 'BX',
+      CJ: 'BX',
+      BOLSA: 'BG',
+      ROLLO: 'ROL',
+      PAR: 'NIU',
+      PARES: 'NIU',
+      BLISTER: 'NIU',
+      PAQUETE: 'NIU',
+      PAQ: 'NIU',
+      DOCENA: 'NIU',
     };
     if (!raw) return 'NIU';
     const key = raw.trim().toUpperCase();
@@ -3426,6 +3524,11 @@ export class ProductoService {
         if (!unidadMedidaId) {
           const codigoSunat = this.resolverUmbSunat(unidadNombre.toString());
           unidadMedidaId = unidadMap.get(this.normClave(codigoSunat));
+        }
+        // Última red: unidades libres del cliente ("SET X", "CUARTO DC", etc.)
+        // caen a Unidad (NIU) para no perder el producto en la importación.
+        if (!unidadMedidaId) {
+          unidadMedidaId = unidadMap.get('NIU');
         }
         if (!unidadMedidaId)
           throw new ForbiddenException(
