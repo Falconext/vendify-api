@@ -2315,7 +2315,9 @@ model ResellerMovimiento {
   reseller Reseller @relation(fields: [resellerId], references: [id])
   empresa  Empresa? @relation(fields: [empresaId], references: [id])
 
-  @@unique([empresaId, tipo, periodo])
+  // NOTA: la constraint @@unique([empresaId, tipo, periodo]) para idempotencia de
+  // renovaciones se retiró temporalmente porque el deploy (prisma db push) fallaba
+  // por posibles duplicados existentes en prod. Reaplicar tras depurar duplicados.
   @@index([resellerId, tipo, estado])
   @@index([empresaId, tipo, fecha])
 }
