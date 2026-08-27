@@ -49,7 +49,9 @@ export class ResellerController {
   @Roles('ADMIN_SISTEMA')
   @Post('renewals/run')
   runRenewalsNow() {
-    return this.resellerService.processMonthlyRenewals();
+    // Solo procesa vencimientos (avisos y suspensión por gracia agotada);
+    // nunca cobra: la renovación es manual por cliente.
+    return this.resellerService.procesarVencimientosClientes();
   }
 
   @Roles('ADMIN_SISTEMA')
@@ -340,6 +342,40 @@ export class ResellerController {
       id,
     );
     return this.resellerService.getClientDetails(id, clienteId);
+  }
+
+  // Preview del botón "Renovar": costo exacto (misma fórmula del cobro), sin cobrar.
+  @Roles('ADMIN_SISTEMA', 'RESELLER')
+  @Get(':id/clientes/:clienteId/renovar/costo')
+  async previewRenovarCliente(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('clienteId', ParseIntPipe) clienteId: number,
+    @Request() req: any,
+  ) {
+    await this.resellerService.validateResellerAccess(
+      req.user.id,
+      req.user.rol,
+      id,
+    );
+    return this.resellerService.renovarCliente(id, clienteId, {
+      soloCosto: true,
+    });
+  }
+
+  // Renovación manual: único punto que cobra una renovación al saldo.
+  @Roles('ADMIN_SISTEMA', 'RESELLER')
+  @Post(':id/clientes/:clienteId/renovar')
+  async renovarCliente(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('clienteId', ParseIntPipe) clienteId: number,
+    @Request() req: any,
+  ) {
+    await this.resellerService.validateResellerAccess(
+      req.user.id,
+      req.user.rol,
+      id,
+    );
+    return this.resellerService.renovarCliente(id, clienteId);
   }
 
   @Roles('ADMIN_SISTEMA', 'RESELLER')

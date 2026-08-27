@@ -21,6 +21,10 @@ import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { PdfGeneratorService } from '../comprobante/pdf-generator.service';
+import {
+  formatFechaLima,
+  getDiasRestantesLima,
+} from '../common/utils/fecha-lima';
 
 function parseDDMMYYYY(input: string): Date {
   if (!input || input.trim() === '') {
@@ -45,28 +49,10 @@ function parseDDMMYYYY(input: string): Date {
   }
 }
 
-function formatDateEsPeDateOnly(value?: Date | null): string {
-  if (!value) return '';
-  const [yyyy, mm, dd] = value.toISOString().slice(0, 10).split('-');
-  return `${dd}/${mm}/${yyyy}`;
-}
-
-function getDaysRemainingDateOnly(value?: Date | null): number {
-  if (!value) return 0;
-  const [yyyy, mm, dd] = value
-    .toISOString()
-    .slice(0, 10)
-    .split('-')
-    .map(Number);
-  const today = new Date();
-  const todayUtc = Date.UTC(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  );
-  const targetUtc = Date.UTC(yyyy, mm - 1, dd);
-  return Math.ceil((targetUtc - todayUtc) / 86400000);
-}
+// "Vence en X días" y fechas dd/mm/yyyy: siempre en día calendario de Lima,
+// vía los helpers compartidos de src/common/utils/fecha-lima.ts.
+const formatDateEsPeDateOnly = formatFechaLima;
+const getDaysRemainingDateOnly = getDiasRestantesLima;
 
 function formatDaysLabel(days: number): string {
   const abs = Math.abs(days);
@@ -1957,10 +1943,7 @@ export class EmpresaService {
       razonSocial: empresa.razonSocial,
       nombreComercial: empresa.nombreComercial,
       fechaExpiracion: empresa.fechaExpiracion,
-      diasRestantes: Math.ceil(
-        (empresa.fechaExpiracion.getTime() - new Date().getTime()) /
-          (1000 * 60 * 60 * 24),
-      ),
+      diasRestantes: getDiasRestantesLima(empresa.fechaExpiracion),
       plan: empresa.plan,
     }));
   }

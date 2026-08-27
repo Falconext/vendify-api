@@ -135,19 +135,69 @@ export class SchedulerService {
     }
   }
 
+  // Este cron NO cobra: la renovación es manual (botón "Renovar" del panel).
+  // Solo recuerda renovar durante la gracia y suspende al agotarse.
   @Cron('10 9 * * *', {
-    name: 'renovar-clientes-reseller',
+    name: 'vencimientos-clientes-reseller',
     timeZone: 'America/Lima',
   })
-  async renovarClientesReseller(): Promise<void> {
-    this.logger.log('💼 Iniciando renovación mensual de clientes reseller...');
+  async vencimientosClientesReseller(): Promise<void> {
+    this.logger.log('💼 Procesando vencimientos de clientes reseller...');
     try {
-      const resultado = await this.resellerService.processMonthlyRenewals();
+      const resultado =
+        await this.resellerService.procesarVencimientosClientes();
       this.logger.log(
-        `✅ Renovación reseller completada. Evaluadas: ${resultado.totalEvaluadas}, renovadas: ${resultado.renovadas}, suspendidas: ${resultado.suspendidas}`,
+        `✅ Vencimientos procesados. Evaluadas: ${resultado.totalEvaluadas}, avisadas: ${resultado.avisadas}, suspendidas: ${resultado.suspendidas}`,
       );
     } catch (error) {
-      this.logger.error('❌ Error en renovación mensual reseller:', error);
+      this.logger.error('❌ Error en vencimientos de clientes reseller:', error);
+    }
+  }
+
+  // Aviso previo al cobro de renovación (7 y 1 día antes) — antes del cron de
+  // cobro de las 9:10 para que el reseller alcance a recargar el mismo día.
+  @Cron('0 9 * * *', {
+    name: 'avisar-renovaciones-reseller',
+    timeZone: 'America/Lima',
+  })
+  async avisarRenovacionesReseller(): Promise<void> {
+    this.logger.log('🔔 Enviando avisos de próximas renovaciones reseller...');
+    try {
+      const resultado =
+        await this.resellerService.notificarProximasRenovaciones();
+      this.logger.log(
+        `✅ Avisos de renovación enviados: ${resultado.avisos}`,
+      );
+    } catch (error) {
+      this.logger.error('❌ Error en avisos de renovación reseller:', error);
+    }
+  }
+
+  // Conciliación de saldos reseller: saldo == suma de movimientos APLICADOS.
+  @Cron('30 9 * * *', {
+    name: 'conciliar-saldos-reseller',
+    timeZone: 'America/Lima',
+  })
+  async conciliarSaldosReseller(): Promise<void> {
+    this.logger.log('🧮 Conciliando saldos de resellers...');
+    try {
+      const resultado = await this.resellerService.conciliarSaldosResellers();
+      if (resultado.discrepancias.length > 0) {
+        this.logger.error(
+          `❌ CONCILIACIÓN: ${resultado.discrepancias.length} reseller(s) con drift de saldo: ${resultado.discrepancias
+            .map(
+              (d) =>
+                `${d.nombre} (saldo S/${d.saldo.toFixed(2)} vs ledger S/${d.ledger.toFixed(2)})`,
+            )
+            .join(', ')}`,
+        );
+      } else {
+        this.logger.log(
+          `✅ Conciliación OK: ${resultado.revisados} resellers, sin discrepancias.`,
+        );
+      }
+    } catch (error) {
+      this.logger.error('❌ Error en conciliación de saldos reseller:', error);
     }
   }
 

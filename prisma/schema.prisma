@@ -247,6 +247,9 @@ model Empresa {
   sunatClientSecret   String?
   qpseExternalId      String?
   usaDemo             Boolean              @default(false)
+  // false = el cron de renovaciones NO cobra ni reactiva este cliente.
+  // Se apaga al suspenderlo manualmente el reseller; se enciende al reactivarlo.
+  renovacionAutomatica Boolean             @default(true)
   metodoSalidaLotes   String               @default("LIFO")
   notas               NotaEmpresa[]
   logs                EmpresaLog[]
@@ -2304,10 +2307,15 @@ model ResellerMovimiento {
   motivo      String?
   fecha       DateTime @default(now())
   descripcion String?
+  // Idempotencia de renovaciones: día (Lima, YYYY-MM-DD) del vencimiento que se
+  // renovó. Solo se setea en MENSUALIDAD APLICADO; el unique hace físicamente
+  // imposible cobrar dos veces el mismo ciclo (los NULL no colisionan).
+  periodo     String?
 
   reseller Reseller @relation(fields: [resellerId], references: [id])
   empresa  Empresa? @relation(fields: [empresaId], references: [id])
 
+  @@unique([empresaId, tipo, periodo])
   @@index([resellerId, tipo, estado])
   @@index([empresaId, tipo, fecha])
 }

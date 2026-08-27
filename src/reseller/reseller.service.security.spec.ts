@@ -32,7 +32,9 @@ describe('ResellerService - seguridad de cobros', () => {
       findFirst: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn(),
+      count: jest.fn(),
     },
+    reseller: { findUnique: jest.fn() },
     $transaction: jest.fn((cb: any) => cb(txMock)),
   };
 
@@ -274,37 +276,78 @@ describe('ResellerService - seguridad de cobros', () => {
 
   // ---- #5: la renovación cuenta SOLO clientes en producción -----------------
 
-  it('#5 la renovación mensual cuenta el tramo con usaDemo:false (no infla con demos)', async () => {
+  it('#5 la renovación manual cuenta el tramo con usaDemo:false (no infla con demos)', async () => {
     jest
       .spyOn(service as any, 'notifyResellerUsers')
       .mockResolvedValue(undefined);
 
-    prismaMock.empresa.findMany.mockResolvedValue([
-      {
-        id: 10,
-        razonSocial: 'Cliente SAC',
-        fechaExpiracion: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        resellerId: 5,
-        cicloFacturacion: 'MENSUAL',
-        plan: { id: 1, nombre: 'Negocio', costo: 30 },
-      },
-    ]);
-    txMock.resellerMovimiento.findFirst.mockResolvedValue(null);
-    txMock.reseller.findUnique.mockResolvedValue({
+    prismaMock.empresa.findFirst.mockResolvedValue({
+      id: 10,
+      razonSocial: 'Cliente SAC',
+      usaDemo: false,
+      fechaExpiracion: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      cicloFacturacion: 'MENSUAL',
+      plan: { id: 1, nombre: 'Negocio', costo: 30 },
+    });
+    prismaMock.reseller.findUnique.mockResolvedValue({
       id: 5,
       saldo: 100,
       porcentajeDescuento: 20,
     });
-    txMock.empresa.count.mockResolvedValue(0);
+    prismaMock.empresa.count.mockResolvedValue(0);
     txMock.reseller.updateMany.mockResolvedValue({ count: 1 });
 
-    const res = await service.processMonthlyRenewals();
+    const res: any = await service.renovarCliente(5, 10);
 
-    expect(txMock.empresa.count).toHaveBeenCalledWith(
+    expect(prismaMock.empresa.count).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ usaDemo: false }),
       }),
     );
-    expect(res.renovadas).toBe(1);
+    expect(res.ok).toBe(true);
+  });
+
+  it('#5b la renovación manual NO cobra si el saldo no alcanza', async () => {
+    jest
+      .spyOn(service as any, 'notifyResellerUsers')
+      .mockResolvedValue(undefined);
+
+    prismaMock.empresa.findFirst.mockResolvedValue({
+      id: 10,
+      razonSocial: 'Cliente SAC',
+      usaDemo: false,
+      fechaExpiracion: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      cicloFacturacion: 'MENSUAL',
+      plan: { id: 1, nombre: 'Negocio', costo: 30 },
+    });
+    prismaMock.reseller.findUnique.mockResolvedValue({
+      id: 5,
+      saldo: 1,
+      porcentajeDescuento: 20,
+    });
+    prismaMock.empresa.count.mockResolvedValue(0);
+    // El cobro condicional no encuentra saldo suficiente.
+    txMock.reseller.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.renovarCliente(5, 10)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(txMock.empresa.update).not.toHaveBeenCalled();
+    expect(txMock.resellerMovimiento.create).not.toHaveBeenCalled();
+  });
+
+  it('#5c las cuentas demo no se pueden renovar', async () => {
+    prismaMock.empresa.findFirst.mockResolvedValue({
+      id: 10,
+      razonSocial: 'Cliente SAC',
+      usaDemo: true,
+      fechaExpiracion: new Date(),
+      cicloFacturacion: 'MENSUAL',
+      plan: { id: 1, nombre: 'Negocio', costo: 30 },
+    });
+
+    await expect(service.renovarCliente(5, 10)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });

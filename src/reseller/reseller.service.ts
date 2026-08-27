@@ -18,6 +18,7 @@ import { SedeService } from 'src/sede/sede.service';
 import { S3Service } from 'src/s3/s3.service';
 import * as bcrypt from 'bcrypt';
 import { resolveBillingProvider } from 'src/common/utils/billing-provider';
+import { getDiasRestantesLima } from 'src/common/utils/fecha-lima';
 import { QpseClient } from 'src/common/utils/qpse.client';
 import { EmpresaService } from 'src/empresa/empresa.service';
 import axios from 'axios';
@@ -1794,17 +1795,28 @@ export class ResellerService {
     });
   }
 
-  async processMonthlyRenewals() {
+  /**
+   * Vencimientos de clientes reseller. Este cron NUNCA cobra: la renovación es
+   * SIEMPRE manual (botón "Renovar" del panel → renovarCliente()). Aquí solo:
+   * 1) durante los días de gracia: recordatorio diario al reseller para renovar;
+   * 2) agotada la gracia: suspende al cliente, sin tocar el saldo.
+   */
+  async procesarVencimientosClientes() {
     const now = new Date();
-    const startOfDay = new Date(now);
-    startOfDay.setHours(0, 0, 0, 0);
-    const { graceDays, maxRetries } = this.getRenewalPolicy();
+    const { graceDays } = this.getRenewalPolicy();
 
     const vencidas = await this.prisma.empresa.findMany({
       where: {
         resellerId: { not: null },
         fechaExpiracion: { lte: now },
-        estado: { in: ['ACTIVO', 'INACTIVO'] },
+        // Solo ACTIVO: los ya suspendidos (por gracia agotada o manualmente)
+        // quedan como están hasta que el reseller los renueve con el botón.
+        estado: 'ACTIVO',
+        // Las cuentas demo no se suspenden por este cron: su fechaExpiracion es
+        // el fin del período de prueba, no un ciclo pagado.
+        usaDemo: false,
+        // Clientes suspendidos a propósito por el reseller: fuera del ciclo.
+        renovacionAutomatica: true,
       },
       select: {
         id: true,
@@ -1817,189 +1829,310 @@ export class ResellerService {
       orderBy: { fechaExpiracion: 'asc' },
     });
 
-    let renovadas = 0;
+    let avisadas = 0;
     let suspendidas = 0;
 
     for (const empresa of vencidas) {
       if (!empresa.resellerId) continue;
 
-      await this.prisma.$transaction(async (tx) => {
-        const movimientoHoy = await tx.resellerMovimiento.findFirst({
-          where: {
-            resellerId: empresa.resellerId!,
-            empresaId: empresa.id,
-            tipo: 'MENSUALIDAD',
-            fecha: { gte: startOfDay },
-          },
-        });
+      // Días vencida en días calendario de Lima (0 = venció hoy).
+      const diasVencida = Math.max(
+        0,
+        -getDiasRestantesLima(empresa.fechaExpiracion),
+      );
 
-        if (movimientoHoy) return;
-
-        const ultimoIntento = await tx.resellerMovimiento.findFirst({
-          where: {
-            resellerId: empresa.resellerId!,
-            empresaId: empresa.id,
-            tipo: 'MENSUALIDAD',
-          },
-          orderBy: { fecha: 'desc' },
-          select: { intento: true },
-        });
-
-        const intentoActual = (ultimoIntento?.intento ?? 0) + 1;
-
-        const reseller = await tx.reseller.findUnique({
-          where: { id: empresa.resellerId! },
-          select: { id: true, saldo: true, porcentajeDescuento: true },
-        });
-
-        if (!reseller) return;
-
-        const planCosto = Number(empresa.plan.costo);
-        const descuento = Number(reseller.porcentajeDescuento) || 0;
-        // Tramo de volumen: SOLO clientes en producción (usaDemo:false), igual que
-        // en la activación. Antes contaba también los demo (gratis), lo que dejaba
-        // que el reseller inflara con demos para renovar sus reales más barato.
-        const clientesActivos = await tx.empresa.count({
-          where: { resellerId: reseller.id, estado: 'ACTIVO', usaDemo: false },
-        });
-        const cicloEmpresa = this.derivarCiclo(
-          empresa.plan.nombre,
-          (empresa as any).cicloFacturacion,
-        );
-        const costoFinal = this.resolveClientCost(
-          empresa.plan.nombre,
-          planCosto,
-          descuento,
-          clientesActivos,
-          cicloEmpresa,
-        );
-        const saldoActual = Number(reseller.saldo);
-        const diasVencida = Math.max(
-          0,
-          Math.floor(
-            (now.getTime() - empresa.fechaExpiracion.getTime()) /
-              (1000 * 60 * 60 * 24),
-          ),
-        );
-        const enGracia = diasVencida <= graceDays;
-
-        // Cobro atómico condicional: descuenta SOLO si el saldo alcanza. Si otra
-        // corrida (cron + disparo manual del admin) ya gastó el saldo, count será
-        // 0 y caemos al flujo de gracia/suspensión en vez de dejar saldo negativo.
-        const cobrado =
-          saldoActual >= costoFinal
-            ? await tx.reseller.updateMany({
-                where: { id: reseller.id, saldo: { gte: costoFinal } },
-                data: { saldo: { decrement: costoFinal } },
-              })
-            : { count: 0 };
-
-        if (cobrado.count === 1) {
-          const baseFecha =
-            empresa.fechaExpiracion > now
-              ? new Date(empresa.fechaExpiracion)
-              : new Date(now);
-          const nuevaFechaExpiracion = new Date(baseFecha);
-          nuevaFechaExpiracion.setDate(
-            nuevaFechaExpiracion.getDate() + this.getCicloDias(cicloEmpresa),
-          );
-
-          await tx.empresa.update({
-            where: { id: empresa.id },
-            data: {
-              fechaExpiracion: nuevaFechaExpiracion,
-              estado: 'ACTIVO',
-              cicloFacturacion: cicloEmpresa,
-            },
-          });
-
-          await tx.resellerMovimiento.create({
-            data: {
-              resellerId: reseller.id,
-              empresaId: empresa.id,
-              tipo: 'MENSUALIDAD',
-              monto: -costoFinal,
-              estado: 'APLICADO',
-              intento: intentoActual,
-              descripcion:
-                cicloEmpresa === 'ANUAL'
-                  ? `Renovación anual cliente: ${empresa.razonSocial} - Plan: ${empresa.plan.nombre}`
-                  : getVolumeTierPrice(empresa.plan.nombre, clientesActivos) !==
-                      null
-                    ? `Renovación mensual cliente: ${empresa.razonSocial} - Plan: ${empresa.plan.nombre} (Tier ${this.getTierLabel(clientesActivos)})`
-                    : `Renovación mensual cliente: ${empresa.razonSocial} - Plan: ${empresa.plan.nombre} (${descuento}% Off)`,
-            },
-          });
-
-          await this.notifyResellerUsers(tx, reseller.id, {
-            empresaId: empresa.id,
-            tipo: 'INFO',
-            titulo: 'Renovación aplicada',
-            mensaje: `Se renovó ${empresa.razonSocial} por S/${costoFinal.toFixed(2)}. Nuevo vencimiento: ${nuevaFechaExpiracion.toLocaleDateString('es-PE')}.`,
-          });
-
-          renovadas += 1;
-          return;
-        }
-
-        if (enGracia && intentoActual <= maxRetries) {
-          await tx.resellerMovimiento.create({
-            data: {
-              resellerId: reseller.id,
-              empresaId: empresa.id,
-              tipo: 'MENSUALIDAD',
-              monto: 0,
-              estado: 'PENDIENTE',
-              intento: intentoActual,
-              motivo: 'SALDO_INSUFICIENTE',
-              descripcion: `Renovación pendiente por saldo insuficiente: ${empresa.razonSocial}. Intento ${intentoActual}/${maxRetries}.`,
-            },
-          });
-
-          await this.notifyResellerUsers(tx, reseller.id, {
-            empresaId: empresa.id,
-            tipo: 'WARNING',
-            titulo: 'Renovación pendiente',
-            mensaje: `No se pudo renovar ${empresa.razonSocial} por saldo insuficiente. Intento ${intentoActual}/${maxRetries}. Días de gracia restantes: ${Math.max(0, graceDays - diasVencida)}.`,
-          });
-
-          return;
-        }
-
-        await tx.empresa.update({
-          where: { id: empresa.id },
-          data: { estado: 'INACTIVO' },
-        });
-
-        await tx.resellerMovimiento.create({
-          data: {
-            resellerId: reseller.id,
-            empresaId: empresa.id,
-            tipo: 'MENSUALIDAD',
-            monto: 0,
-            estado: 'RECHAZADO',
-            intento: intentoActual,
-            motivo: 'SALDO_INSUFICIENTE',
-            descripcion: `No renovado por saldo insuficiente: ${empresa.razonSocial} - Plan: ${empresa.plan.nombre}. Cliente suspendido.`,
-          },
-        });
-
-        await this.notifyResellerUsers(tx, reseller.id, {
+      if (diasVencida <= graceDays) {
+        await this.notifyResellerUsers(this.prisma, empresa.resellerId, {
           empresaId: empresa.id,
-          tipo: 'CRITICAL',
-          titulo: 'Cliente suspendido por falta de saldo',
-          mensaje: `${empresa.razonSocial} fue suspendido por no renovar dentro del periodo de gracia o por superar intentos de cobro.`,
+          tipo: 'WARNING',
+          titulo: 'Cliente vencido — renovación pendiente',
+          mensaje: `El plan de ${empresa.razonSocial} venció ${diasVencida === 0 ? 'hoy' : `hace ${diasVencida} día${diasVencida === 1 ? '' : 's'}`}. Renuévalo con el botón "Renovar" de tu panel. Días de gracia restantes: ${Math.max(0, graceDays - diasVencida)}.`,
         });
+        avisadas += 1;
+        continue;
+      }
 
-        suspendidas += 1;
+      await this.prisma.empresa.update({
+        where: { id: empresa.id },
+        data: { estado: 'INACTIVO' },
       });
+
+      await this.notifyResellerUsers(this.prisma, empresa.resellerId, {
+        empresaId: empresa.id,
+        tipo: 'CRITICAL',
+        titulo: 'Cliente suspendido por no renovar',
+        mensaje: `${empresa.razonSocial} fue suspendido: su plan venció hace ${diasVencida} días y no se renovó dentro del período de gracia. Puedes reactivarlo renovándolo desde tu panel.`,
+      });
+
+      suspendidas += 1;
     }
 
     return {
       totalEvaluadas: vencidas.length,
-      renovadas,
+      avisadas,
       suspendidas,
     };
+  }
+
+  /**
+   * Renovación MANUAL de un cliente: el ÚNICO punto donde se cobra una
+   * renovación (mensual o anual según el plan). Extiende desde el vencimiento
+   * vigente si aún no pasó, o desde hoy si ya venció, y reactiva al cliente.
+   * Con `soloCosto: true` devuelve el precio sin cobrar (preview del botón).
+   */
+  async renovarCliente(
+    resellerId: number,
+    empresaId: number,
+    opts?: { soloCosto?: boolean },
+  ) {
+    const empresa = await this.prisma.empresa.findFirst({
+      where: { id: empresaId, resellerId },
+      select: {
+        id: true,
+        razonSocial: true,
+        usaDemo: true,
+        fechaExpiracion: true,
+        cicloFacturacion: true,
+        plan: { select: { id: true, nombre: true, costo: true } },
+      },
+    });
+    if (!empresa) throw new NotFoundException('Cliente no encontrado');
+    if (empresa.usaDemo) {
+      throw new BadRequestException(
+        'Las cuentas demo no se renuevan: pasa el cliente a producción primero.',
+      );
+    }
+    if (!empresa.plan) {
+      throw new BadRequestException('El cliente no tiene un plan asignado.');
+    }
+
+    const reseller = await this.prisma.reseller.findUnique({
+      where: { id: resellerId },
+      select: { id: true, saldo: true, porcentajeDescuento: true },
+    });
+    if (!reseller) throw new NotFoundException('Distribuidor no encontrado');
+
+    const descuento = Number(reseller.porcentajeDescuento) || 0;
+    const clientesActivos = await this.prisma.empresa.count({
+      where: { resellerId, estado: 'ACTIVO', usaDemo: false },
+    });
+    const ciclo = this.derivarCiclo(
+      empresa.plan.nombre,
+      empresa.cicloFacturacion,
+    );
+    const costo = this.resolveClientCost(
+      empresa.plan.nombre,
+      Number(empresa.plan.costo),
+      descuento,
+      clientesActivos,
+      ciclo,
+    );
+
+    if (opts?.soloCosto) {
+      return {
+        costo,
+        ciclo,
+        saldo: Number(reseller.saldo),
+        fechaExpiracion: empresa.fechaExpiracion,
+      };
+    }
+
+    const now = new Date();
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Cobro atómico condicional: nunca deja saldo negativo.
+        const cobrado = await tx.reseller.updateMany({
+          where: { id: resellerId, saldo: { gte: costo } },
+          data: { saldo: { decrement: costo } },
+        });
+        if (cobrado.count !== 1) {
+          throw new BadRequestException(
+            `Saldo insuficiente: la renovación cuesta S/${costo.toFixed(2)} y tienes S/${Number(reseller.saldo).toFixed(2)}. Recarga tu saldo e inténtalo de nuevo.`,
+          );
+        }
+
+        const base =
+          empresa.fechaExpiracion > now
+            ? new Date(empresa.fechaExpiracion)
+            : new Date(now);
+        const nuevaFechaExpiracion = new Date(base);
+        nuevaFechaExpiracion.setDate(
+          nuevaFechaExpiracion.getDate() + this.getCicloDias(ciclo),
+        );
+
+        await tx.empresa.update({
+          where: { id: empresa.id },
+          data: {
+            fechaExpiracion: nuevaFechaExpiracion,
+            estado: 'ACTIVO',
+            cicloFacturacion: ciclo,
+            renovacionAutomatica: true,
+          },
+        });
+
+        await tx.resellerMovimiento.create({
+          data: {
+            resellerId,
+            empresaId: empresa.id,
+            tipo: 'MENSUALIDAD',
+            monto: -costo,
+            estado: 'APLICADO',
+            // Día (Lima) del vencimiento renovado: el unique en BD aborta la
+            // transacción entera si este ciclo ya fue renovado (doble clic,
+            // doble pestaña), devolviendo el saldo cobrado.
+            periodo: empresa.fechaExpiracion.toLocaleDateString('en-CA', {
+              timeZone: 'America/Lima',
+            }),
+            descripcion:
+              ciclo === 'ANUAL'
+                ? `Renovación anual: ${empresa.razonSocial} - Plan: ${empresa.plan.nombre}`
+                : getVolumeTierPrice(empresa.plan.nombre, clientesActivos) !==
+                    null
+                  ? `Renovación mensual: ${empresa.razonSocial} - Plan: ${empresa.plan.nombre} (Tier ${this.getTierLabel(clientesActivos)})`
+                  : `Renovación mensual: ${empresa.razonSocial} - Plan: ${empresa.plan.nombre} (${descuento}% Off)`,
+          },
+        });
+
+        await this.notifyResellerUsers(tx, resellerId, {
+          empresaId: empresa.id,
+          tipo: 'INFO',
+          titulo: 'Renovación aplicada',
+          mensaje: `Renovaste ${empresa.razonSocial} por S/${costo.toFixed(2)} (${ciclo === 'ANUAL' ? 'anual' : 'mensual'}). Nuevo vencimiento: ${nuevaFechaExpiracion.toLocaleDateString('es-PE', { timeZone: 'America/Lima' })}.`,
+        });
+
+        return {
+          ok: true,
+          costo,
+          ciclo,
+          nuevaFechaExpiracion,
+        };
+      });
+    } catch (e) {
+      if (
+        e instanceof PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        throw new BadRequestException(
+          'Este período ya fue renovado (posible doble clic). Revisa el estado de cuenta.',
+        );
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Aviso previo al vencimiento: notifica al reseller 7 días y 1 día antes del
+   * vencimiento de cada cliente en producción, con el MISMO monto que cobrará
+   * el botón "Renovar" (misma fórmula de tier/descuento/ciclo). Corre una
+   * vez al día; el match exacto de días evita avisos duplicados.
+   */
+  async notificarProximasRenovaciones() {
+    const clientes = await this.prisma.empresa.findMany({
+      where: {
+        resellerId: { not: null },
+        estado: 'ACTIVO',
+        usaDemo: false,
+        renovacionAutomatica: true,
+      },
+      select: {
+        id: true,
+        razonSocial: true,
+        fechaExpiracion: true,
+        resellerId: true,
+        cicloFacturacion: true,
+        plan: { select: { nombre: true, costo: true } },
+      },
+    });
+
+    const porAvisar = clientes.filter((c) => {
+      const dias = getDiasRestantesLima(c.fechaExpiracion);
+      return dias === 7 || dias === 1;
+    });
+
+    let avisos = 0;
+    for (const empresa of porAvisar) {
+      if (!empresa.plan || !empresa.resellerId) continue;
+      const reseller = await this.prisma.reseller.findUnique({
+        where: { id: empresa.resellerId },
+        select: { id: true, saldo: true, porcentajeDescuento: true },
+      });
+      if (!reseller) continue;
+      const clientesActivos = await this.prisma.empresa.count({
+        where: { resellerId: reseller.id, estado: 'ACTIVO', usaDemo: false },
+      });
+      const ciclo = this.derivarCiclo(
+        empresa.plan.nombre,
+        (empresa as any).cicloFacturacion,
+      );
+      const costo = this.resolveClientCost(
+        empresa.plan.nombre,
+        Number(empresa.plan.costo),
+        Number(reseller.porcentajeDescuento) || 0,
+        clientesActivos,
+        ciclo,
+      );
+      const dias = getDiasRestantesLima(empresa.fechaExpiracion);
+      const saldo = Number(reseller.saldo);
+      const alcanza = saldo >= costo;
+      const cuando = dias === 1 ? 'mañana' : `en ${dias} días`;
+      await this.notifyResellerUsers(this.prisma, reseller.id, {
+        empresaId: empresa.id,
+        tipo: alcanza ? 'INFO' : 'WARNING',
+        titulo:
+          dias === 1
+            ? 'Un cliente vence mañana'
+            : `Un cliente vence en ${dias} días`,
+        mensaje: `El plan de ${empresa.razonSocial} vence ${cuando}. Renuévalo con el botón "Renovar" de tu panel por S/${costo.toFixed(2)} (${ciclo === 'ANUAL' ? 'anual' : 'mensual'}). ${
+          alcanza
+            ? `Saldo actual: S/${saldo.toFixed(2)}.`
+            : `Tu saldo (S/${saldo.toFixed(2)}) NO alcanza: recarga antes de renovar.`
+        }`,
+      });
+      avisos += 1;
+    }
+
+    return { avisos };
+  }
+
+  /**
+   * Conciliación diaria: el saldo de cada reseller debe ser exactamente la suma
+   * de sus movimientos APLICADOS (recargas + devoluciones − cobros). Un drift
+   * significa cobro sin registro, reembolso perdido o edición directa en BD:
+   * se reporta para corregirlo antes de que el reseller lo reclame.
+   */
+  async conciliarSaldosResellers() {
+    const resellers = await this.prisma.reseller.findMany({
+      select: { id: true, nombre: true, saldo: true },
+    });
+    const discrepancias: {
+      resellerId: number;
+      nombre: string;
+      saldo: number;
+      ledger: number;
+      diferencia: number;
+    }[] = [];
+    for (const r of resellers) {
+      const agg = await this.prisma.resellerMovimiento.aggregate({
+        where: { resellerId: r.id, estado: 'APLICADO' },
+        _sum: { monto: true },
+      });
+      const ledger = Number(agg._sum.monto ?? 0);
+      const saldo = Number(r.saldo);
+      const diferencia = Math.round((saldo - ledger) * 100) / 100;
+      if (Math.abs(diferencia) >= 0.01) {
+        discrepancias.push({
+          resellerId: r.id,
+          nombre: r.nombre,
+          saldo,
+          ledger,
+          diferencia,
+        });
+        console.error(
+          `[CONCILIACION] Drift de saldo en reseller ${r.nombre} (id ${r.id}): saldo S/${saldo.toFixed(2)} vs ledger S/${ledger.toFixed(2)} (dif ${diferencia >= 0 ? '+' : ''}${diferencia.toFixed(2)})`,
+        );
+      }
+    }
+    return { revisados: resellers.length, discrepancias };
   }
 
   async getDashboardStats(resellerId: number) {
@@ -2192,9 +2325,8 @@ export class ResellerService {
         return fecha <= en30dias;
       })
       .map((c) => {
-        const fecha = new Date(c.fechaExpiracion);
-        const diasRestantes = Math.ceil(
-          (fecha.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        const diasRestantes = getDiasRestantesLima(
+          new Date(c.fechaExpiracion),
         );
         return {
           empresaId: c.empresaId,
@@ -2546,7 +2678,13 @@ export class ResellerService {
 
     return this.prisma.empresa.update({
       where: { id: empresaId },
-      data: { estado: nuevoEstado as EstadoType },
+      data: {
+        estado: nuevoEstado as EstadoType,
+        // Suspensión manual = el reseller no quiere seguir pagando este cliente:
+        // el cron de renovaciones no debe cobrarlo ni reactivarlo. Al reactivar
+        // manualmente, vuelve al ciclo normal de renovación.
+        renovacionAutomatica: nuevoEstado === 'ACTIVO',
+      },
     });
   }
 
