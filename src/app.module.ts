@@ -32,6 +32,7 @@ import { RubroModule } from './rubro/rubro.module';
 import { PlanModule } from './plan/plan.module';
 import { BannersModule } from './banners/banners.module';
 import { ComprasModule } from './compras/compras.module';
+import { ListaPrecioModule } from './lista-precio/lista-precio.module';
 import { FinanzasModule } from './finanzas/finanzas.module';
 import { GuiaRemisionModule } from './guia-remision/guia-remision.module';
 import { ModulosModule } from './modulos/modulos.module';
@@ -87,6 +88,7 @@ import { TipoCambioModule } from './tipo-cambio/tipo-cambio.module';
     PlanModule,
     BannersModule,
     ComprasModule,
+    ListaPrecioModule,
     FinanzasModule,
     GuiaRemisionModule,
     ModulosModule,

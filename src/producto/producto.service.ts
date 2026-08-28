@@ -584,6 +584,100 @@ export class ProductoService {
     return this.obtenerPorId(nuevo.id, empresaId);
   }
 
+  /**
+   * Carga los items de la lista de precio que aplica al usuario/sede, en un
+   * Map keyed por `${productoId}|${presentacionCodigo}` ('' = unidad base).
+   *
+   * Precedencia (pensado para el empresario):
+   *   1) Lista ESPECÍFICA del usuario  (excluye la default)
+   *   2) Lista ESPECÍFICA de la sede    (excluye la default)
+   *   3) Lista "por defecto" de la empresa (fallback general)
+   * Una sola query por listado (no por producto). Map vacío si no hay lista.
+   */
+  private async cargarItemsListaPrecio(
+    empresaId: number,
+    usuarioId?: number,
+    sedeId?: number,
+  ): Promise<
+    Map<string, { precioUnitario: number; precioOferta: number | null }>
+  > {
+    const map = new Map<
+      string,
+      { precioUnitario: number; precioOferta: number | null }
+    >();
+
+    let lista: { items: any[] } | null = null;
+    if (usuarioId) {
+      lista = await this.prisma.listaPrecio.findFirst({
+        where: {
+          empresaId,
+          activo: true,
+          esPorDefecto: false,
+          usuarios: { some: { usuarioId } },
+        },
+        orderBy: { id: 'asc' },
+        include: { items: true },
+      });
+    }
+    if (!lista && sedeId) {
+      lista = await this.prisma.listaPrecio.findFirst({
+        where: {
+          empresaId,
+          activo: true,
+          esPorDefecto: false,
+          sedes: { some: { sedeId } },
+        },
+        orderBy: { id: 'asc' },
+        include: { items: true },
+      });
+    }
+    if (!lista) {
+      lista = await this.prisma.listaPrecio.findFirst({
+        where: { empresaId, activo: true, esPorDefecto: true },
+        include: { items: true },
+      });
+    }
+    if (lista) {
+      for (const it of lista.items) {
+        map.set(`${it.productoId}|${it.presentacionCodigo || ''}`, {
+          precioUnitario: Number(it.precioUnitario),
+          precioOferta:
+            it.precioOferta != null ? Number(it.precioOferta) : null,
+        });
+      }
+    }
+    return map;
+  }
+
+  /**
+   * Precio efectivo de venta con la precedencia completa:
+   * lista de precio (usuario/sede) > override legado de ProductoStock >
+   * precio base del producto. `itemsLista` ya viene filtrado por usuario/sede.
+   */
+  private resolverPrecioConLista(
+    itemsLista: Map<
+      string,
+      { precioUnitario: number; precioOferta: number | null }
+    >,
+    productoId: number,
+    presentacionCodigo: string,
+    usarPrecioSede: boolean,
+    overrideUnit: any,
+    overrideOferta: any,
+    baseUnit: number,
+    baseOferta: number | null,
+  ): { precioUnitario: number; precioOferta: number | null } {
+    const desdeLista = itemsLista.get(`${productoId}|${presentacionCodigo}`);
+    if (desdeLista) return desdeLista;
+    const precioUnitario =
+      usarPrecioSede && overrideUnit != null ? Number(overrideUnit) : baseUnit;
+    const precioOferta =
+      usarPrecioSede && overrideOferta != null
+        ? Number(overrideOferta)
+        : baseOferta;
+    return { precioUnitario, precioOferta };
+  }
+
   async listar(params: {
     empresaId: number;
     sedeId?: number;
@@ -597,6 +691,7 @@ export class ProductoService {
     incluirVariantes?: string | boolean;
     soloVendibles?: boolean;
     usarPrecioSede?: boolean;
+    usuarioId?: number;
     soloStockBajo?: boolean;
   }) {
     const {
@@ -866,6 +961,19 @@ export class ProductoService {
       }
     };
 
+    // Lista de precios que aplica al usuario/sede (solo en contexto de venta,
+    // igual que el override por sede). Una sola query para todo el listado.
+    const itemsLista = params.usarPrecioSede
+      ? await this.cargarItemsListaPrecio(
+          empresaId,
+          params.usuarioId,
+          params.sedeId,
+        )
+      : new Map<
+          string,
+          { precioUnitario: number; precioOferta: number | null }
+        >();
+
     const productos = await Promise.all(
       productosRaw.map(async (p) => {
         const stockDesdeLotes = (p.lotes || []).reduce(
@@ -894,16 +1002,19 @@ export class ProductoService {
         const stockSede = params.sedeId
           ? (p.stocks[0] as any | undefined)
           : undefined;
-        const precioUnitarioEfectivo =
-          params.usarPrecioSede && stockSede?.precioUnitarioOverride != null
-            ? Number(stockSede.precioUnitarioOverride)
-            : Number(p.precioUnitario);
-        const precioOfertaEfectivo =
-          params.usarPrecioSede && stockSede?.precioOfertaOverride != null
-            ? Number(stockSede.precioOfertaOverride)
-            : p.precioOferta != null
-              ? Number(p.precioOferta)
-              : null;
+        const {
+          precioUnitario: precioUnitarioEfectivo,
+          precioOferta: precioOfertaEfectivo,
+        } = this.resolverPrecioConLista(
+          itemsLista,
+          p.id,
+          '',
+          !!params.usarPrecioSede,
+          stockSede?.precioUnitarioOverride,
+          stockSede?.precioOfertaOverride,
+          Number(p.precioUnitario),
+          p.precioOferta != null ? Number(p.precioOferta) : null,
+        );
         const reservado = reservadoPorProducto.get(p.id) ?? 0;
         const cupoProvision = Math.floor(
           (stockTotal * (p.porcentajeProvision ?? 0)) / 100,
@@ -934,18 +1045,21 @@ export class ProductoService {
             const varianteStockSede = params.sedeId
               ? variante.stocks?.[0]
               : undefined;
-            const variantePrecioUnitario =
-              params.usarPrecioSede &&
-              varianteStockSede?.precioUnitarioOverride != null
-                ? Number(varianteStockSede.precioUnitarioOverride)
-                : Number(variante.precioUnitario);
-            const variantePrecioOferta =
-              params.usarPrecioSede &&
-              varianteStockSede?.precioOfertaOverride != null
-                ? Number(varianteStockSede.precioOfertaOverride)
-                : variante.precioOferta != null
-                  ? Number(variante.precioOferta)
-                  : null;
+            const {
+              precioUnitario: variantePrecioUnitario,
+              precioOferta: variantePrecioOferta,
+            } = this.resolverPrecioConLista(
+              itemsLista,
+              variante.id,
+              '',
+              !!params.usarPrecioSede,
+              varianteStockSede?.precioUnitarioOverride,
+              varianteStockSede?.precioOfertaOverride,
+              Number(variante.precioUnitario),
+              variante.precioOferta != null
+                ? Number(variante.precioOferta)
+                : null,
+            );
 
             return {
               ...variante,
@@ -1137,6 +1251,7 @@ export class ProductoService {
     limit?: number;
     search?: string;
     categoriaId?: number;
+    usuarioId?: number;
   }) {
     const { empresaId, sedeId, categoriaId } = params;
     const page = Number(params.page) || 1;
@@ -1275,6 +1390,13 @@ export class ProductoService {
       ]),
     );
 
+    // Lista de precio que aplica al usuario/sede (catálogo de farmacia = venta).
+    const itemsLista = await this.cargarItemsListaPrecio(
+      empresaId,
+      params.usuarioId,
+      sedeId,
+    );
+
     const productos = productosRaw.map((p) => {
       const loteFefo = p.lotes[0] ?? null; // primer lote FEFO (más próximo a vencer)
       const stockTotalLotes = p.lotes.reduce(
@@ -1291,10 +1413,16 @@ export class ProductoService {
       // Ya que en catalogoFarmacia siempre se filtra por sede, usamos estrictamente ProductoStock.
       const stockBase = num(p.stocks[0]?.stock);
       const stockSede = p.stocks[0] as any | undefined;
-      const precioUnitario =
-        stockSede?.precioUnitarioOverride != null
-          ? Number(stockSede.precioUnitarioOverride)
-          : Number(p.precioUnitario);
+      const { precioUnitario } = this.resolverPrecioConLista(
+        itemsLista,
+        p.id,
+        '',
+        true,
+        stockSede?.precioUnitarioOverride,
+        stockSede?.precioOfertaOverride,
+        Number(p.precioUnitario),
+        null,
+      );
       const reservado = reservadoPorProducto.get(p.id) ?? 0;
       const cupoProvision = Math.floor(
         (stockBase * (p.porcentajeProvision ?? 0)) / 100,

@@ -55,6 +55,11 @@ export class CrearOrdenCompraDto {
   @IsBoolean()
   aplicaIgv?: boolean;
 
+  // Si es true, los precios ingresados ya incluyen el IGV (se extrae del total)
+  @IsOptional()
+  @IsBoolean()
+  igvIncluido?: boolean;
+
   @IsOptional()
   @IsString()
   observaciones?: string;

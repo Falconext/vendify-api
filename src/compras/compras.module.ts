@@ -5,11 +5,12 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { KardexModule } from '../kardex/kardex.module';
 import { ProductoModule } from '../producto/producto.module';
 import { ComprobanteModule } from '../comprobante/comprobante.module';
+import { GeminiModule } from '../gemini/gemini.module';
 import { OrdenCompraController } from './orden-compra.controller';
 import { OrdenCompraService } from './orden-compra.service';
 
 @Module({
-  imports: [PrismaModule, KardexModule, ProductoModule, ComprobanteModule],
+  imports: [PrismaModule, KardexModule, ProductoModule, ComprobanteModule, GeminiModule],
   controllers: [OrdenCompraController, ComprasController],
   providers: [ComprasService, OrdenCompraService],
 })
