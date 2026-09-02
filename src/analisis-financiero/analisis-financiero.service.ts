@@ -79,6 +79,12 @@ interface ComprobantePnl {
   tipoMoneda?: string | null;
   tipoCambio?: number | null;
   fechaEmision?: Date;
+  // Para excluir del P&L los pares de ANULACIÓN (NC motivo 01/06 + su afectado).
+  serie?: string | null;
+  correlativo?: number | string | null;
+  numDocAfectado?: string | null;
+  tipDocAfectado?: string | null;
+  motivo?: { codigo: string } | null;
   detalles: DetalleComprobantePnl[];
 }
 
@@ -331,6 +337,32 @@ export class AnalisisFinancieroService {
     return tipoDoc === '07' ? -1 : 1;
   }
 
+  private keyComprobante(c: ComprobantePnl): string {
+    return `${c.tipoDoc}-${c.serie}-${c.correlativo}`;
+  }
+
+  /**
+   * Pares de ANULACIÓN que deben EXCLUIRSE del P&L: una Nota de Crédito con motivo
+   * 01 (anulación) o 06 (devolución total) ya deja el comprobante afectado en
+   * ANULADO (ver crearNotaCredito). Como `esDocumentoVenta` ya excluye los ANULADO,
+   * volver a restar la NC contaba la reversión DOS VECES → ventas y costos en
+   * negativo (bug del reporte). Excluimos tanto la NC 01/06 como su documento
+   * afectado. Mismas reglas que la exportación masiva de comprobantes.
+   * Las NC parciales (descuento/devolución parcial) NO se excluyen: siguen restando.
+   */
+  private excluidosAnulacion(comprobantes: ComprobantePnl[]): Set<string> {
+    const excluidos = new Set<string>();
+    for (const c of comprobantes) {
+      if (c.tipoDoc === '07' && c.motivo && ['01', '06'].includes(c.motivo.codigo)) {
+        excluidos.add(this.keyComprobante(c));
+        if (c.numDocAfectado) {
+          excluidos.add(`${c.tipDocAfectado}-${c.numDocAfectado}`);
+        }
+      }
+    }
+    return excluidos;
+  }
+
   private calcularCostoProducto(comprobante: ComprobantePnl) {
     const signo = this.signoDocumento(comprobante.tipoDoc);
     let costoBaseProductos = 0;
@@ -376,8 +408,11 @@ export class AnalisisFinancieroService {
     otrosIngresos: number = 0,
   ) {
     const gastosAplicados = this.expandirGastosPeriodo(gastosRaw, mes, anio);
-    const documentosVenta = comprobantes.filter((c) =>
-      this.esDocumentoVenta(c),
+    // Excluir ANULADOS y los pares de anulación (NC 01/06 + su afectado) para no
+    // contar la reversión dos veces (bug: ventas/costos negativos al anular).
+    const excluidos = this.excluidosAnulacion(comprobantes);
+    const documentosVenta = comprobantes.filter(
+      (c) => this.esDocumentoVenta(c) && !excluidos.has(this.keyComprobante(c)),
     );
     const ventasBrutas = documentosVenta
       .filter((c) => c.tipoDoc !== '07')
@@ -586,6 +621,11 @@ export class AnalisisFinancieroService {
             tipoMoneda: true,
             tipoCambio: true,
             fechaEmision: true,
+            serie: true,
+            correlativo: true,
+            numDocAfectado: true,
+            tipDocAfectado: true,
+            motivo: { select: { codigo: true } },
             detalles: {
               select: {
                 productoId: true,
@@ -758,6 +798,11 @@ export class AnalisisFinancieroService {
           estadoEnvioSunat: true,
           mtoImpVenta: true,
           fechaEmision: true,
+          serie: true,
+          correlativo: true,
+          numDocAfectado: true,
+          tipDocAfectado: true,
+          motivo: { select: { codigo: true } },
           detalles: {
             select: {
               productoId: true,
