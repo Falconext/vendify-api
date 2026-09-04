@@ -218,6 +218,10 @@ export class CrearComprobanteDto {
 
   @IsOptional()
   @IsString()
+  ordenCompraCliente?: string;
+
+  @IsOptional()
+  @IsString()
   medioPago?: string;
 
   @IsOptional()
