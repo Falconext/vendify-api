@@ -99,6 +99,8 @@ export class SireService {
         mtoOperGravadas: true,
         mtoIGV: true,
         mtoOperInafectas: true,
+        mtoOperExoneradas: true,
+        mtoOperExportacion: true,
         mtoDescuentoGlobal: true,
         mtoImpVenta: true,
         tipDocAfectado: true,
@@ -145,6 +147,12 @@ export class SireService {
       const baseGravadas = this.fmt(c.mtoOperGravadas);
       const igv = this.fmt(c.mtoIGV);
       const inafectas = this.fmt(c.mtoOperInafectas);
+      const exoneradas = this.fmt(c.mtoOperExoneradas);
+      const exportacion = this.fmt(c.mtoOperExportacion);
+      // mtoOperGravadas ya viene NETO del descuento global (el descuento se
+      // pliega en el precio unitario al emitir); este campo es solo
+      // informativo para SUNAT, no se resta de nuevo.
+      const dctoBaseImp = this.fmt(c.mtoDescuentoGlobal);
       const total = this.fmt(c.mtoImpVenta);
       const tipoCambio = c.tipoMoneda === 'USD' ? '' : '1.000';
       const tipRef = c.tipDocAfectado ?? '';
@@ -165,12 +173,12 @@ export class SireService {
             tipoDocCliente,
             nroDocCliente,
             razonSocial,
-            '0.00',
+            exportacion,
             baseGravadas,
-            '0.00',
+            dctoBaseImp,
             igv,
             '0.00',
-            '0.00',
+            exoneradas,
             inafectas,
             total,
             estado,
@@ -191,12 +199,12 @@ export class SireService {
             tipoDocCliente, // 9  Tipo doc identidad cliente
             nroDocCliente, // 10 Nro doc cliente
             razonSocial, // 11 Razón social
-            '0.00', // 12 Exportación
+            exportacion, // 12 Exportación
             baseGravadas, // 13 Base imp. gravadas
-            '0.00', // 14 Dcto. base imp.
+            dctoBaseImp, // 14 Dcto. base imp.
             igv, // 15 IGV / IPM
             '0.00', // 16 Dcto. IGV
-            '0.00', // 17 Exoneradas
+            exoneradas, // 17 Exoneradas
             inafectas, // 18 Inafectas
             '0.00', // 19 ISC
             '0.00', // 20 Base IVAP
@@ -218,7 +226,10 @@ export class SireService {
       }
     }
 
-    return Buffer.from(lines.join('\r\n'), 'utf-8');
+    // SUNAT exige el TXT en ANSI (Windows-1252/ISO-8859-1), no UTF-8: con
+    // UTF-8, cualquier nombre con tilde o Ñ sale corrupto o es rechazado por
+    // el validador. 'latin1' cubre correctamente los caracteres del español.
+    return Buffer.from(lines.join('\r\n'), 'latin1');
   }
 
   async generarExcelVentas(
@@ -276,12 +287,12 @@ export class SireService {
         'TIPO DOC CLIENTE': tipoDocCliente,
         'NRO DOC CLIENTE': c.cliente?.nroDoc ?? '',
         'RAZÓN SOCIAL': c.cliente?.nombre ?? '',
-        EXPORTACIÓN: 0,
+        EXPORTACIÓN: +(c.mtoOperExportacion ?? 0).toFixed(2),
         'BASE GRAVADA': +(c.mtoOperGravadas ?? 0).toFixed(2),
-        'DCTO. BASE IMP.': 0,
+        'DCTO. BASE IMP.': +(c.mtoDescuentoGlobal ?? 0).toFixed(2),
         IGV: +(c.mtoIGV ?? 0).toFixed(2),
         'DCTO. IGV': 0,
-        EXONERADAS: 0,
+        EXONERADAS: +(c.mtoOperExoneradas ?? 0).toFixed(2),
         INAFECTAS: +(c.mtoOperInafectas ?? 0).toFixed(2),
         ISC: 0,
         'BASE IVAP': 0,
@@ -432,7 +443,10 @@ export class SireService {
       }
     }
 
-    return Buffer.from(lines.join('\r\n'), 'utf-8');
+    // SUNAT exige el TXT en ANSI (Windows-1252/ISO-8859-1), no UTF-8: con
+    // UTF-8, cualquier nombre con tilde o Ñ sale corrupto o es rechazado por
+    // el validador. 'latin1' cubre correctamente los caracteres del español.
+    return Buffer.from(lines.join('\r\n'), 'latin1');
   }
 
   async generarExcelCompras(
