@@ -76,6 +76,14 @@ export class ListComprobanteDto {
   @IsIn(['zip', 'pdf', 'excel'])
   formato?: 'zip' | 'pdf' | 'excel';
 
+  // Solo para exportar-resumen: CSV con las keys de las columnas opcionales que
+  // el usuario dejó visibles en el panel de ventas (saldo, mpago, productos...).
+  // Si no llega, se exportan todas las opcionales.
+  @IsOptional()
+  @Type(() => String)
+  @IsString()
+  columnas?: string;
+
   @IsOptional()
   @Type(() => String)
   @IsString()
