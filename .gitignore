@@ -61,3 +61,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 *.sqlite3
 prisma/dev.db
 prisma/nephi_pos_template.db
+
+# Claude Code local settings
+.claude/settings.local.json
