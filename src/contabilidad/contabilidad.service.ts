@@ -1,6 +1,11 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { montoEnPen } from '../common/utils/moneda.util';
+import {
+  egresosCajaWhere,
+  mapCategoriaCaja,
+  EGRESO_CAJA_SELECT,
+} from '../common/utils/egresos-caja.util';
 
 @Injectable()
 export class ContabilidadService {
@@ -408,7 +413,8 @@ export class ContabilidadService {
 
   /**
    * Reporte de GASTOS operativos del período (egresos).
-   * Fuente: modelo GastoOperativo. Incluye gastos con fecha en el rango y
+   * Fuente: GastoOperativo + los gastos registrados en caja
+   * (MovimientoCaja EGRESO), que son plata que salio del negocio igual. Incluye gastos con fecha en el rango y
    * los recurrentes diarios vigentes (misma lógica que finanzas.listarEgresos).
    * No se filtra por sede porque GastoOperativo no está asociado a una sede.
    */
@@ -434,15 +440,38 @@ export class ContabilidadService {
       orderBy: [{ fecha: 'desc' }, { creadoEn: 'desc' }],
     });
 
-    const gastos = gastosRaw.map((g) => ({
-      id: g.id,
-      fecha: g.fecha ?? g.fechaInicio ?? g.creadoEn,
-      categoria: g.categoria,
-      etiqueta: g.etiqueta ?? '',
-      descripcion: g.descripcion ?? '',
-      recurrenteDiario: g.recurrenteDiario,
-      monto: Number(g.monto || 0),
-    }));
+    // Gastos de caja chica: mismas reglas que el resto de los reportes
+    // (sin transferencias entre sedes, solo aprobados).
+    const cajaRaw = await this.prisma.movimientoCaja.findMany({
+      where: egresosCajaWhere(empresaId, rango.gte, rango.lte),
+      select: EGRESO_CAJA_SELECT,
+      orderBy: { fecha: 'desc' },
+    });
+
+    const gastos = [
+      ...gastosRaw.map((g) => ({
+        id: g.id,
+        fecha: g.fecha ?? g.fechaInicio ?? g.creadoEn,
+        categoria: g.categoria as string,
+        etiqueta: g.etiqueta ?? '',
+        descripcion: g.descripcion ?? '',
+        recurrenteDiario: g.recurrenteDiario,
+        monto: Number(g.monto || 0),
+        origen: 'OPERATIVO',
+      })),
+      ...cajaRaw.map((m) => ({
+        id: m.id,
+        fecha: m.fecha,
+        categoria: mapCategoriaCaja(m.categoriaGasto),
+        etiqueta: m.categoriaGasto?.trim()
+          ? `Caja - ${m.categoriaGasto.trim()}`
+          : 'Caja chica',
+        descripcion: m.descripcionGasto ?? '',
+        recurrenteDiario: false,
+        monto: Number(m.monto || 0),
+        origen: 'CAJA',
+      })),
+    ].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
     const porCategoria: Record<string, number> = {};
     let totalGastos = 0;
