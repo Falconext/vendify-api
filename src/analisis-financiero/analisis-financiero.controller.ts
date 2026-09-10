@@ -22,10 +22,37 @@ import { ActualizarGastoDto } from './dto/actualizar-gasto.dto';
 export class AnalisisFinancieroController {
   constructor(private readonly service: AnalisisFinancieroService) {}
 
+  /**
+   * Sede por la que se filtra el análisis.
+   *
+   * · ADMIN_EMPRESA / ADMIN_SISTEMA: elige con el selector. Sin valor (o 0) =
+   *   todas las sedes, que es el comportamiento histórico.
+   * · USUARIO_EMPRESA: SIEMPRE su sede, la del JWT. El `?sedeId=` de la URL se
+   *   ignora, así que no puede pedir el análisis de otra sede a mano.
+   *
+   * Mismo criterio que ya aplica Flujo de Caja (finanzas.controller.ts).
+   */
+  private resolverSedeId(user: any, sedeIdQuery?: string): number | null {
+    const isAdmin =
+      user?.rol === 'ADMIN_EMPRESA' || user?.rol === 'ADMIN_SISTEMA';
+    if (!isAdmin) return user?.sedeId ?? null;
+    const n = Number(sedeIdQuery);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
   /** GET /analisis-financiero/pnl?mes=&anio= */
   @Get('pnl')
-  getPnl(@User() user: any, @Query() query: QueryPeriodoDto) {
-    return this.service.getPnl(user.empresaId, query.mes, query.anio);
+  getPnl(
+    @User() user: any,
+    @Query() query: QueryPeriodoDto,
+    @Query('sedeId') sedeIdQuery?: string,
+  ) {
+    return this.service.getPnl(
+      user.empresaId,
+      query.mes,
+      query.anio,
+      this.resolverSedeId(user, sedeIdQuery),
+    );
   }
 
   /**
@@ -33,17 +60,34 @@ export class AnalisisFinancieroController {
    * meses defaults to 6 if not provided.
    */
   @Get('evolucion')
-  getEvolucion(@User() user: any, @Query('meses') mesesQuery?: string) {
+  getEvolucion(
+    @User() user: any,
+    @Query('meses') mesesQuery?: string,
+    @Query('sedeId') sedeIdQuery?: string,
+  ) {
     const meses = mesesQuery
       ? Math.min(Math.max(parseInt(mesesQuery, 10) || 6, 1), 24)
       : 6;
-    return this.service.getEvolucion(user.empresaId, meses);
+    return this.service.getEvolucion(
+      user.empresaId,
+      meses,
+      this.resolverSedeId(user, sedeIdQuery),
+    );
   }
 
   /** GET /analisis-financiero/gastos?mes=&anio= */
   @Get('gastos')
-  listarGastos(@User() user: any, @Query() query: QueryPeriodoDto) {
-    return this.service.listarGastos(user.empresaId, query.mes, query.anio);
+  listarGastos(
+    @User() user: any,
+    @Query() query: QueryPeriodoDto,
+    @Query('sedeId') sedeIdQuery?: string,
+  ) {
+    return this.service.listarGastos(
+      user.empresaId,
+      query.mes,
+      query.anio,
+      this.resolverSedeId(user, sedeIdQuery),
+    );
   }
 
   /** GET /analisis-financiero/gastos/historial */
@@ -77,11 +121,13 @@ export class AnalisisFinancieroController {
   getRentabilidadCategorias(
     @User() user: any,
     @Query() query: QueryPeriodoDto,
+    @Query('sedeId') sedeIdQuery?: string,
   ) {
     return this.service.getRentabilidadCategorias(
       user.empresaId,
       query.mes,
       query.anio,
+      this.resolverSedeId(user, sedeIdQuery),
     );
   }
 
@@ -93,6 +139,7 @@ export class AnalisisFinancieroController {
     @Query('anio') anio?: string,
     @Query('fechaInicio') fechaInicio?: string,
     @Query('fechaFin') fechaFin?: string,
+    @Query('sedeId') sedeIdQuery?: string,
   ) {
     return this.service.getMetodosPago(
       user.empresaId,
@@ -100,6 +147,7 @@ export class AnalisisFinancieroController {
       anio ? Number(anio) : undefined,
       fechaInicio,
       fechaFin,
+      this.resolverSedeId(user, sedeIdQuery),
     );
   }
 

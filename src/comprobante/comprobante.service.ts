@@ -5675,7 +5675,10 @@ export class ComprobanteService {
       };
       const rawFormatoCfg = ((full.empresa as any).cotizFormatoConfig ||
         {}) as Record<string, { visible?: boolean; size?: number }>;
-      const fc: Record<string, { visible: boolean; size: number }> = {};
+      const fc: Record<
+        string,
+        { visible: boolean; size: number; texto?: string }
+      > = {};
       for (const [k, def] of Object.entries(cotizElemDefaults)) {
         const c = rawFormatoCfg[k] || {};
         fc[k] = { visible: c.visible !== false, size: Number(c.size) || def };
@@ -5686,6 +5689,51 @@ export class ComprobanteService {
         visible: rawFormatoCfg.qrPagos?.visible === true,
         size: Number(rawFormatoCfg.qrPagos?.size) || 90,
       };
+      // Precios unitarios SIN IGV (valor unitario / valor de venta). Opt-in, igual
+      // que en el frontend: por defecto la cotización sigue mostrando el precio
+      // con IGV incluido.
+      fc.preciosSinIgv = {
+        visible: (rawFormatoCfg as any).preciosSinIgv?.visible === true,
+        size: 12,
+      };
+
+      // Cuando el formato pide precios sin IGV, la columna P.UNIT pasa a ser el
+      // VALOR unitario y el importe de línea el VALOR de venta. El factor se saca
+      // de la propia línea (mtoValorUnitario / mtoPrecioUnitario), así respeta la
+      // afectación real de cada ítem (gravado 18%, exonerado/inafecto sin cambio)
+      // sin asumir una tasa fija.
+      const productosCotiz = fc.preciosSinIgv.visible
+        ? productos.map((prod, i) => {
+            const d: any = full.detalles[i];
+            const pu = Number(d?.mtoPrecioUnitario || 0);
+            const vu = Number(d?.mtoValorUnitario || 0);
+            const factor = pu > 0 && vu > 0 ? vu / pu : 1;
+            return {
+              ...prod,
+              precioUnitario: (Number(prod.precioUnitario) * factor).toFixed(2),
+              total: (Number(prod.total) * factor).toFixed(2),
+            };
+          })
+        : productos;
+
+      // Cada línea del texto libre se imprime como un renglón aparte (el HTML
+      // colapsa los saltos). Se usa para las observaciones y para el pie.
+      const enLineas = (t: any): string[] =>
+        String(t ?? '')
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+      // Mensaje del pie configurable por empresa; vacío = el texto por defecto que
+      // arma la propia plantilla con el nombre comercial.
+      fc.gracias.texto = String(
+        (rawFormatoCfg as any).gracias?.texto ?? '',
+      ).trim();
+      const graciasLineas = enLineas(fc.gracias.texto).map((l) =>
+        l.toUpperCase(),
+      );
+      const observacionesLineas = enLineas(full.observaciones).map((l) =>
+        l.toUpperCase(),
+      );
 
       // SON: en letras alineado al frontend (decimales con "CON" + moneda).
       const sonBase = numeroALetras(mtoImpVenta)
@@ -5697,6 +5745,9 @@ export class ComprobanteService {
 
       const cotizacionData = {
         ...pdfData,
+        productos: productosCotiz,
+        graciasLineas,
+        observacionesLineas,
         monedaSimbolo: cotizEsUSD ? 'US$' : 'S/',
         monedaNombre: cotizEsUSD ? 'DÓLARES' : 'SOLES',
         fc,

@@ -28,6 +28,8 @@
     "prisma:web": "cp prisma/schema.prisma prisma/schema.backup.prisma && prisma generate && echo 'Usando PostgreSQL (Web)'",
     "prisma:desktop": "cp prisma/schema.sqlite.prisma prisma/schema.prisma && prisma generate && echo 'Usando SQLite (Desktop)'",
     "seed:desktop": "npx ts-node prisma/desktop-seed.ts",
+    "backfill:sede-comprobantes": "npx ts-node src/scripts/backfill-sede-comprobantes.ts",
+    "limpiar:pagos-duplicados": "npx ts-node src/scripts/limpiar-pagos-duplicados-envio.ts",
     "seed:detracciones": "npx ts-node prisma/seeds/seed-detracciones.ts",
     "export:catalog": "npx ts-node scripts/export-catalog-web.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
