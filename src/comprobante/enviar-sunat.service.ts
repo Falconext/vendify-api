@@ -271,7 +271,8 @@ export class EnviarSunatService {
    * que ya generó comisión. Atribuye al vendedor apuntado (vendedorCampoId) o,
    * en su defecto, al emisor (usuarioId). No bloqueante.
    */
-  private async registrarComisionesAlAceptar(comp: any): Promise<void> {
+  // Público: lo llaman el scheduler de reintentos y la conciliación manual.
+  async registrarComisionesAlAceptar(comp: any): Promise<void> {
     if (!this.comisionesService) return;
     // Solo generan comisión los comprobantes de VENTA: factura (01) y boleta (03).
     // Notas de crédito (07) y débito (08) no generan comisión positiva; la nota
@@ -379,7 +380,9 @@ export class EnviarSunatService {
         empresa: { include: { ubicacion: true, rubro: true } },
         sede: { select: { nombre: true, direccion: true } },
         detalles: {
-          include: { producto: { select: { codigo: true, codProdSunat: true } } },
+          include: {
+            producto: { select: { codigo: true, codProdSunat: true } },
+          },
         },
         leyendas: true,
         tipoOperacion: true,
@@ -2446,7 +2449,8 @@ export class EnviarSunatService {
             `⛔ Comprobante ${comprobanteId} ya está ${actual?.estadoEnvioSunat}; se ignora el resultado ${estadoFinal} de este envío.`,
           );
           return {
-            status: actual?.estadoEnvioSunat === 'EMITIDO' ? 'ACEPTADO' : 'ANULADO',
+            status:
+              actual?.estadoEnvioSunat === 'EMITIDO' ? 'ACEPTADO' : 'ANULADO',
             documentId,
             comprobanteId,
             serie: comp.serie,
@@ -2619,7 +2623,11 @@ export class EnviarSunatService {
 
         // Nunca degradar un comprobante que otro proceso ya dejó en estado final
         // (p. ej. aceptado por SUNAT mientras este reintento fallaba).
-        const ESTADOS_FINALES = ['EMITIDO', 'ANULADO', 'PENDIENTE_CONCILIACION'];
+        const ESTADOS_FINALES = [
+          'EMITIDO',
+          'ANULADO',
+          'PENDIENTE_CONCILIACION',
+        ];
         if (
           currentComp &&
           ESTADOS_FINALES.includes(String(currentComp.estadoEnvioSunat))
@@ -2751,6 +2759,17 @@ export class EnviarSunatService {
         sunatLastRetryAt: new Date(),
       },
     });
+
+    // Este estado se pone cuando SUNAT respondió que el documento YA ESTÁ
+    // REGISTRADO (código 1033): la venta es válida y aceptada, lo único que
+    // falta es el CDR. Antes la comisión solo se generaba al conciliar a mano y,
+    // como casi nadie concilia, el vendedor no cobraba nunca esas ventas.
+    // El helper es idempotente, así que si después se concilia no se duplica.
+    const conDetalles = await this.prisma.comprobante.findUnique({
+      where: { id: comprobanteId },
+      include: { detalles: true },
+    });
+    if (conDetalles) await this.registrarComisionesAlAceptar(conDetalles);
   }
 
   // Afectaciones gratuitas Catálogo 07 (11-16 gravado, 21 exonerado, 31-37 inafecto):
@@ -3455,7 +3474,9 @@ export class EnviarSunatService {
 
       // Dirección de la sede emisora: solo se muestra si tiene una
       // dirección propia distinta a la fiscal del RUC.
-      const sedeDir = ((comp as any).sede?.direccion || '').trim().toUpperCase();
+      const sedeDir = ((comp as any).sede?.direccion || '')
+        .trim()
+        .toUpperCase();
       const fiscalDir = (comp.empresa.direccion || '').trim().toUpperCase();
       const sedeDireccionPdf = sedeDir && sedeDir !== fiscalDir ? sedeDir : '';
 
