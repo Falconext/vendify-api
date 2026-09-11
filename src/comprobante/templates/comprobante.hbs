@@ -184,6 +184,16 @@
     .tot-neto { display: flex; justify-content: space-between; font-weight: 700; font-size: 11px; margin-bottom: 2px; }
 
     /* ── BRAND FOOTER ── */
+    /* QR de pago y cuentas bancarias (mismo estilo que cotizacion.hbs) */
+    .qr-pagos { display: flex; justify-content: flex-end; gap: 24px; margin-top: 12px; }
+    .qr-item { display: flex; flex-direction: column; align-items: center; }
+    .qr-label { font-weight: 700; font-size: 11px; margin-bottom: 4px; }
+    .qr-item img { border: 1px solid #d1d5db; object-fit: contain; }
+    .qr-num { font-size: 10px; margin-top: 4px; }
+    .bank-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    .bank-table th, .bank-table td { border: 1px solid #000; padding: 2px 8px; text-align: center; }
+    .bank-table th { background: #f3f4f6; font-weight: 700; }
+    .bank-table .bank-td-name { font-weight: 700; }
     .brand-footer { margin-top: 32px; text-align: center; font-size: 11px; }
     .brand-thanks { font-weight: 700; margin-bottom: 4px; }
     .brand-vuelta { font-weight: 700; margin-bottom: 32px; }
@@ -199,18 +209,19 @@
 <body>
 
   <!-- HEADER: Logo | Empresa | Documento -->
+  <!-- Mismo orden y mismas reglas de visibilidad/tamaño que la vista previa del modal (comprobanteImprimir.tsx) -->
   <div class="header">
-    {{#if logo}}<img class="header-logo" src="{{logo}}" alt="logo" style="width: {{logoSize}}px; height: {{logoSize}}px;">{{/if}}
+    {{#if (vis fc 'logo')}}{{#if logo}}<img class="header-logo" src="{{logo}}" alt="logo" style="width: {{fsz fc 'logo' 150}}px; height: {{fsz fc 'logo' 150}}px;">{{/if}}{{/if}}
     <div class="header-company">
-      <h1>{{nombreComercial}}</h1>
+      {{#if (vis fc 'razonSocial')}}<h1 style="font-size: {{fsz fc 'razonSocial' 20}}px;">{{razonSocial}}</h1>{{/if}}
       <p>
-        {{direccion}}<br>
-        {{#if sedeDireccion}}SEDE: {{sedeDireccion}}<br>{{/if}}
-        {{#if rubro}}{{rubro}}<br>{{/if}}
-        RAZON SOCIAL: {{razonSocial}}<br>
-        {{#if celular}}CELULAR: {{celular}}<br>{{/if}}
-        {{#if email}}EMAIL: {{email}}<br>{{/if}}
-        {{#if paginaWeb}}WEB: {{paginaWeb}}{{/if}}
+        {{#if (vis fc 'direccion')}}<span style="font-size: {{fsz fc 'direccion' 12}}px;">{{direccion}}</span><br>
+        {{#if sedeDireccion}}<span style="font-size: {{fsz fc 'direccion' 12}}px;">SEDE: {{sedeDireccion}}</span><br>{{/if}}{{/if}}
+        {{#if (vis fc 'rubro')}}{{#if rubro}}<span style="font-size: {{fsz fc 'rubro' 12}}px;">{{rubro}}</span><br>{{/if}}{{/if}}
+        {{#if (vis fc 'nombreComercial')}}{{#unless (eq nombreComercial razonSocial)}}<span style="font-size: {{fsz fc 'nombreComercial' 12}}px;">NOMBRE COMERCIAL: {{nombreComercial}}</span><br>{{/unless}}{{/if}}
+        {{#if (vis fc 'celular')}}{{#if celular}}<span style="font-size: {{fsz fc 'celular' 12}}px;">CELULAR: {{celular}}</span><br>{{/if}}{{/if}}
+        {{#if (vis fc 'email')}}{{#if email}}<span style="font-size: {{fsz fc 'email' 12}}px;">EMAIL: {{email}}</span><br>{{/if}}{{/if}}
+        {{#if (vis fc 'web')}}{{#if paginaWeb}}<span style="font-size: {{fsz fc 'web' 12}}px;">WEB: {{paginaWeb}}</span>{{/if}}{{/if}}
       </p>
     </div>
     <div class="header-doc">
@@ -222,8 +233,10 @@
   </div>
 
   <!-- DATOS DEL CLIENTE + COMPROBANTE (caja única, mismo estilo que cotización) -->
+  {{#if (or (vis fc 'datosCliente') (vis fc 'datosCotizacion'))}}
   <div class="info-unified">
-    <div class="info-col">
+    {{#if (vis fc 'datosCliente')}}
+    <div class="info-col" style="font-size: {{fsz fc 'datosCliente' 12}}px;">
       <div class="info-grid">
         <span class="lbl">CLIENTE:</span>
         <span class="val">{{clienteNombre}}</span>
@@ -237,7 +250,9 @@
         <span class="val">{{#if clienteDireccion}}{{clienteDireccion}}{{else}}-{{/if}}</span>
       </div>
     </div>
-    <div class="info-col with-divider">
+    {{/if}}
+    {{#if (vis fc 'datosCotizacion')}}
+    <div class="info-col {{#if (vis fc 'datosCliente')}}with-divider{{/if}}" style="font-size: {{fsz fc 'datosCotizacion' 12}}px;">
       <div class="info-grid wide">
         <span class="lbl">FECHA:</span>
         <span class="val">{{fecha}}</span>
@@ -261,7 +276,9 @@
         <span class="val">{{vendedor}}</span>
       </div>
     </div>
+    {{/if}}
   </div>
+  {{/if}}
 
   {{#if cuotas}}
   <div class="cuotas-box">
@@ -277,9 +294,9 @@
   </div>
   {{/if}}
 
-  {{#if tipoDetraccion}}
+  {{#if (vis fc 'detraccion')}}{{#if tipoDetraccion}}
   <!-- DETRACCIÓN -->
-  <div class="detraccion">
+  <div class="detraccion" style="font-size: {{fsz fc 'detraccion' 12}}px;">
     <p class="detraccion-title">OPERACIÓN SUJETA A DETRACCIÓN</p>
     <div class="detraccion-grid">
       <div class="det-row">
@@ -302,11 +319,11 @@
       {{/if}}
     </div>
   </div>
-  {{/if}}
+  {{/if}}{{/if}}
 
   <!-- TABLA DE PRODUCTOS -->
   <div class="table-wrap">
-    <div class="tbl-header">
+    <div class="tbl-header" style="font-size: {{fsz fc 'productos' 11}}px;">
       <div class="c-num">N°</div>
       <div class="c-cant">CANT.</div>
       <div class="c-um">UNIDAD</div>
@@ -316,7 +333,7 @@
       <div class="c-tot">TOTAL</div>
     </div>
     {{#each productos}}
-    <div class="tbl-row">
+    <div class="tbl-row" style="font-size: {{fsz ../fc 'productos' 11}}px;">
       <div class="c-num">{{this.index}}</div>
       <div class="c-cant">{{this.cantidad}}</div>
       <div class="c-um">{{this.unidadMedida}}</div>
@@ -336,17 +353,19 @@
   </div>
 
   <!-- SON (TOTAL EN LETRAS) -->
-  <div class="son-box">SON: {{totalEnLetras}}</div>
+  {{#if (vis fc 'sonTexto')}}<div class="son-box" style="font-size: {{fsz fc 'sonTexto' 18}}px;">SON: {{totalEnLetras}}</div>{{/if}}
 
   <!-- OBSERVACIONES + TOTALES -->
   <div class="footer-box">
     <div class="footer-content">
       <div class="footer-obs">
         {{#if ordenCompraCliente}}
-        <div class="obs-title">N° ORDEN DE COMPRA: {{ordenCompraCliente}}</div>
+        <div class="obs-title" style="font-size: {{fsz fc 'observaciones' 12}}px;">N° ORDEN DE COMPRA: {{ordenCompraCliente}}</div>
         {{/if}}
-        <div class="obs-title">OBSERVACIONES:</div>
-        <div class="obs-text">{{observaciones}}</div>
+        {{#if (vis fc 'observaciones')}}
+        <div class="obs-title" style="font-size: {{fsz fc 'observaciones' 12}}px;">OBSERVACIONES:</div>
+        <div class="obs-text" style="font-size: {{fsz fc 'observaciones' 12}}px;">{{observaciones}}</div>
+        {{/if}}
         <div class="legal-text">
           Representación impresa del Comprobante de Pago Electrónico.<br>
           Autorizado mediante Resolución de Intendencia N° 080-005-000153/SUNAT.<br>
@@ -355,34 +374,78 @@
       </div>
       <div class="footer-totals">
         {{#if isDocumentoFiscal}}
-        {{#if (vis fc 'opGravadas')}}<div class="tot-row bold"><span>OP. GRAVADAS:</span><span>{{simboloMoneda}} {{mtoOperGravadas}}</span></div>{{/if}}
-        {{#if (vis fc 'opExoneradas')}}<div class="tot-row bold"><span>OP. EXONERADAS:</span><span>{{simboloMoneda}} {{mtoOperExoneradas}}</span></div>{{/if}}
-        {{#if (vis fc 'opInafectas')}}<div class="tot-row bold"><span>OP. INAFECTAS:</span><span>{{simboloMoneda}} {{mtoOperInafectas}}</span></div>{{/if}}
-        {{#if (vis fc 'opGratuitas')}}<div class="tot-row bold"><span>OP. GRATUITAS:</span><span>{{simboloMoneda}} 0.00</span></div>{{/if}}
-        {{#if (vis fc 'icbper')}}<div class="tot-row bold"><span>ICBPER:</span><span>{{simboloMoneda}} 0.00</span></div>{{/if}}
-        {{#if (vis fc 'subTotal')}}<div class="tot-row bold"><span>SUB TOTAL:</span><span>{{simboloMoneda}} {{subTotal}}</span></div>{{/if}}
-        {{#if (vis fc 'descuentos')}}<div class="tot-row"><span>DESCUENTOS TOTAL:</span><span>{{simboloMoneda}} {{descuento}}</span></div>{{/if}}
-        {{#if (vis fc 'igv')}}<div class="tot-row bold"><span>IGV 18%:</span><span>{{simboloMoneda}} {{mtoIGV}}</span></div>{{/if}}
+        {{#if (vis fc 'opGravadas')}}<div style="font-size: {{fsz fc 'opGravadas' 12}}px;" class="tot-row bold"><span>OP. GRAVADAS:</span><span>{{simboloMoneda}} {{mtoOperGravadas}}</span></div>{{/if}}
+        {{#if (vis fc 'opExoneradas')}}<div style="font-size: {{fsz fc 'opExoneradas' 12}}px;" class="tot-row bold"><span>OP. EXONERADAS:</span><span>{{simboloMoneda}} {{mtoOperExoneradas}}</span></div>{{/if}}
+        {{#if (vis fc 'opInafectas')}}<div style="font-size: {{fsz fc 'opInafectas' 12}}px;" class="tot-row bold"><span>OP. INAFECTAS:</span><span>{{simboloMoneda}} {{mtoOperInafectas}}</span></div>{{/if}}
+        {{#if (vis fc 'opGratuitas')}}<div style="font-size: {{fsz fc 'opGratuitas' 12}}px;" class="tot-row bold"><span>OP. GRATUITAS:</span><span>{{simboloMoneda}} 0.00</span></div>{{/if}}
+        {{#if (vis fc 'icbper')}}<div style="font-size: {{fsz fc 'icbper' 12}}px;" class="tot-row bold"><span>ICBPER:</span><span>{{simboloMoneda}} 0.00</span></div>{{/if}}
+        {{#if (vis fc 'subTotal')}}<div style="font-size: {{fsz fc 'subTotal' 12}}px;" class="tot-row bold"><span>SUB TOTAL:</span><span>{{simboloMoneda}} {{subTotal}}</span></div>{{/if}}
+        {{#if (vis fc 'descuentos')}}<div style="font-size: {{fsz fc 'descuentos' 12}}px;" class="tot-row"><span>DESCUENTOS TOTAL:</span><span>{{simboloMoneda}} {{descuento}}</span></div>{{/if}}
+        {{#if (vis fc 'igv')}}<div style="font-size: {{fsz fc 'igv' 12}}px;" class="tot-row bold"><span>IGV 18%:</span><span>{{simboloMoneda}} {{mtoIGV}}</span></div>{{/if}}
         {{/if}}
         {{#unless isDocumentoFiscal}}{{#if descuento}}
         <div class="tot-row"><span>DESCUENTO:</span><span>- {{simboloMoneda}} {{descuento}}</span></div>
         {{/if}}{{/unless}}
-        <div class="tot-final">
+        {{#if (vis fc 'montoTotal')}}
+        <div class="tot-final" style="font-size: {{fsz fc 'montoTotal' 18}}px;">
           <span>MONTO TOTAL:</span>
           <span>{{simboloMoneda}} {{mtoImpVenta}}</span>
         </div>
+        {{/if}}
         {{#if shouldShowRetention}}
         <div class="tot-row tot-retention"><span>RETENCIÓN (3%):</span><span>{{simboloMoneda}} {{retencionMonto}}</span></div>
         <div class="tot-neto"><span>IMPORTE NETO:</span><span>{{simboloMoneda}} {{importeNeto}}</span></div>
         {{/if}}
       </div>
     </div>
+    <!-- QR de pago (Yape / Plin): oculto por defecto, se activa desde el formato -->
+    {{#if fc.qrPagos.visible}}
+    <div class="qr-pagos">
+      {{#if yapeQrUrl}}
+      <div class="qr-item">
+        <div class="qr-label">Yape</div>
+        <img src="{{yapeQrUrl}}" alt="QR Yape" style="width: {{fc.qrPagos.size}}px; height: {{fc.qrPagos.size}}px;">
+        {{#if yapeNumero}}<div class="qr-num">{{yapeNumero}}</div>{{/if}}
+      </div>
+      {{/if}}
+      {{#if plinQrUrl}}
+      <div class="qr-item">
+        <div class="qr-label">Plin</div>
+        <img src="{{plinQrUrl}}" alt="QR Plin" style="width: {{fc.qrPagos.size}}px; height: {{fc.qrPagos.size}}px;">
+        {{#if plinNumero}}<div class="qr-num">{{plinNumero}}</div>{{/if}}
+      </div>
+      {{/if}}
+    </div>
+    {{/if}}
   </div>
+
+  <!-- CUENTAS BANCARIAS (misma tabla que la cotización; solo si el formato las activa) -->
+  {{#if (vis fc 'cuentas')}}
+  {{#if cuentasBancarias.length}}
+  <table class="bank-table" style="font-size: {{fsz fc 'cuentas' 10}}px;">
+    <thead>
+      <tr><th>BANCO</th><th>MONEDA</th><th>CUENTA</th><th>CCI</th></tr>
+    </thead>
+    <tbody>
+      {{#each cuentasBancarias}}
+      <tr>
+        <td class="bank-td-name">{{banco}}</td>
+        <td>{{moneda}}</td>
+        <td>{{numeroCuenta}}</td>
+        <td>{{cci}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  {{/if}}
+  {{/if}}
 
   <!-- BRAND FOOTER -->
   <div class="brand-footer">
-    <div class="brand-thanks">GRACIAS POR ELEGIR {{nombreComercial}} PARA CUBRIR SUS REQUERIMIENTOS</div>
-    <div class="brand-vuelta">VUELVA PRONTO</div>
+    {{#if (vis fc 'gracias')}}
+    <div class="brand-thanks" style="font-size: {{fsz fc 'gracias' 10}}px;">GRACIAS POR ELEGIR {{nombreComercial}} PARA CUBRIR SUS REQUERIMIENTOS</div>
+    <div class="brand-vuelta" style="font-size: {{fsz fc 'gracias' 10}}px;">VUELVA PRONTO</div>
+    {{/if}}
     <div class="brand-bottom">
       <div class="brand-left">USUARIO: {{usuario}} {{fechaImpresion}}</div>
       <div class="brand-right">

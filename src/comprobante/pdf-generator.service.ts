@@ -5,20 +5,27 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * Construye el objeto de formato configurable (visibilidad por elemento) para
- * comprobantes fiscales, a partir de la empresa y el tipo de documento.
- * Boleta ('03') usa `boletaFormatoConfig`; el resto (factura, NC, ND) usa
- * `facturaFormatoConfig`. Por defecto todo es visible (visible !== false).
- * Se usa en los 3 flujos que generan el PDF (impresión, emisión y reemisión)
- * para que el documento salga idéntico en todos lados.
+ * Construye el objeto de formato configurable (visibilidad + tamaño por
+ * elemento) para comprobantes fiscales, a partir de la empresa y el tipo de
+ * documento. Boleta ('03') usa `boletaFormatoConfig`; el resto (factura, NC,
+ * ND) usa `facturaFormatoConfig`. Por defecto todo es visible (visible !==
+ * false) salvo el QR de pago. Los defaults de tamaño deben coincidir con
+ * `cotizFormatoElementos.ts` del frontend (defaultSizeFiscal cuando aplica)
+ * para que la vista previa del modal y el PDF sean el mismo documento.
+ * Se usa en los 3 flujos que generan el PDF (impresión, emisión y reemisión).
  */
 export function buildFiscalFormatoFc(
   empresa: any,
   tipoDoc: string,
 ): Record<string, { visible: boolean; size: number }> {
   const defaults: Record<string, number> = {
+    logo: 150, nombreComercial: 12, direccion: 12, rubro: 12,
+    razonSocial: 20, celular: 12, email: 12, web: 12,
+    datosCliente: 12, datosCotizacion: 12, productos: 12, sonTexto: 18,
+    observaciones: 12, detraccion: 12,
     opGravadas: 12, opExoneradas: 12, opInafectas: 12, opGratuitas: 12,
-    icbper: 12, subTotal: 12, descuentos: 12, igv: 12,
+    icbper: 12, subTotal: 12, descuentos: 12, igv: 12, montoTotal: 18,
+    cuentas: 10, gracias: 10,
   };
   const raw = ((tipoDoc === '03'
     ? empresa?.boletaFormatoConfig
@@ -31,6 +38,11 @@ export function buildFiscalFormatoFc(
     const c = raw[k] || {};
     fc[k] = { visible: c.visible !== false, size: Number(c.size) || def };
   }
+  // QR de pago (Yape/Plin): oculto por defecto, igual que el frontend.
+  fc.qrPagos = {
+    visible: raw.qrPagos?.visible === true,
+    size: Number(raw.qrPagos?.size) || 90,
+  };
   return fc;
 }
 
@@ -92,6 +104,12 @@ export class PdfGeneratorService {
     // afectar comprobantes/tickets que se generan sin `fc`.
     Handlebars.registerHelper('vis', (fc: any, key: string) => {
       return !fc || !fc[key] || fc[key].visible !== false;
+    });
+    // Tamaño (px) de un elemento del formato configurable, con fallback para
+    // PDFs generados sin `fc`.
+    Handlebars.registerHelper('fsz', (fc: any, key: string, def: any) => {
+      const n = Number(fc?.[key]?.size);
+      return n > 0 ? n : Number(def) || 12;
     });
 
     const templateSource = fs.readFileSync(foundPath, 'utf-8');
@@ -378,9 +396,11 @@ export class PdfGeneratorService {
     subTotal?: string;
     totalEnLetras?: string;
 
-    // Formato configurable (visibilidad por elemento de totales). Opcional:
-    // si no se envía, todas las filas se muestran (ver helper `vis`).
+    // Formato configurable (visibilidad + tamaño por elemento). Opcional:
+    // si no se envía, todo se muestra con tamaños por defecto (helpers `vis`/`fsz`).
     fc?: Record<string, { visible: boolean; size: number }>;
+    // Cuentas bancarias (solo se dibujan si el formato las activa).
+    cuentasBancarias?: Array<{ banco: string; moneda: string; numeroCuenta: string; cci: string }>;
 
     // Otros
     formaPago: string;
