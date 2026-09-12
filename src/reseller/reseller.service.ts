@@ -2473,7 +2473,11 @@ export class ResellerService {
   private async buildEarnings(resellerId: number) {
     const reseller = await this.prisma.reseller.findUnique({
       where: { id: resellerId },
-      select: { porcentajeDescuento: true, whiteLabelDesde: true },
+      select: {
+        porcentajeDescuento: true,
+        whiteLabelDesde: true,
+        whiteLabelProximoCobro: true,
+      },
     });
     if (!reseller) throw new NotFoundException('Reseller no encontrado');
 
@@ -2548,6 +2552,22 @@ export class ResellerService {
     const costoMarcaBlanca = reseller.whiteLabelDesde
       ? getWhiteLabelFee(clientesActivos)
       : 0;
+    // Detalle para el panel del reseller: cuánto, por qué (tramo) y cuándo.
+    const tramoActual = WHITE_LABEL_FEE_TIERS.find(
+      (t) => clientesActivos < t.menosDe,
+    );
+    const marcaBlanca = {
+      cuota: getWhiteLabelFee(clientesActivos),
+      cicloIniciado: Boolean(reseller.whiteLabelDesde),
+      desde: reseller.whiteLabelDesde,
+      proximoCobro: reseller.whiteLabelProximoCobro,
+      clientesProduccion: clientesActivos,
+      tramoHasta: tramoActual ? tramoActual.menosDe - 1 : null,
+      siguienteCuota: tramoActual
+        ? (WHITE_LABEL_FEE_TIERS[WHITE_LABEL_FEE_TIERS.indexOf(tramoActual) + 1]
+            ?.monto ?? WHITE_LABEL_FEE_TOPE)
+        : null,
+    };
     const gananciaMensual = ingresoMensual - costoMensual - costoMarcaBlanca;
     const margenPct =
       ingresoMensual > 0 ? (gananciaMensual / ingresoMensual) * 100 : 0;
@@ -2558,6 +2578,7 @@ export class ResellerService {
         ingresoMensual: Math.round(ingresoMensual * 100) / 100,
         costoMensual: Math.round(costoMensual * 100) / 100,
         costoMarcaBlanca,
+        marcaBlanca,
         gananciaMensual: Math.round(gananciaMensual * 100) / 100,
         margenPct: Math.round(margenPct * 100) / 100,
         clientesConPrecio,
