@@ -137,6 +137,24 @@ export class SchedulerService {
 
   // Este cron NO cobra: la renovación es manual (botón "Renovar" del panel).
   // Solo recuerda renovar durante la gracia y suspende al agotarse.
+  @Cron('20 9 * * *', {
+    name: 'cobros-marca-blanca',
+    timeZone: 'America/Lima',
+  })
+  async cobrosMarcaBlanca(): Promise<void> {
+    this.logger.log('🏷️  Procesando cuotas de marca blanca...');
+    try {
+      const resultado = await this.resellerService.procesarCobrosMarcaBlanca();
+      this.logger.log(
+        `✅ Marca blanca procesada. Evaluados: ${resultado.totalEvaluados}, cobrados: ${resultado.cobrados} (S/${resultado.montoCobrado}), pendientes: ${resultado.pendientes}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ Error procesando cuotas de marca blanca: ${(error as Error).message}`,
+      );
+    }
+  }
+
   @Cron('10 9 * * *', {
     name: 'vencimientos-clientes-reseller',
     timeZone: 'America/Lima',
@@ -150,7 +168,10 @@ export class SchedulerService {
         `✅ Vencimientos procesados. Evaluadas: ${resultado.totalEvaluadas}, avisadas: ${resultado.avisadas}, suspendidas: ${resultado.suspendidas}`,
       );
     } catch (error) {
-      this.logger.error('❌ Error en vencimientos de clientes reseller:', error);
+      this.logger.error(
+        '❌ Error en vencimientos de clientes reseller:',
+        error,
+      );
     }
   }
 
@@ -165,9 +186,7 @@ export class SchedulerService {
     try {
       const resultado =
         await this.resellerService.notificarProximasRenovaciones();
-      this.logger.log(
-        `✅ Avisos de renovación enviados: ${resultado.avisos}`,
-      );
+      this.logger.log(`✅ Avisos de renovación enviados: ${resultado.avisos}`);
     } catch (error) {
       this.logger.error('❌ Error en avisos de renovación reseller:', error);
     }

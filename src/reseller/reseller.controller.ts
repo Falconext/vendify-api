@@ -55,6 +55,14 @@ export class ResellerController {
   }
 
   @Roles('ADMIN_SISTEMA')
+  @Post('white-label/cobros/run')
+  runCobrosMarcaBlancaNow() {
+    // Cobra las cuotas de marca blanca ya vencidas (lo mismo que hace el cron
+    // diario). Útil para cobrar en el acto a un reseller atrasado.
+    return this.resellerService.procesarCobrosMarcaBlanca();
+  }
+
+  @Roles('ADMIN_SISTEMA')
   @Get('dominio/check')
   checkDominio(
     @Query('dominio') dominio: string,
@@ -114,7 +122,11 @@ export class ResellerController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { nuevoSaldo: number; motivo: string },
   ) {
-    return this.resellerService.ajustarSaldo(id, Number(body.nuevoSaldo), body.motivo);
+    return this.resellerService.ajustarSaldo(
+      id,
+      Number(body.nuevoSaldo),
+      body.motivo,
+    );
   }
 
   @Roles('ADMIN_SISTEMA', 'RESELLER')
@@ -133,7 +145,10 @@ export class ResellerController {
 
   @Roles('ADMIN_SISTEMA', 'RESELLER')
   @Get(':id/branding')
-  async getBranding(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+  async getBranding(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
     await this.resellerService.validateResellerAccess(
       req.user.id,
       req.user.rol,

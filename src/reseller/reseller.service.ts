@@ -69,6 +69,43 @@ function normalizePlanName(planNombre: string): string {
     .toLowerCase();
 }
 
+// Cuota MENSUAL de marca blanca que la plataforma le cobra al reseller (aparte
+// del costo por cliente). Escala por cantidad de clientes activos en producción,
+// los mismos que definen el tramo de volumen del plan.
+// 1-19 => S/50 · 20-49 => S/70 · 50-99 => S/100 · 100+ => WHITE_LABEL_FEE_TOPE.
+const WHITE_LABEL_FEE_TIERS: { menosDe: number; monto: number }[] = [
+  { menosDe: 20, monto: 50 },
+  { menosDe: 50, monto: 70 },
+  { menosDe: 100, monto: 100 },
+];
+// Tramo abierto (100 clientes o más). Sin definición de negocio todavía: se
+// mantiene el último tramo. Cambiar aquí si el tope debe subir.
+const WHITE_LABEL_FEE_TOPE = 100;
+
+function getWhiteLabelFee(clientesActivos: number): number {
+  const tier = WHITE_LABEL_FEE_TIERS.find((t) => clientesActivos < t.menosDe);
+  return tier ? tier.monto : WHITE_LABEL_FEE_TOPE;
+}
+
+// Período de la cuota en formato YYYY-MM (día de Lima). Es la clave de
+// idempotencia: un solo cobro APLICADO de marca blanca por reseller y mes.
+function getPeriodoMarcaBlanca(fecha: Date): string {
+  return fecha
+    .toLocaleDateString('en-CA', { timeZone: 'America/Lima' })
+    .slice(0, 7);
+}
+
+// Suma meses conservando el día (aniversario). Si el mes destino no tiene ese
+// día (31 -> 30/28), setMonth desborda al mes siguiente: retrocedemos al último
+// día del mes correcto.
+function sumarMeses(fecha: Date, meses: number): Date {
+  const d = new Date(fecha);
+  const dia = d.getDate();
+  d.setMonth(d.getMonth() + meses);
+  if (d.getDate() !== dia) d.setDate(0);
+  return d;
+}
+
 function getVolumeTierPrice(
   planNombre: string,
   clientesActivos: number,
@@ -178,7 +215,138 @@ export class ResellerService {
         descripcion: `Activación (producción): ${empresa.razonSocial} - Plan: ${empresa.plan.nombre}`,
       },
     });
+    // Marca blanca: el ciclo de la cuota mensual arranca con el PRIMER cliente
+    // que el reseller pone en producción. Deliberadamente NO bloquea la
+    // activación si el saldo no alcanza (queda PENDIENTE y el cron reintenta).
+    await this.iniciarCicloMarcaBlanca(tx, resellerId, clientesActuales + 1);
     return costoFinal;
+  }
+
+  /**
+   * Arranca el ciclo de cobro de marca blanca del reseller: cobra la primera
+   * cuota en el acto y fija el aniversario (mismo día de cada mes). Idempotente:
+   * si el ciclo ya estaba iniciado no hace nada. Debe correr dentro de una
+   * transacción.
+   */
+  private async iniciarCicloMarcaBlanca(
+    tx: any,
+    resellerId: number,
+    clientesActivos: number,
+  ): Promise<void> {
+    const reseller = await tx.reseller.findUnique({
+      where: { id: resellerId },
+      select: { whiteLabelDesde: true },
+    });
+    if (!reseller || reseller.whiteLabelDesde) return;
+
+    const ahora = new Date();
+    await this.cobrarMarcaBlanca(
+      tx,
+      resellerId,
+      clientesActivos,
+      getPeriodoMarcaBlanca(ahora),
+    );
+    await tx.reseller.update({
+      where: { id: resellerId },
+      data: {
+        whiteLabelDesde: ahora,
+        whiteLabelProximoCobro: sumarMeses(ahora, 1),
+      },
+    });
+  }
+
+  /**
+   * Cobra al saldo del reseller la cuota mensual de marca blanca del `periodo`
+   * (YYYY-MM). A diferencia de la activación NO lanza si el saldo no alcanza:
+   * deja el movimiento en PENDIENTE para que el cron lo reintente y el admin vea
+   * la deuda. Idempotente por (reseller, periodo). Debe correr dentro de una
+   * transacción.
+   */
+  private async cobrarMarcaBlanca(
+    tx: any,
+    resellerId: number,
+    clientesActivos: number,
+    periodo: string,
+  ): Promise<{ cobrado: boolean; monto: number; yaEstaba: boolean }> {
+    const monto = getWhiteLabelFee(clientesActivos);
+
+    // Ya cobrado este mes: cortamos antes de tocar el saldo (el cron corre a
+    // diario y el endpoint manual puede dispararse en cualquier momento).
+    const yaCobrado = await tx.resellerMovimiento.findFirst({
+      where: { resellerId, tipo: 'MARCA_BLANCA', estado: 'APLICADO', periodo },
+      select: { id: true },
+    });
+    if (yaCobrado) return { cobrado: true, monto: 0, yaEstaba: true };
+
+    // Intento previo que quedó debiendo: se reutiliza para no generar un
+    // movimiento nuevo por cada día que el cron reintenta.
+    const pendiente = await tx.resellerMovimiento.findFirst({
+      where: { resellerId, tipo: 'MARCA_BLANCA', estado: 'PENDIENTE', periodo },
+      select: { id: true, intento: true },
+    });
+
+    // Cobro atómico: descuenta solo si el saldo alcanza, en una única operación
+    // condicional (mismo patrón que la activación, evita la carrera TOCTOU).
+    const cobro = await tx.reseller.updateMany({
+      where: { id: resellerId, saldo: { gte: monto } },
+      data: { saldo: { decrement: monto } },
+    });
+    const cobrado = cobro.count === 1;
+
+    const descripcion = `Marca blanca ${periodo} — ${clientesActivos} cliente${clientesActivos === 1 ? '' : 's'} en producción (S/${monto.toFixed(2)}/mes)`;
+
+    if (cobrado) {
+      if (pendiente) {
+        await tx.resellerMovimiento.update({
+          where: { id: pendiente.id },
+          data: {
+            estado: 'APLICADO',
+            monto: -monto,
+            motivo: null,
+            fecha: new Date(),
+            descripcion,
+          },
+        });
+      } else {
+        await tx.resellerMovimiento.create({
+          data: {
+            resellerId,
+            tipo: 'MARCA_BLANCA',
+            monto: -monto,
+            estado: 'APLICADO',
+            periodo,
+            descripcion,
+          },
+        });
+      }
+      return { cobrado: true, monto, yaEstaba: false };
+    }
+
+    const motivo = `Saldo insuficiente para la cuota de marca blanca (S/${monto.toFixed(2)})`;
+    if (pendiente) {
+      await tx.resellerMovimiento.update({
+        where: { id: pendiente.id },
+        data: {
+          intento: pendiente.intento + 1,
+          monto: -monto,
+          motivo,
+          descripcion,
+        },
+      });
+    } else {
+      await tx.resellerMovimiento.create({
+        data: {
+          resellerId,
+          tipo: 'MARCA_BLANCA',
+          monto: -monto,
+          estado: 'PENDIENTE',
+          periodo,
+          motivo,
+          descripcion,
+        },
+      });
+    }
+    return { cobrado: false, monto, yaEstaba: false };
   }
 
   // Días a extender el vencimiento según el ciclo.
@@ -454,7 +622,10 @@ export class ResellerService {
     // al saldo del reseller (esto es el reseller pagándole a Vendify por activar
     // al cliente; distinto del costo por comprobante, que cubre Vendify en QPSE).
     // No migramos en QPSE si el saldo no alcanza, porque es irreversible.
-    const ciclo = this.derivarCiclo(empresa.plan.nombre, empresa.cicloFacturacion);
+    const ciclo = this.derivarCiclo(
+      empresa.plan.nombre,
+      empresa.cicloFacturacion,
+    );
     const reseller = await this.prisma.reseller.findUnique({
       where: { id: resellerId },
       select: { saldo: true, porcentajeDescuento: true },
@@ -1875,6 +2046,90 @@ export class ResellerService {
   }
 
   /**
+   * Cobra las cuotas de marca blanca vencidas (aniversario cumplido). Corre a
+   * diario por cron y también a mano desde POST /resellers/white-label/cobros/run.
+   *
+   * - Solo resellers activos con el ciclo ya iniciado (whiteLabelDesde != null),
+   *   es decir, los que tienen o tuvieron un cliente en producción.
+   * - El monto sale del tramo por cantidad de clientes activos en producción.
+   * - Si el saldo no alcanza, el movimiento queda PENDIENTE y NO se avanza la
+   *   fecha: al día siguiente se reintenta el mismo período.
+   * - Si el reseller quedó atrasado varios meses, cada corrida cobra un período;
+   *   los siguientes salen en las corridas posteriores.
+   */
+  async procesarCobrosMarcaBlanca() {
+    const now = new Date();
+
+    const resellers = await this.prisma.reseller.findMany({
+      where: {
+        activo: true,
+        whiteLabelDesde: { not: null },
+        whiteLabelProximoCobro: { lte: now },
+      },
+      select: { id: true, nombre: true, whiteLabelProximoCobro: true },
+      orderBy: { whiteLabelProximoCobro: 'asc' },
+    });
+
+    let cobrados = 0;
+    let pendientes = 0;
+    let montoCobrado = 0;
+
+    for (const reseller of resellers) {
+      const vencimiento = reseller.whiteLabelProximoCobro as Date;
+      const periodo = getPeriodoMarcaBlanca(vencimiento);
+
+      // Mismo criterio que los tramos de volumen: solo producción, no demo.
+      const clientesActivos = await this.prisma.empresa.count({
+        where: { resellerId: reseller.id, estado: 'ACTIVO', usaDemo: false },
+      });
+
+      const resultado = await this.prisma.$transaction(async (tx) => {
+        const cobro = await this.cobrarMarcaBlanca(
+          tx,
+          reseller.id,
+          clientesActivos,
+          periodo,
+        );
+        // La fecha avanza solo si el período quedó saldado (cobrado ahora o ya
+        // cobrado antes); si quedó debiendo, se reintenta mañana.
+        if (cobro.cobrado) {
+          await tx.reseller.update({
+            where: { id: reseller.id },
+            data: { whiteLabelProximoCobro: sumarMeses(vencimiento, 1) },
+          });
+        }
+        return cobro;
+      });
+
+      if (resultado.cobrado) {
+        cobrados += 1;
+        montoCobrado += resultado.monto;
+        if (!resultado.yaEstaba) {
+          await this.notifyResellerUsers(this.prisma, reseller.id, {
+            tipo: 'INFO',
+            titulo: 'Cuota de marca blanca cobrada',
+            mensaje: `Se cobró S/${resultado.monto.toFixed(2)} por la marca blanca del período ${periodo} (${clientesActivos} cliente${clientesActivos === 1 ? '' : 's'} en producción).`,
+          });
+        }
+      } else {
+        pendientes += 1;
+        await this.notifyResellerUsers(this.prisma, reseller.id, {
+          tipo: 'WARNING',
+          titulo: 'Marca blanca pendiente de pago',
+          mensaje: `No se pudo cobrar la cuota de marca blanca del período ${periodo} (S/${resultado.monto.toFixed(2)}): saldo insuficiente. Recarga tu saldo; el cobro se reintenta automáticamente cada día.`,
+        });
+      }
+    }
+
+    return {
+      totalEvaluados: resellers.length,
+      cobrados,
+      pendientes,
+      montoCobrado: Math.round(montoCobrado * 100) / 100,
+    };
+  }
+
+  /**
    * Renovación MANUAL de un cliente: el ÚNICO punto donde se cobra una
    * renovación (mensual o anual según el plan). Extiende desde el vencimiento
    * vigente si aún no pasó, o desde hoy si ya venció, y reactiva al cliente.
@@ -2008,10 +2263,7 @@ export class ResellerService {
         };
       });
     } catch (e) {
-      if (
-        e instanceof PrismaClientKnownRequestError &&
-        e.code === 'P2002'
-      ) {
+      if (e instanceof PrismaClientKnownRequestError && e.code === 'P2002') {
         throw new BadRequestException(
           'Este período ya fue renovado (posible doble clic). Revisa el estado de cuenta.',
         );
@@ -2221,7 +2473,7 @@ export class ResellerService {
   private async buildEarnings(resellerId: number) {
     const reseller = await this.prisma.reseller.findUnique({
       where: { id: resellerId },
-      select: { porcentajeDescuento: true },
+      select: { porcentajeDescuento: true, whiteLabelDesde: true },
     });
     if (!reseller) throw new NotFoundException('Reseller no encontrado');
 
@@ -2290,7 +2542,13 @@ export class ResellerService {
       };
     });
 
-    const gananciaMensual = ingresoMensual - costoMensual;
+    // Cuota mensual de marca blanca: costo del reseller que no cuelga de ningún
+    // cliente en particular, por eso va aparte de costoMensual (que sí es la suma
+    // de los clientes) pero igual descuenta de la ganancia.
+    const costoMarcaBlanca = reseller.whiteLabelDesde
+      ? getWhiteLabelFee(clientesActivos)
+      : 0;
+    const gananciaMensual = ingresoMensual - costoMensual - costoMarcaBlanca;
     const margenPct =
       ingresoMensual > 0 ? (gananciaMensual / ingresoMensual) * 100 : 0;
 
@@ -2299,6 +2557,7 @@ export class ResellerService {
         clientesActivos,
         ingresoMensual: Math.round(ingresoMensual * 100) / 100,
         costoMensual: Math.round(costoMensual * 100) / 100,
+        costoMarcaBlanca,
         gananciaMensual: Math.round(gananciaMensual * 100) / 100,
         margenPct: Math.round(margenPct * 100) / 100,
         clientesConPrecio,
@@ -2325,9 +2584,7 @@ export class ResellerService {
         return fecha <= en30dias;
       })
       .map((c) => {
-        const diasRestantes = getDiasRestantesLima(
-          new Date(c.fechaExpiracion),
-        );
+        const diasRestantes = getDiasRestantesLima(new Date(c.fechaExpiracion));
         return {
           empresaId: c.empresaId,
           razonSocial: c.razonSocial,
@@ -2354,7 +2611,11 @@ export class ResellerService {
         // Proyección del próximo mes = ganancia recurrente actual (asume que la
         // cartera activa se mantiene y renueva).
         ingresoProyectadoProximoMes: resumen.ingresoMensual,
-        costoProyectadoProximoMes: resumen.costoMensual,
+        // Incluye la cuota de marca blanca: es costo recurrente del próximo mes
+        // igual que los planes de los clientes (la ganancia ya la descuenta).
+        costoProyectadoProximoMes:
+          Math.round((resumen.costoMensual + resumen.costoMarcaBlanca) * 100) /
+          100,
         gananciaProyectadaProximoMes: resumen.gananciaMensual,
         costoRenovacionesProximas:
           Math.round(costoRenovacionesProximas * 100) / 100,
@@ -2467,6 +2728,7 @@ export class ResellerService {
       'RECARGA',
       'ACTIVACION',
       'MENSUALIDAD',
+      'MARCA_BLANCA',
       'DEVOLUCION',
     ]);
     const allowedStatus = new Set(['APLICADO', 'PENDIENTE', 'RECHAZADO']);
@@ -2553,6 +2815,12 @@ export class ResellerService {
         pendientes: 0,
         rechazadas: 0,
       },
+      marcaBlanca: {
+        cobrado: 0,
+        aplicadas: 0,
+        pendientes: 0,
+        rechazadas: 0,
+      },
       devoluciones: {
         total: 0,
         cantidad: 0,
@@ -2580,6 +2848,16 @@ export class ResellerService {
           resumen.mensualidades.rechazadas += count;
         }
       }
+      if (row.tipo === 'MARCA_BLANCA') {
+        if (row.estado === 'APLICADO') {
+          resumen.marcaBlanca.cobrado += Math.abs(sum);
+          resumen.marcaBlanca.aplicadas += count;
+        } else if (row.estado === 'PENDIENTE') {
+          resumen.marcaBlanca.pendientes += count;
+        } else if (row.estado === 'RECHAZADO') {
+          resumen.marcaBlanca.rechazadas += count;
+        }
+      }
       if (row.tipo === 'DEVOLUCION') {
         resumen.devoluciones.total += sum;
         resumen.devoluciones.cantidad += count;
@@ -2587,7 +2865,9 @@ export class ResellerService {
     }
 
     const totalCobrado =
-      resumen.activaciones.cobrado + resumen.mensualidades.cobrado;
+      resumen.activaciones.cobrado +
+      resumen.mensualidades.cobrado +
+      resumen.marcaBlanca.cobrado;
     const flujoNeto =
       resumen.recargas.total + resumen.devoluciones.total - totalCobrado;
 

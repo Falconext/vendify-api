@@ -20,10 +20,18 @@ describe('ResellerService - seguridad de cobros', () => {
   let service: ResellerService;
 
   const txMock = {
-    reseller: { findUnique: jest.fn(), updateMany: jest.fn() },
+    reseller: {
+      findUnique: jest.fn(),
+      updateMany: jest.fn(),
+      update: jest.fn(),
+    },
     empresa: { count: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
     plan: { findUnique: jest.fn() },
-    resellerMovimiento: { create: jest.fn(), findFirst: jest.fn() },
+    resellerMovimiento: {
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+    },
     usuario: { update: jest.fn(), findMany: jest.fn() },
   };
 
@@ -59,6 +67,9 @@ describe('ResellerService - seguridad de cobros', () => {
     txMock.reseller.findUnique.mockResolvedValue({
       saldo: 100,
       porcentajeDescuento: 20,
+      // Ciclo de marca blanca ya iniciado: estos tests miden el cobro de
+      // ACTIVACIÓN. La cuota mensual tiene su propio spec (marca-blanca).
+      whiteLabelDesde: new Date('2026-01-15T12:00:00Z'),
     });
     txMock.empresa.count.mockResolvedValue(0); // clientesActuales en producción
     txMock.empresa.update.mockResolvedValue({

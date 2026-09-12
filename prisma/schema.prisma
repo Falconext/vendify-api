@@ -2262,6 +2262,12 @@ model Reseller {
   whiteLabelEmail           String?
   whiteLabelTelefono        String?
   whiteLabelWhatsapp        String?
+  // Cuota MENSUAL de marca blanca que la plataforma le cobra al reseller.
+  // El ciclo arranca cuando pone su PRIMER cliente en produccion (ver
+  // cobrarActivacionCliente) y se repite cada mes en esa misma fecha.
+  // Null = todavia no tiene clientes en produccion => no se le cobra.
+  whiteLabelDesde           DateTime?
+  whiteLabelProximoCobro    DateTime?
   representante             String?
   telefono                  String?
   email                     String   @unique // Contact email
