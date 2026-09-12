@@ -61,6 +61,12 @@ function getAnnualPrice(planNombre: string): number | null {
   return key ? VENDIFY_ANNUAL_PRICING[key] : null;
 }
 
+// Planes anuales ("EMPRENDEDOR ANUAL", etc.): se pagan una vez al año, así que en
+// la proyección mensual se prorratean (÷12) en vez de contarse cada mes.
+function esPlanAnual(planNombre: string): boolean {
+  return /\banual\b/i.test(String(planNombre || ''));
+}
+
 function normalizePlanName(planNombre: string): string {
   return String(planNombre || '')
     .normalize('NFD')
@@ -2510,16 +2516,22 @@ export class ResellerService {
 
     const clientes = empresas.map((empresa) => {
       const planCosto = Number(empresa.plan.costo);
-      const costo = this.resolveClientCost(
-        empresa.plan.nombre,
-        planCosto,
-        descuento,
-        clientesActivos,
-      );
-      const { ingreso, esEstimado } = this.computeIngresoCliente(
-        empresa.precioClienteFinal,
-        planCosto,
-      );
+      const esAnual = esPlanAnual(empresa.plan.nombre);
+      // Anual: lo que el reseller pagó por el año (costo del plan con su
+      // descuento, igual que la activación) y lo que cobró al cliente, ambos
+      // prorrateados a 12 meses para que la proyección mensual sea real.
+      const costoPeriodo = esAnual
+        ? this.calculatePlanCostWithDiscount(planCosto, descuento)
+        : this.resolveClientCost(
+            empresa.plan.nombre,
+            planCosto,
+            descuento,
+            clientesActivos,
+          );
+      const { ingreso: ingresoPeriodo, esEstimado } =
+        this.computeIngresoCliente(empresa.precioClienteFinal, planCosto);
+      const costo = esAnual ? costoPeriodo / 12 : costoPeriodo;
+      const ingreso = esAnual ? ingresoPeriodo / 12 : ingresoPeriodo;
       const ganancia = ingreso - costo;
 
       ingresoMensual += ingreso;
@@ -2543,6 +2555,10 @@ export class ResellerService {
         costo: Math.round(costo * 100) / 100,
         ganancia: Math.round(ganancia * 100) / 100,
         ingresoEsEstimado: esEstimado,
+        // Anual prorrateado: el panel lo marca y muestra el total del año.
+        esAnual,
+        ingresoAnual: esAnual ? Math.round(ingresoPeriodo * 100) / 100 : null,
+        costoAnual: esAnual ? Math.round(costoPeriodo * 100) / 100 : null,
       };
     });
 
