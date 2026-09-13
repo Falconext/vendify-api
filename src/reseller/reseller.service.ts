@@ -53,8 +53,14 @@ const VENDIFY_ANNUAL_PRICING: Record<string, number> = {
   Corporativo: 450,
 };
 
+// Los planes anuales se llaman "EMPRENDEDOR ANUAL", "NEGOCIO ANUAL", etc.; la
+// tabla usa el nombre base, así que se quita el sufijo "anual" antes de buscar.
+// Sin esto nunca coincidía y se caía al fallback (mensual con descuento × 10),
+// cobrando p.ej. S/1200 en vez de S/150.
 function getAnnualPrice(planNombre: string): number | null {
-  const normalized = normalizePlanName(planNombre);
+  const normalized = normalizePlanName(planNombre)
+    .replace(/[\s_-]*anual\s*$/i, '')
+    .trim();
   const key = Object.keys(VENDIFY_ANNUAL_PRICING).find(
     (item) => normalizePlanName(item) === normalized,
   );
