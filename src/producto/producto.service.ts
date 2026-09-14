@@ -3359,11 +3359,20 @@ export class ProductoService {
           : (p.stockMinimo ?? 0);
       const costo = Number(p.costoPromedio ?? 0);
       const valorInventario = Math.round(stockTotal * costo * 100) / 100;
+      // El campo "Ubicación / Localización" del formulario del producto se
+      // guarda en producto.localizacion (general, no por sede). El campo
+      // ubicacionSede (más específico, por almacén) vive en ProductoStock.
+      // Sin el fallback a producto.localizacion, si el usuario solo llenó el
+      // campo general del formulario (el uso normal), esta columna mostraba
+      // solo el nombre de la sede, ignorando lo que sí configuró.
       const ubicaciones = (p.stocks || [])
-        .filter((s: any) => Number(s.stock) > 0 || s.ubicacion)
+        .filter(
+          (s: any) => Number(s.stock) > 0 || s.ubicacion || p.localizacion,
+        )
         .map((s: any) => {
           const nombreSede = s.sede?.nombre || `Sede ${s.sedeId}`;
-          return s.ubicacion ? `${nombreSede}: ${s.ubicacion}` : nombreSede;
+          const lugar = s.ubicacion || p.localizacion;
+          return lugar ? `${nombreSede}: ${lugar}` : nombreSede;
         })
         .join(' | ');
 
