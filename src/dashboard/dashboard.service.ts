@@ -176,14 +176,16 @@ export class DashboardService {
             codigo: { notIn: ['DGD', 'IPM', 'PLD'] },
           },
         }),
-        sedeId
-          ? Promise.resolve([] as any[])
-          : this.prisma.ingresoManual.findMany({
-              where: {
-                empresaId,
-                ...(fechaEmision ? { fecha: fechaEmision } : {}),
-              },
-            }),
+        // Los ingresos manuales son casi siempre de toda la empresa (sedeId
+        // null); con sede activa se incluyen los de esa sede + los de toda
+        // la empresa, en vez de descartarlos por completo.
+        this.prisma.ingresoManual.findMany({
+          where: {
+            empresaId,
+            ...(fechaEmision ? { fecha: fechaEmision } : {}),
+            ...(sedeId ? { OR: [{ sedeId }, { sedeId: null }] } : {}),
+          },
+        }),
       ]);
 
       const elapsed = Date.now() - startTime;
@@ -590,16 +592,23 @@ export class DashboardService {
         { ...baseComprobanteWhere, fechaEmision: prevRange },
         empresaId,
       ),
-      sedeId
-        ? Promise.resolve([] as any[])
-        : this.prisma.ingresoManual.findMany({
-            where: { empresaId, fecha: currentRange },
-          }),
-      sedeId
-        ? Promise.resolve([] as any[])
-        : this.prisma.ingresoManual.findMany({
-            where: { empresaId, fecha: prevRange },
-          }),
+      // Los ingresos manuales son casi siempre de toda la empresa (sedeId
+      // null); con sede activa se incluyen los de esa sede + los de toda la
+      // empresa, en vez de descartarlos por completo.
+      this.prisma.ingresoManual.findMany({
+        where: {
+          empresaId,
+          fecha: currentRange,
+          ...(sedeId ? { OR: [{ sedeId }, { sedeId: null }] } : {}),
+        },
+      }),
+      this.prisma.ingresoManual.findMany({
+        where: {
+          empresaId,
+          fecha: prevRange,
+          ...(sedeId ? { OR: [{ sedeId }, { sedeId: null }] } : {}),
+        },
+      }),
     ]);
 
     const otrosIngresosCurr = ingresosManualesCurr.reduce(

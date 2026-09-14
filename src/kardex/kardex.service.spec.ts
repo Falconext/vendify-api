@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { KardexService } from './kardex.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PdfGeneratorService } from '../comprobante/pdf-generator.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 describe('KardexService', () => {
@@ -32,6 +33,12 @@ describe('KardexService', () => {
     },
   };
 
+  // KardexService lo inyecta solo para la constancia de garantía; ninguna de
+  // estas pruebas la ejercita, pero Nest exige el provider para instanciar.
+  const mockPdfGeneratorService = {
+    generarPDFConstanciaGarantia: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,6 +46,10 @@ describe('KardexService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: PdfGeneratorService,
+          useValue: mockPdfGeneratorService,
         },
       ],
     }).compile();
@@ -189,6 +200,64 @@ describe('KardexService', () => {
       });
 
       expect(result).toEqual(mockMovimiento);
+    });
+
+    it('debería registrar un ingreso con costoUnitario=0 (bonificación) sin reemplazarlo por el costoPromedio, y bajar el costo promedio ponderado', async () => {
+      // 50 unidades a S/8.00, y llegan 12 de bonificación a costo S/0.00.
+      // Costo promedio esperado: (50*8 + 12*0) / 62 = 6.4516... (debe BAJAR de 8).
+      mockPrismaService.productoStock.findUnique.mockResolvedValue({
+        stock: 50,
+        producto: { costoPromedio: 8.0 },
+      });
+      mockPrismaService.productoStock.aggregate.mockResolvedValue({
+        _sum: { stock: 62 },
+      });
+      mockPrismaService.producto.findUnique.mockResolvedValue({
+        costoPromedio: 8.0,
+      });
+      mockPrismaService.movimientoKardex.create.mockResolvedValue({
+        id: 3,
+        productoId: 1,
+        empresaId: 1,
+        tipoMovimiento: 'INGRESO',
+        concepto: 'Bonificación proveedor',
+        cantidad: 12,
+        costoUnitario: 0,
+        valorTotal: 0,
+        fecha: new Date(),
+        producto: {
+          id: 1,
+          descripcion: 'Petaca de anís 125ml',
+          unidadMedida: { codigo: 'UND', nombre: 'Unidad' },
+        },
+        usuario: null,
+        comprobante: null,
+      });
+
+      await service.registrarMovimiento({
+        productoId: 1,
+        empresaId: 1,
+        sedeId: 1,
+        tipoMovimiento: 'INGRESO',
+        concepto: 'Bonificación proveedor',
+        cantidad: 12,
+        costoUnitario: 0,
+      });
+
+      // El costo 0 debe grabarse tal cual en el movimiento, no reemplazarse
+      // por el costoPromedio vigente.
+      expect(mockPrismaService.movimientoKardex.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ costoUnitario: 0, valorTotal: 0 }),
+        }),
+      );
+
+      // El costo promedio del producto debe recalcularse (y bajar), no
+      // quedarse intacto por tratar el costo 0 como "sin costo".
+      expect(mockPrismaService.producto.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { costoPromedio: 400 / 62 },
+      });
     });
   });
 

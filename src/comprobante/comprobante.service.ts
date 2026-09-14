@@ -6108,9 +6108,6 @@ export class ComprobanteService {
     const monto = `S/ ${Number(comp.mtoImpVenta || 0).toFixed(2)}`;
     const clienteNombre = comp.cliente?.nombre || 'Cliente';
     const empresaNombre = comp.empresa.razonSocial;
-    // Comprobantes SUNAT (BOLETA/FACTURA) ya tienen PDF en S3 — usar esa URL directamente.
-    // Informales (Ticket, NV, etc.) se generan al vuelo con el endpoint HMAC.
-    const pdfUrl = comp.s3PdfUrl || this.generarUrlPdfPublico(id);
 
     const numero = celular.replace(/\D/g, '').replace(/^0+/, '');
     const to = numero.startsWith('51') ? numero : `51${numero}`;
@@ -6118,16 +6115,15 @@ export class ComprobanteService {
     const caption = `Hola ${clienteNombre}, aquí está tu ${tipoPretty} ${serie}-${correlativo} por ${monto}.\n\nGracias por tu preferencia — ${empresaNombre}.`;
 
     // ── Paso 1: Obtener el buffer del PDF ────────────────────────────────────
-    // Comprobantes SUNAT → descargar desde S3. Informales → generar con Puppeteer.
-    let pdfBuffer: Buffer;
-    if (comp.s3PdfUrl) {
-      const s3Res = await fetch(comp.s3PdfUrl);
-      if (!s3Res.ok)
-        throw new BadRequestException('No se pudo descargar el PDF desde S3');
-      pdfBuffer = Buffer.from(await s3Res.arrayBuffer());
-    } else {
-      ({ buffer: pdfBuffer } = await this.buildPdfBufferInformal(id));
-    }
+    // Se regenera siempre antes de enviarlo al cliente: descargar comp.s3PdfUrl
+    // a ciegas mandaba un PDF cacheado desde la primera vez que se generó, con
+    // la plantilla y el branding de ese momento — aunque "Descargar PDF" en el
+    // listado sí regenera y ya mostraba el formato y la marca correctos.
+    const pdfUrlFresco = await this.generarYSubirPdf(id, context, true);
+    const s3Res = await fetch(pdfUrlFresco);
+    if (!s3Res.ok)
+      throw new BadRequestException('No se pudo descargar el PDF generado');
+    const pdfBuffer = Buffer.from(await s3Res.arrayBuffer());
 
     const apiBase = `https://graph.facebook.com/v25.0/${phoneNumberId}`;
     const authHeader = `Bearer ${token}`;
@@ -6260,17 +6256,16 @@ export class ComprobanteService {
       throw new NotFoundException('Comprobante no encontrado');
     }
 
-    // Comprobantes SUNAT ya tienen PDF en S3 — descargarlo directamente.
-    // Informales se generan en memoria con Puppeteer.
-    let buffer: Buffer;
-    if (comp.s3PdfUrl) {
-      const s3Res = await fetch(comp.s3PdfUrl);
-      if (!s3Res.ok)
-        throw new BadRequestException('No se pudo descargar el PDF desde S3');
-      buffer = Buffer.from(await s3Res.arrayBuffer());
-    } else {
-      ({ buffer } = await this.buildPdfBufferInformal(id));
-    }
+    // Se regenera siempre antes de enviarlo por correo (mismo criterio que
+    // enviarWhatsAppComprobante): descargar comp.s3PdfUrl a ciegas mandaba un
+    // PDF cacheado desde la primera vez que se generó, con la plantilla y el
+    // branding de ese momento — aunque "Descargar PDF" en el listado sí
+    // regenera y ya mostraba el formato y la marca correctos.
+    const pdfUrlFresco = await this.generarYSubirPdf(id, context, true);
+    const s3Res = await fetch(pdfUrlFresco);
+    if (!s3Res.ok)
+      throw new BadRequestException('No se pudo descargar el PDF generado');
+    const buffer = Buffer.from(await s3Res.arrayBuffer());
 
     const tipoDocMap: Record<string, string> = {
       TICKET: 'Ticket',
@@ -6300,7 +6295,7 @@ export class ComprobanteService {
       month: 'long',
       year: 'numeric',
     });
-    const pdfUrl = comp.s3PdfUrl || this.generarUrlPdfPublico(id);
+    const pdfUrl = pdfUrlFresco;
 
     const productos = (comp.detalles ?? []).map((item: any) => ({
       descripcion: item.descripcion,
