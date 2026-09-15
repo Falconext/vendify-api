@@ -3417,6 +3417,75 @@ export class ComprobanteService {
    * Devuelve los datos del comprobante; el reenvío real lo hace
    * EnviarSunatService.execute() desde el controller.
    */
+  /**
+   * Respuesta HONESTA de una reemisión manual. `enviarSunat.execute` devuelve
+   * mensajes pensados para el mostrador ("Comprobante registrado correctamente…")
+   * aunque el envío haya fallado (RED/CONFIG), porque en una venta lo importante
+   * es no bloquear al cliente. Al REEMITIR el que mira es el administrador y
+   * necesita saber qué pasó de verdad: se relee el estado persistido y se arma
+   * el resultado a partir de él, nunca del texto del flujo de venta.
+   */
+  async resultadoReemision(id: number, sunatResp: any) {
+    const comp = await this.prisma.comprobante.findUnique({
+      where: { id },
+      select: {
+        serie: true,
+        correlativo: true,
+        estadoEnvioSunat: true,
+        sunatErrorMsg: true,
+        sunatNextRetryAt: true,
+      },
+    });
+    const estado = String(comp?.estadoEnvioSunat || sunatResp?.status || '');
+    // "[RED] (intento 3/30): QPSE: …" → "QPSE: …"
+    const detalle = String(comp?.sunatErrorMsg || '')
+      .replace(/^\[(DATOS|RED|CONFIG)\]\s*(\(intento \d+\/\d+\):\s*)?/i, '')
+      .trim();
+    const proximo = comp?.sunatNextRetryAt
+      ? ` El sistema volverá a intentarlo automáticamente (próximo intento: ${new Date(comp.sunatNextRetryAt).toLocaleString('es-PE', { timeZone: 'America/Lima' })}).`
+      : '';
+    let status: string;
+    let message: string;
+    switch (estado) {
+      case 'EMITIDO':
+        status = 'ACEPTADO';
+        message = 'Comprobante reemitido y aceptado por SUNAT.';
+        break;
+      case 'PENDIENTE':
+        status = 'PENDIENTE';
+        message =
+          'El comprobante fue enviado pero SUNAT aún no devuelve su respuesta (CDR). Queda "En procesamiento"; el sistema seguirá consultando el estado automáticamente.';
+        break;
+      case 'PENDIENTE_CONCILIACION':
+        status = 'PENDIENTE_CONCILIACION';
+        message =
+          sunatResp?.message ||
+          'SUNAT informa que este comprobante ya fue registrado antes; requiere conciliación.';
+        break;
+      case 'FALLIDO_ENVIO':
+        status = 'FALLIDO_ENVIO';
+        message = `No se pudo reemitir: ${detalle || 'error al enviar a SUNAT'}.${proximo}`;
+        break;
+      case 'RECHAZADO':
+        status = 'RECHAZADO';
+        message = `SUNAT rechazó el comprobante: ${detalle || 'revisa los datos e intenta de nuevo'}.`;
+        break;
+      default:
+        status = estado || 'DESCONOCIDO';
+        message = sunatResp?.message || 'Reemisión procesada.';
+    }
+    return {
+      status,
+      estadoEnvioSunat: estado,
+      message,
+      errorMsg: detalle || null,
+      comprobanteId: id,
+      serie: comp?.serie ?? sunatResp?.serie,
+      correlativo: comp?.correlativo ?? sunatResp?.correlativo,
+      reemitido: true,
+    };
+  }
+
   async prepararReemision(id: number, empresaId: number) {
     const comp = await this.prisma.comprobante.findFirst({
       where: { id, empresaId },

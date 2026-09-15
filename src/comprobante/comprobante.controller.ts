@@ -456,7 +456,10 @@ export class ComprobanteController {
     const comp = await this.service.prepararReemision(id, user.empresaId);
     try {
       const sunatResp = await this.enviarSunat.execute(comp.id);
-      return { ...sunatResp, comprobanteId: comp.id, reemitido: true };
+      // execute() responde con textos de mostrador aunque el envío haya fallado
+      // (RED/CONFIG quedan PENDIENTE "registrado correctamente"): acá manda el
+      // estado real persistido, para no hacerle creer al admin que se aceptó.
+      return this.service.resultadoReemision(comp.id, sunatResp);
     } catch (error: any) {
       // A diferencia de la creación, NUNCA eliminamos el comprobante al reemitir:
       // se deja como FALLIDO_ENVIO para poder reintentar de nuevo.
