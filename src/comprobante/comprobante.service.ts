@@ -32,6 +32,7 @@ import {
 } from './pdf-generator.service';
 import { generarQrSunatDataUrl } from './qr-sunat.util';
 import { numeroALetras } from './utils/numero-a-letras';
+import { construirDescripcionVehiculo } from '../producto/ficha-tecnica-vehiculo';
 import { ProductoLoteService } from '../producto/producto-lote.service';
 import { EnviarSunatService } from './enviar-sunat.service';
 import {
@@ -1970,7 +1971,13 @@ export class ComprobanteService {
         item.numerosSerie ?? item.series,
       );
       const requiereSerie = this.productoRequiereSerie(prod);
-      const descripcion = item.descripcion ?? (prod as any).descripcion;
+      // Rubro vehículos (motos): anexar la ficha del vehículo (marca, VIN, motor,
+      // cilindrada, etc.) a la descripción del ítem, estilo boleta vehicular. Si el
+      // producto no tiene ficha de vehículo, devuelve el nombre tal cual.
+      const descripcion = construirDescripcionVehiculo(
+        item.descripcion ?? (prod as any).descripcion,
+        (prod as any).atributosTecnicos,
+      );
       // El precio ya llega convertido a soles desde el POS (los productos en USD se
       // convierten al agregarlos al carrito con el TC del día). El comprobante es en PEN.
       const precioConIgv =

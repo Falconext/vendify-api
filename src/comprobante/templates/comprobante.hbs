@@ -144,6 +144,7 @@
     .tbl-row .c-cant { border-right: 1px solid #d1d5db; }
     .tbl-row .c-um   { border-right: 1px solid #d1d5db; }
     .tbl-row .c-desc { border-right: 1px solid #d1d5db; }
+    .desc-text { white-space: pre-line; line-height: 1.7; }
     .tbl-row .c-pu   { border-right: 1px solid #d1d5db; }
     .lote-info { font-size: 9px; color: #555; margin-top: 2px; }
 
@@ -342,7 +343,7 @@
       <div class="c-cant">{{this.cantidad}}</div>
       <div class="c-um">{{this.unidadMedida}}</div>
       <div class="c-desc">
-        {{this.descripcion}}
+        <span class="desc-text">{{this.descripcion}}</span>
         {{#if this.lotes}}
         {{#each this.lotes}}
         <div class="lote-info">Lote: {{this.lote}} Venc: {{this.fechaVencimiento}}</div>
