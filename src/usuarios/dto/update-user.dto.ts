@@ -49,6 +49,12 @@ export class UpdateUserDto {
   @IsOptional()
   sedeIds?: number[];
 
+  // Sede que se usa como activa al loguear, entre las de sedeIds — evita el
+  // selector de sede aunque el usuario tenga varias asignadas.
+  @IsInt()
+  @IsOptional()
+  sedeDefaultId?: number;
+
   @IsArray()
   @IsOptional()
   subModuloIds?: number[];

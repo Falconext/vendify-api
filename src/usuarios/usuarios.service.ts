@@ -32,8 +32,15 @@ export class UsersService {
       password,
       permisos,
       sedeIds,
+      sedeDefaultId,
       subModuloIds,
     } = dto;
+
+    if (sedeDefaultId && (!sedeIds || !sedeIds.includes(sedeDefaultId))) {
+      throw new BadRequestException(
+        'La sede por defecto debe estar entre las sedes asignadas',
+      );
+    }
 
     const existeEmail = await this.prisma.usuario.findUnique({
       where: { email },
@@ -86,6 +93,7 @@ export class UsersService {
             ? dto.comisionGlobalVenta
             : null,
         puedeAnularComprobantes: dto.puedeAnularComprobantes ?? false,
+        sedeId: sedeDefaultId || null,
       },
       select: {
         id: true,
@@ -101,6 +109,7 @@ export class UsersService {
         comisionGlobalFija: true,
         comisionGlobalVenta: true,
         puedeAnularComprobantes: true,
+        sedeId: true,
       },
     });
 
@@ -173,6 +182,7 @@ export class UsersService {
           comisionGlobalFija: true,
           comisionGlobalVenta: true,
           puedeAnularComprobantes: true,
+          sedeId: true,
           sedesAsignadas: {
             select: {
               sede: {
@@ -229,6 +239,7 @@ export class UsersService {
       password,
       permisos,
       sedeIds,
+      sedeDefaultId,
       subModuloIds,
       comisionGlobal,
       comisionGlobalFija,
@@ -239,6 +250,23 @@ export class UsersService {
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
     if (usuario.empresaId !== empresaId)
       throw new ForbiddenException('Empresa no identificada');
+
+    if (sedeDefaultId) {
+      const sedeIdsEfectivos =
+        sedeIds !== undefined
+          ? sedeIds
+          : (
+              await this.prisma.usuarioSede.findMany({
+                where: { usuarioId: id },
+                select: { sedeId: true },
+              })
+            ).map((us) => us.sedeId);
+      if (!sedeIdsEfectivos.includes(sedeDefaultId)) {
+        throw new BadRequestException(
+          'La sede por defecto debe estar entre las sedes asignadas',
+        );
+      }
+    }
 
     // Solo se cambia la contraseña si viene una nueva no vacía; si no, se deja igual.
     const nuevaPasswordHash =
@@ -262,6 +290,7 @@ export class UsersService {
         comisionGlobalVenta:
           comisionGlobalVenta !== undefined ? comisionGlobalVenta : undefined,
         puedeAnularComprobantes: dto.puedeAnularComprobantes,
+        sedeId: sedeDefaultId !== undefined ? sedeDefaultId || null : undefined,
       },
       select: {
         id: true,
@@ -277,6 +306,7 @@ export class UsersService {
         comisionGlobalFija: true,
         comisionGlobalVenta: true,
         puedeAnularComprobantes: true,
+        sedeId: true,
       },
     });
 
@@ -287,6 +317,19 @@ export class UsersService {
         await this.prisma.usuarioSede.createMany({
           data: sedeIds.map((sedeId) => ({ usuarioId: id, sedeId })),
           skipDuplicates: true,
+        });
+      }
+      // Si la sede por defecto actual quedó fuera del nuevo set de sedes
+      // asignadas (y esta llamada no mandó un nuevo default explícito), se
+      // limpia para no dejar un default apuntando a una sede ya no asignada.
+      if (
+        sedeDefaultId === undefined &&
+        usuario.sedeId != null &&
+        !sedeIds.includes(usuario.sedeId)
+      ) {
+        await this.prisma.usuario.update({
+          where: { id },
+          data: { sedeId: null },
         });
       }
     }
@@ -323,6 +366,7 @@ export class UsersService {
         comisionGlobalFija: true,
         comisionGlobalVenta: true,
         puedeAnularComprobantes: true,
+        sedeId: true,
         sedesAsignadas: {
           select: {
             sede: {
