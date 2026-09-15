@@ -3055,6 +3055,35 @@ export class ProductoService {
     }
   }
 
+  /** Cambio rápido de categoría desde la tabla. La categoría debe ser de la misma empresa. */
+  async cambiarCategoria(
+    id: number,
+    empresaId: number,
+    categoriaId: number | null,
+  ) {
+    const producto = await this.prisma.producto.findFirst({
+      where: { id, empresaId },
+      select: { id: true },
+    });
+    if (!producto) throw new NotFoundException('Producto no encontrado');
+    if (categoriaId != null) {
+      const categoria = await this.prisma.categoria.findFirst({
+        where: { id: categoriaId, empresaId },
+        select: { id: true },
+      });
+      if (!categoria) throw new NotFoundException('Categoría no encontrada');
+    }
+    return this.prisma.producto.update({
+      where: { id },
+      data: { categoriaId },
+      select: {
+        id: true,
+        categoriaId: true,
+        categoria: { select: { id: true, nombre: true } },
+      },
+    });
+  }
+
   async cambiarEstado(id: number, empresaId: number, estado: EstadoType) {
     const producto = await this.prisma.producto.findFirst({
       where: { id, empresaId },
