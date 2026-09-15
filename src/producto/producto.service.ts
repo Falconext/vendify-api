@@ -825,6 +825,46 @@ export class ProductoService {
     return { precioUnitario, precioOferta };
   }
 
+  /** Campos donde se busca cada palabra de un término de producto. */
+  private camposBusquedaProducto(term: string): any[] {
+    return [
+      { descripcion: { contains: term, mode: 'insensitive' } },
+      { codigo: { contains: term, mode: 'insensitive' } },
+      { principioActivo: { contains: term, mode: 'insensitive' } },
+      { codigoBarras: { contains: term, mode: 'insensitive' } },
+      { codigoDigemid: { contains: term, mode: 'insensitive' } },
+      { laboratorio: { contains: term, mode: 'insensitive' } },
+      // Códigos alternos/paquetes: encontrar el producto buscando por el
+      // nombre del pack (ej. "six pack") o su código de barras alterno.
+      {
+        codigosBarras: {
+          some: {
+            OR: [
+              { codigo: { contains: term, mode: 'insensitive' } },
+              { alias: { contains: term, mode: 'insensitive' } },
+            ],
+          },
+        },
+      },
+    ];
+  }
+
+  /**
+   * Búsqueda flexible por palabras: divide el término en palabras y exige que
+   * CADA palabra aparezca en algún campo (AND de tokens). Así "válvula tanque"
+   * encuentra "Válvula de llenado de agua para tanque" sin escribir el nombre
+   * completo ni respetar el orden. Devuelve el arreglo para `where.AND` (o
+   * undefined si no hay término).
+   */
+  private busquedaPorPalabras(searchTerm?: string): any[] | undefined {
+    const t = searchTerm?.trim();
+    if (!t) return undefined;
+    const palabras = t.split(/\s+/).filter(Boolean);
+    return palabras.map((palabra) => ({
+      OR: this.camposBusquedaProducto(palabra),
+    }));
+  }
+
   async listar(params: {
     empresaId: number;
     sedeId?: number;
@@ -870,29 +910,11 @@ export class ProductoService {
       codigo: { notIn: productosDelSistema },
       marcaId: marcaId ? Number(marcaId) : undefined,
       categoriaId: categoriaId ? Number(categoriaId) : undefined,
-      OR: searchTerm
-        ? [
-            { descripcion: { contains: searchTerm, mode: 'insensitive' } },
-            { codigo: { contains: searchTerm, mode: 'insensitive' } },
-            { principioActivo: { contains: searchTerm, mode: 'insensitive' } },
-            { codigoBarras: { contains: searchTerm, mode: 'insensitive' } },
-            { codigoDigemid: { contains: searchTerm, mode: 'insensitive' } },
-            { laboratorio: { contains: searchTerm, mode: 'insensitive' } },
-            // Códigos alternos/paquetes: encontrar el producto buscando por el
-            // nombre del pack (ej. "six pack") o su código de barras alterno.
-            {
-              codigosBarras: {
-                some: {
-                  OR: [
-                    { codigo: { contains: searchTerm, mode: 'insensitive' } },
-                    { alias: { contains: searchTerm, mode: 'insensitive' } },
-                  ],
-                },
-              },
-            },
-          ]
-        : undefined,
     };
+
+    // Búsqueda flexible por palabras (cada palabra debe aparecer en algún campo).
+    const searchAnd = this.busquedaPorPalabras(searchTerm);
+    if (searchAnd) where.AND = searchAnd;
 
     if (String(params.incluirVariantes) !== 'true') {
       where.productoPadreId = null;
@@ -1347,17 +1369,11 @@ export class ProductoService {
       productoPadreId: null,
       marcaId: marcaId ? Number(marcaId) : undefined,
       categoriaId: categoriaId ? Number(categoriaId) : undefined,
-      OR: searchTerm
-        ? [
-            { descripcion: { contains: searchTerm, mode: 'insensitive' } },
-            { codigo: { contains: searchTerm, mode: 'insensitive' } },
-            { principioActivo: { contains: searchTerm, mode: 'insensitive' } },
-            { codigoBarras: { contains: searchTerm, mode: 'insensitive' } },
-            { codigoDigemid: { contains: searchTerm, mode: 'insensitive' } },
-            { laboratorio: { contains: searchTerm, mode: 'insensitive' } },
-          ]
-        : undefined,
     };
+
+    // Búsqueda flexible por palabras (misma lógica que `listar`).
+    const searchAnd = this.busquedaPorPalabras(searchTerm);
+    if (searchAnd) where.AND = searchAnd;
     // Misma regla de disponibilidad por sede que `listar`.
     if (params.sedeId) {
       where.NOT = {
@@ -1444,19 +1460,11 @@ export class ProductoService {
           vendibleEnSede: true,
         },
       },
-      ...(searchTerm
-        ? {
-            OR: [
-              { descripcion: { contains: searchTerm, mode: 'insensitive' } },
-              { codigo: { contains: searchTerm, mode: 'insensitive' } },
-              {
-                principioActivo: { contains: searchTerm, mode: 'insensitive' },
-              },
-              { codigoBarras: { contains: searchTerm, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
     };
+
+    // Búsqueda flexible por palabras (misma lógica que `listar`).
+    const searchAnd = this.busquedaPorPalabras(searchTerm);
+    if (searchAnd) where.AND = searchAnd;
 
     const [productosRaw, total] = await Promise.all([
       this.prisma.producto.findMany({
