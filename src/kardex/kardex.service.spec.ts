@@ -20,6 +20,9 @@ describe('KardexService', () => {
         .fn()
         .mockResolvedValue({ stock: 100, producto: { costoPromedio: 10.5 } }),
       update: jest.fn().mockResolvedValue({}),
+      // Descuento atómico de salidas: `count: 1` = habia stock suficiente, que
+      // es el camino normal. Con 0 el servicio cae al fallback que fuerza 0.
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       aggregate: jest.fn().mockResolvedValue({ _sum: { stock: 100 } }),
     },
     movimientoKardex: {
