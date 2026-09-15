@@ -37,6 +37,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         empresaId: true,
         sistemaNegocio: true,
         sistemaProducto: true,
+        puedeAnularComprobantes: true,
         empresa: {
           select: {
             estado: true,
@@ -68,6 +69,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       sedeId: payload.sedeId ?? null,
       sistemaNegocio: user.sistemaNegocio ?? payload.sistemaNegocio ?? null,
       sistemaProducto: user.sistemaProducto ?? payload.sistemaProducto ?? null,
+      puedeAnularComprobantes: user.puedeAnularComprobantes,
     };
   }
 }

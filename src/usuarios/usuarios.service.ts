@@ -85,6 +85,7 @@ export class UsersService {
           dto.comisionGlobalVenta !== undefined
             ? dto.comisionGlobalVenta
             : null,
+        puedeAnularComprobantes: dto.puedeAnularComprobantes ?? false,
       },
       select: {
         id: true,
@@ -99,6 +100,7 @@ export class UsersService {
         comisionGlobal: true,
         comisionGlobalFija: true,
         comisionGlobalVenta: true,
+        puedeAnularComprobantes: true,
       },
     });
 
@@ -170,6 +172,7 @@ export class UsersService {
           comisionGlobal: true,
           comisionGlobalFija: true,
           comisionGlobalVenta: true,
+          puedeAnularComprobantes: true,
           sedesAsignadas: {
             select: {
               sede: {
@@ -258,6 +261,7 @@ export class UsersService {
           comisionGlobalFija !== undefined ? comisionGlobalFija : undefined,
         comisionGlobalVenta:
           comisionGlobalVenta !== undefined ? comisionGlobalVenta : undefined,
+        puedeAnularComprobantes: dto.puedeAnularComprobantes,
       },
       select: {
         id: true,
@@ -272,6 +276,7 @@ export class UsersService {
         comisionGlobal: true,
         comisionGlobalFija: true,
         comisionGlobalVenta: true,
+        puedeAnularComprobantes: true,
       },
     });
 
@@ -317,6 +322,7 @@ export class UsersService {
         comisionGlobal: true,
         comisionGlobalFija: true,
         comisionGlobalVenta: true,
+        puedeAnularComprobantes: true,
         sedesAsignadas: {
           select: {
             sede: {

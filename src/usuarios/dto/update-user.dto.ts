@@ -8,6 +8,7 @@ import {
   IsString,
   Length,
   IsNumber,
+  IsBoolean,
 } from 'class-validator';
 
 export class UpdateUserDto {
@@ -51,6 +52,10 @@ export class UpdateUserDto {
   @IsArray()
   @IsOptional()
   subModuloIds?: number[];
+
+  @IsBoolean()
+  @IsOptional()
+  puedeAnularComprobantes?: boolean;
 
   @IsOptional()
   @IsString()  sistemaNegocio?: string | null;

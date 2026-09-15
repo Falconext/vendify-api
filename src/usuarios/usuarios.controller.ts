@@ -30,12 +30,29 @@ import { User } from '../common/decorators/user.decorator';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  /**
+   * Anti-escalada para `puedeAnularComprobantes`: es un poder reservado al
+   * admin, así que solo ADMIN_EMPRESA/ADMIN_SISTEMA puede otorgarlo o
+   * quitarlo. Un USUARIO_EMPRESA que gestiona usuarios no puede dárselo a
+   * nadie — ni a sí mismo. Se ignora el campo en vez de rechazar todo el
+   * request, para que editar nombre/sedes de un usuario que ya lo tiene siga
+   * funcionando.
+   */
+  private soloAdminOtorgaAnular(user: any, body: any) {
+    const esAdmin =
+      user?.rol === 'ADMIN_EMPRESA' || user?.rol === 'ADMIN_SISTEMA';
+    if (!esAdmin && body && 'puedeAnularComprobantes' in body) {
+      delete body.puedeAnularComprobantes;
+    }
+  }
+
   @Post()
   async crear(
     @Body() dto: CreateUserDto,
     @User() user: any,
     @Res({ passthrough: true }) res: Response,
   ) {
+    this.soloAdminOtorgaAnular(user, dto);
     const empresaId = user.empresaId;
     const nuevo = await this.usersService.create(dto, empresaId);
     res.locals.message = 'Usuario creado exitosamente';
@@ -79,6 +96,7 @@ export class UsersController {
     @User() user: any,
     @Res({ passthrough: true }) res: Response,
   ) {
+    this.soloAdminOtorgaAnular(user, body);
     const empresaId = user.empresaId;
     const dto: UpdateUserDto = { id, ...body } as UpdateUserDto;
     const usuario = await this.usersService.update(dto, empresaId);

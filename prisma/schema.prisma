@@ -337,6 +337,10 @@ model Usuario {
   comisionGlobal         Decimal?                @db.Decimal(12, 2)
   comisionGlobalFija     Decimal?                @db.Decimal(12, 2)
   comisionGlobalVenta    Decimal?                @db.Decimal(12, 2)
+  // Único permiso opt-in en el sentido contrario (default false = SIN el
+  // permiso, igual que el comportamiento actual): anular/eliminar
+  // comprobantes queda reservado a ADMIN_EMPRESA salvo que se active aquí.
+  puedeAnularComprobantes Boolean                @default(false)
   actasInspeccion        ActaInspeccion[]
   listasPrecio           ListaPrecioUsuario[]
 

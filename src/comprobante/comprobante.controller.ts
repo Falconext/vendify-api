@@ -40,6 +40,7 @@ import {
   xmlUploadOptions,
 } from '../common/utils/multer.config';
 import { numeroALetras } from './utils/numero-a-letras';
+import { verificarPuedeAnularComprobante } from './puede-anular-comprobante.util';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('comprobante')
@@ -410,11 +411,12 @@ export class ComprobanteController {
 
   // Estado y pagos
   @Patch(':id/descartar')
-  @Roles('ADMIN_EMPRESA')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async descartarComprobante(
     @Param('id', ParseIntPipe) id: number,
     @User() user: any,
   ) {
+    verificarPuedeAnularComprobante(user);
     return this.service.descartarComprobante(id, user.empresaId);
   }
 
@@ -476,11 +478,13 @@ export class ComprobanteController {
   }
 
   @Patch(':comprobanteId/anular')
-  @Roles('ADMIN_EMPRESA')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async anularComprobante(
     @Param('comprobanteId', ParseIntPipe) comprobanteId: number,
     @Body() input: any,
+    @User() user: any,
   ) {
+    verificarPuedeAnularComprobante(user);
     return this.service.anularComprobante(comprobanteId, input?.motivo);
   }
 

@@ -8,6 +8,7 @@ import {
   IsString,
   Length,
   IsNumber,
+  IsBoolean,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -48,6 +49,10 @@ export class CreateUserDto {
   @IsArray()
   @IsOptional()
   subModuloIds?: number[];
+
+  @IsBoolean()
+  @IsOptional()
+  puedeAnularComprobantes?: boolean;
 
   @IsOptional()
   @IsString()  sistemaNegocio?: string;

@@ -405,6 +405,7 @@ export class AuthService {
         permisos: true,
         sistemaNegocio: true,
         sistemaProducto: true,
+        puedeAnularComprobantes: true,
         sedesAsignadas: {
           select: {
             sede: {
