@@ -78,13 +78,13 @@ export function buildTicketPx(
   raw: Record<string, any> | null | undefined,
   fiscal: boolean,
 ): Record<string, { px: number; factor: number }> {
-  // Mismos defaults del catálogo del web (COTIZ_ELEMENTOS).
+  // Mismos defaults del catálogo del web de vendify-pos (COTIZ_ELEMENTOS).
   const defaults: Record<string, number> = {
     logo: 150, nombreComercial: 12, direccion: 12, rubro: 12, razonSocial: fiscal ? 20 : 12,
     celular: 12, email: 12, web: 12, datosCliente: 12, datosCotizacion: 12,
     productos: 12, sonTexto: 18, observaciones: 12, detraccion: 12,
     opGravadas: 12, opExoneradas: 12, opInafectas: 12, opGratuitas: 12,
-    icbper: 12, subTotal: 12, descuentos: 12, igv: 12, montoTotal: 14,
+    icbper: 12, subTotal: 12, descuentos: 12, igv: 12, montoTotal: 18,
     cuentas: 10, gracias: 10,
   };
   const ticketBase: Record<string, number> = { gracias: 15 };
