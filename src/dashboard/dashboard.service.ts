@@ -123,6 +123,76 @@ export class DashboardService {
     return Object.keys(whereFecha).length ? whereFecha : undefined;
   }
 
+  /**
+   * Distribuye las ventas agrupadas por `medioPago` en los baldes del
+   * gráfico "Ventas por Canal". Los comprobantes "MIXTO" (pagados con más
+   * de un medio, ej. parte efectivo + parte Yape) no tienen un medio único:
+   * el monto real por medio vive en `Pago`, así que se consulta y reparte
+   * ahí en vez de amontonar todo el comprobante en "Otros".
+   */
+  private async ventasPorCanalPen(
+    ventasCanalRows: Array<{
+      medioPago: string | null;
+      tipoMoneda: string | null;
+      tipoCambio: any;
+      _sum: { mtoImpVenta: any };
+    }>,
+    mixtoWhere: any,
+  ): Promise<{
+    sumTarjeta: number;
+    sumTransferencia: number;
+    sumRedes: number;
+    sumEfectivo: number;
+    sumOtros: number;
+  }> {
+    let sumTarjeta = 0;
+    let sumTransferencia = 0;
+    let sumRedes = 0;
+    let sumEfectivo = 0;
+    let sumOtros = 0;
+    let sumMixtoLump = 0;
+    for (const r of ventasCanalRows) {
+      const m = (r.medioPago || '').toString().toUpperCase();
+      const t = montoEnPen(r._sum?.mtoImpVenta, r.tipoMoneda, r.tipoCambio);
+      if (m === 'TARJETA') sumTarjeta += t;
+      else if (m === 'TRANSFERENCIA') sumTransferencia += t;
+      else if (m === 'YAPE' || m === 'PLIN') sumRedes += t;
+      else if (m === 'EFECTIVO') sumEfectivo += t;
+      else if (m === 'MIXTO') sumMixtoLump += t;
+      else sumOtros += t;
+    }
+    if (sumMixtoLump > 0) {
+      const pagosMixtos = await this.prisma.pago.findMany({
+        where: { comprobante: mixtoWhere },
+        select: {
+          monto: true,
+          medioPago: true,
+          comprobante: { select: { tipoMoneda: true, tipoCambio: true } },
+        },
+      });
+      let sumMixtoDistribuido = 0;
+      for (const p of pagosMixtos) {
+        const mp = (p.medioPago || '').toString().toUpperCase();
+        const monto = montoEnPen(
+          p.monto,
+          p.comprobante?.tipoMoneda,
+          p.comprobante?.tipoCambio,
+        );
+        if (mp === 'TARJETA') sumTarjeta += monto;
+        else if (mp === 'TRANSFERENCIA') sumTransferencia += monto;
+        else if (mp === 'YAPE' || mp === 'PLIN') sumRedes += monto;
+        else if (mp === 'EFECTIVO') sumEfectivo += monto;
+        else sumOtros += monto;
+        sumMixtoDistribuido += monto;
+      }
+      // Si algún comprobante MIXTO no tiene sus filas de Pago (dato viejo o
+      // incompleto), no perder ese monto: cae a "Otros" en vez de desaparecer.
+      const faltante = sumMixtoLump - sumMixtoDistribuido;
+      if (faltante > 0.01) sumOtros += faltante;
+    }
+    return { sumTarjeta, sumTransferencia, sumRedes, sumEfectivo, sumOtros };
+  }
+
   // Lima es siempre UTC-5 (sin DST). Extrae "YYYY-MM-DD" en hora Lima.
   private toFechaLima(d: Date): string {
     return new Date(d.getTime() - 5 * 60 * 60 * 1000)
@@ -727,20 +797,13 @@ export class DashboardService {
       _sum: { mtoImpVenta: true },
     });
 
-    let sumTarjeta = 0;
-    let sumTransferencia = 0;
-    let sumRedes = 0;
-    let sumEfectivo = 0;
-    let sumOtros = 0;
-    for (const r of ventasCanalRows) {
-      const m = (r.medioPago || '').toString().toUpperCase();
-      const t = montoEnPen(r._sum?.mtoImpVenta, r.tipoMoneda, r.tipoCambio);
-      if (m === 'TARJETA') sumTarjeta += t;
-      else if (m === 'TRANSFERENCIA') sumTransferencia += t;
-      else if (m === 'YAPE' || m === 'PLIN') sumRedes += t;
-      else if (m === 'EFECTIVO') sumEfectivo += t;
-      else sumOtros += t;
-    }
+    const { sumTarjeta, sumTransferencia, sumRedes, sumEfectivo, sumOtros } =
+      await this.ventasPorCanalPen(ventasCanalRows, {
+        ...baseComprobanteWhere,
+        tipoDoc: { not: '07' },
+        fechaEmision: currentRange,
+        medioPago: 'MIXTO',
+      });
     const totalCanales =
       sumTarjeta + sumTransferencia + sumRedes + sumEfectivo + sumOtros;
     const chartCanales =
