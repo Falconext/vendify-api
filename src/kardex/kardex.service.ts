@@ -940,7 +940,16 @@ export class KardexService {
     // Actualizar stock en la sede específica
     await this.prisma.productoStock.update({
       where: { productoId_sedeId: { productoId, sedeId } },
-      data: { stock: round3(Math.max(0, nuevoStock)) },
+      data: {
+        stock: round3(Math.max(0, nuevoStock)),
+        // Un ingreso (o un ajuste positivo) de stock en la sede la deja
+        // DISPONIBLE ahí (catálogo por sede): nunca puede haber stock de un
+        // producto "invisible".
+        ...(tipoMovimiento === 'INGRESO' ||
+        (tipoMovimiento === 'AJUSTE' && nuevoStock > 0)
+          ? { visibleEnSede: true }
+          : {}),
+      },
     });
 
     // Sincronizar el campo 'stock' global en Producto (suma de todas las sedes) para que las
@@ -1539,7 +1548,8 @@ export class KardexService {
               sedeId: sedeDestinoId,
             },
           },
-          data: { stock: { increment: item.cantidad } },
+          // Recibir stock por traslado asigna el producto a la sede destino.
+          data: { stock: { increment: item.cantidad }, visibleEnSede: true },
         });
 
         resultados.push({ productoId: item.productoId, movSalida, movIngreso });

@@ -159,6 +159,11 @@ export class UpdateEmpresaDto {
   @IsBoolean()
   requiereCajaParaEmitir?: boolean;
 
+  /** Catálogo independiente por sede: un producto nuevo solo queda disponible en la sede que lo crea. */
+  @IsOptional()
+  @IsBoolean()
+  catalogoPorSede?: boolean;
+
   @IsOptional()
   @IsString()
   directorTecnico?: string;

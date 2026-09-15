@@ -181,6 +181,12 @@ model Empresa {
   // (facturas/boletas/notas de venta/tickets) sin tener SU caja abierta en la
   // sede. Las cotizaciones están exentas (no mueven stock ni caja).
   requiereCajaParaEmitir    Boolean                     @default(false)
+  // ── Catálogo por sede ────────────────────────────────────────────────────
+  // false (default) = catálogo COMPARTIDO: un producto nuevo queda disponible en
+  // todas las sedes (comportamiento histórico). true = catálogo INDEPENDIENTE:
+  // un producto nuevo queda disponible SOLO en la sede que lo crea/importa y se
+  // asigna a las demás a mano (ProductoStock.visibleEnSede). Ver ProductoService.
+  catalogoPorSede           Boolean                     @default(false)
   costoActivacionReseller Decimal?                      @default(0)
   precioClienteFinal      Decimal?                      @db.Decimal(10, 2) // Precio mensual que el reseller le cobra a este cliente (para calcular ganancia). Null = usar precio de lista del plan.
   esWhiteLabel            Boolean                       @default(false) // Cliente bajo la marca blanca del reseller vs. marca estándar.

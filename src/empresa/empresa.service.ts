@@ -1220,6 +1220,9 @@ export class EmpresaService {
         updateData.requiereAprobacionCompras = dto.requiereAprobacionCompras;
       if (dto.requiereCajaParaEmitir !== undefined)
         updateData.requiereCajaParaEmitir = dto.requiereCajaParaEmitir;
+      // Catálogo por sede (Perfil → Configuración → Sedes y catálogo).
+      if (dto.catalogoPorSede !== undefined)
+        updateData.catalogoPorSede = dto.catalogoPorSede;
       if (dto.directorTecnico !== undefined)
         updateData.directorTecnico = dto.directorTecnico;
       if (dto.logo !== undefined) updateData.logo = dto.logo;

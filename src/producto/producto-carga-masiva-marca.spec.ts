@@ -42,6 +42,9 @@ describe('ProductoService — carga masiva importa MARCA', () => {
         findFirst: jest.fn(),
         update: jest.fn().mockResolvedValue({ id: 99 }),
       },
+      // El Excel de una sede marca el producto como disponible en ella
+      // (catálogo por sede): upsert de ProductoStock.visibleEnSede.
+      productoStock: { upsert: jest.fn().mockResolvedValue({}) },
     };
     service = new ProductoService(prisma, {} as any, {} as any, {} as any);
   });

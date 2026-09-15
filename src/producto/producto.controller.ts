@@ -27,6 +27,10 @@ import { CreateProductoDto } from './dto/create-producto.dto';
 import { ListProductoDto } from './dto/list-producto.dto';
 import { ResumenProductoDto } from './dto/resumen-producto.dto';
 import { UpdateProductoDto } from './dto/update-producto.dto';
+import {
+  AsignarProductoSedeDto,
+  AsignarSedeMasivoDto,
+} from './dto/asignar-sede.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   excelUploadOptions,
@@ -971,9 +975,88 @@ export class ProductoController {
       usuarioId: user.id,
       soloStockBajo: query.soloStockBajo,
       priorizarStock: query.priorizarStock,
+      incluirOcultos: query.incluirOcultos,
     });
     res.locals.message = 'Productos listados correctamente';
     return resultado;
+  }
+
+  // ==================== DISPONIBILIDAD POR SEDE ====================
+
+  /** ¿Existe ya un producto con ese código/barras? (antes de crear uno nuevo). */
+  @Get('verificar-codigo')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  async verificarCodigo(
+    @User() user: any,
+    @Query('codigo') codigo: string | undefined,
+    @Query('codigoBarras') codigoBarras: string | undefined,
+    @Query('sedeId') sedeId: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const sedeIdNum = sedeId ? Number(sedeId) : (user.sedeId ?? undefined);
+    const resultado = await this.service.verificarCodigo(
+      user.empresaId,
+      codigo,
+      codigoBarras,
+      sedeIdNum,
+    );
+    res.locals.message = 'Verificación de código realizada';
+    return resultado;
+  }
+
+  /** Asignar / quitar varios productos de una sede de golpe. */
+  @Patch('sedes/asignar')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  async asignarSedeMasivo(
+    @User() user: any,
+    @Body() dto: AsignarSedeMasivoDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const resultado = await this.service.asignarSedeMasivo(
+      user.empresaId,
+      dto.sedeId,
+      dto.productoIds,
+      dto.disponible,
+      { ajustarStockACero: dto.ajustarStockACero === true, usuarioId: user.id },
+    );
+    res.locals.message = dto.disponible
+      ? `${resultado.actualizados} producto(s) asignados a ${resultado.sede}`
+      : `${resultado.actualizados} producto(s) quitados de ${resultado.sede}`;
+    return resultado;
+  }
+
+  /** Sedes de la empresa con la disponibilidad y stock del producto. */
+  @Get(':id/sedes')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  async sedesDeProducto(
+    @Param('id', ParseIntPipe) id: number,
+    @User() user: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const sedes = await this.service.sedesDeProducto(id, user.empresaId);
+    res.locals.message = 'Sedes del producto obtenidas';
+    return sedes;
+  }
+
+  /** Asignar un producto existente a una sede (con stock inicial opcional). */
+  @Post(':id/sedes/:sedeId/asignar')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  async asignarProductoASede(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('sedeId', ParseIntPipe) sedeId: number,
+    @User() user: any,
+    @Body() dto: AsignarProductoSedeDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const producto = await this.service.asignarProductoASede(
+      user.empresaId,
+      id,
+      sedeId,
+      dto?.stock,
+      user.id,
+    );
+    res.locals.message = 'Producto asignado a la sede';
+    return producto;
   }
 
   @Get('resumen')
