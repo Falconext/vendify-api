@@ -26,6 +26,9 @@ import { S3Service } from '../s3/s3.service';
 import {
   PdfGeneratorService,
   buildFiscalFormatoFc,
+  buildTicketPx,
+  TIPOS_INFORMALES,
+  type FormatoPdf,
 } from './pdf-generator.service';
 import { numeroALetras } from './utils/numero-a-letras';
 import { ProductoLoteService } from '../producto/producto-lote.service';
@@ -5432,6 +5435,7 @@ export class ComprobanteService {
 
   private async buildPdfBufferInformal(
     id: number,
+    formato: FormatoPdf = 'a4',
   ): Promise<{ buffer: Buffer; key: string }> {
     const full = await this.cargarComprobanteCompleto(id);
     if (!full) throw new NotFoundException('Comprobante no encontrado');
@@ -5820,39 +5824,75 @@ export class ComprobanteService {
           'https://vendify.pe',
         sistemaNombre: process.env.APP_NAME || 'Vendify',
       };
-      buffer = await this.pdfGenerator.generarPDFCotizacion(cotizacionData);
+      buffer = await this.pdfGenerator.generarPDFCotizacion(
+        cotizacionData,
+        formato === 'a5' ? 'a5' : 'a4',
+      );
     } else {
       // Formato configurable de comprobante fiscal (visibilidad por elemento).
       // Debe reflejar lo mismo que respeta el frontend (comprobanteImprimir.tsx)
       // para que "Ver PDF" e "Imprimir" coincidan.
-      const fcFiscal = buildFiscalFormatoFc(full.empresa, full.tipoDoc);
+      const fcFiscal = buildFiscalFormatoFc(full.empresa, full.tipoDoc, formato);
+      // Mensaje del pie propio (Configurar formato → Mensaje de agradecimiento);
+      // vacío = el texto por defecto de la plantilla. Mismo criterio que el web.
+      // Perfil de formato según el documento (el ticket de nota de venta entra
+      // por acá y antes tomaba el de factura).
+      const esInformalPdf = TIPOS_INFORMALES.includes(full.tipoDoc);
+      const rawFiscalCfg = ((full.tipoDoc === '03'
+        ? (full.empresa as any).boletaFormatoConfig
+        : full.tipoDoc === 'COT'
+          ? (full.empresa as any).cotizFormatoConfig
+          : esInformalPdf
+            ? (full.empresa as any).notaVentaFormatoConfig
+            : (full.empresa as any).facturaFormatoConfig) || {}) as any;
+      const graciasLineasFiscal = String(rawFiscalCfg.gracias?.texto ?? '')
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => l.toUpperCase());
       // Sub total = suma de operaciones (gravadas + exoneradas + inafectas).
       const subTotalFiscal = (
         Number(full.mtoOperGravadas || 0) +
         Number((full as any).mtoOperExoneradas || 0) +
         Number((full as any).mtoOperInafectas || 0)
       ).toFixed(2);
-      buffer = await this.pdfGenerator.generarPDFComprobante({
-        ...pdfData,
-        fc: fcFiscal,
-        subTotal: subTotalFiscal,
-        cuentasBancarias: cuentasBancariasPdf,
-      });
+      buffer = await this.pdfGenerator.generarPDFComprobante(
+        {
+          ...pdfData,
+          fc: fcFiscal,
+          subTotal: subTotalFiscal,
+          cuentasBancarias: cuentasBancariasPdf,
+          graciasLineas: graciasLineasFiscal,
+          // Ticket: tamaños configurados escalados a la fuente del térmico,
+          // igual que la impresión web (antes el PDF del ticket los ignoraba).
+          tpx: formato === 'ticket' ? buildTicketPx(rawFiscalCfg, !esInformalPdf && full.tipoDoc !== 'COT') : undefined,
+        },
+        formato,
+      );
     }
 
-    const key = this.s3Service.generateComprobanteKey(
+    const keyBase = this.s3Service.generateComprobanteKey(
       full.empresaId,
       full.tipoDoc,
       full.serie,
       full.correlativo,
       'pdf',
     );
+    // Cada tamaño se guarda con su propia key para no pisar el PDF A4, que es el
+    // que queda referenciado en s3PdfUrl (correo, portal, contabilidad).
+    const key =
+      full.tipoDoc === 'COT' || formato === 'a4'
+        ? keyBase
+        : keyBase.replace(/\.pdf$/, `-${formato}.pdf`);
     return { buffer, key };
   }
 
   // ─── Wrapper público para el controller público ───────────────────────────
-  async generarBufferPdf(id: number): Promise<{ buffer: Buffer; key: string }> {
-    return this.buildPdfBufferInformal(id);
+  async generarBufferPdf(
+    id: number,
+    formato: FormatoPdf = 'a4',
+  ): Promise<{ buffer: Buffer; key: string }> {
+    return this.buildPdfBufferInformal(id, formato);
   }
 
   // ─── Genera PDF, sube a S3 y devuelve URL permanente ─────────────────────
@@ -5860,6 +5900,7 @@ export class ComprobanteService {
     id: number,
     context?: { empresaId?: number; rol?: string },
     force = false,
+    formato: FormatoPdf = 'a4',
   ): Promise<string> {
     const comprobante = await this.prisma.comprobante.findFirst({
       where: {
@@ -5876,13 +5917,16 @@ export class ComprobanteService {
     // así que NO se cachea el PDF: siempre se regenera para reflejar el formato
     // vigente. Los comprobantes fiscales sí conservan el PDF cacheado.
     const esCotizacion = comprobante.tipoDoc === 'COT';
-    if (comprobante.s3PdfUrl && !esCotizacion && !force)
+    // s3PdfUrl guarda solo el A4 (es el que va al correo y a contabilidad); los
+    // otros tamaños se regeneran y NO tocan esa columna.
+    const esFormatoPrincipal = formato === 'a4' || esCotizacion;
+    if (comprobante.s3PdfUrl && !esCotizacion && !force && esFormatoPrincipal)
       return comprobante.s3PdfUrl;
 
     let buffer: Buffer;
     let key: string;
     try {
-      ({ buffer, key } = await this.buildPdfBufferInformal(id));
+      ({ buffer, key } = await this.buildPdfBufferInformal(id, formato));
     } catch (error: any) {
       // Log detallado para diagnosticar el 500 (antes se perdía en un error genérico).
       this.logger.error(
@@ -5897,10 +5941,12 @@ export class ComprobanteService {
     if (this.s3Service.isEnabled()) {
       try {
         const url = await this.s3Service.uploadPDF(buffer, key);
-        await this.prisma.comprobante.update({
-          where: { id },
-          data: { s3PdfUrl: url },
-        });
+        if (esFormatoPrincipal) {
+          await this.prisma.comprobante.update({
+            where: { id },
+            data: { s3PdfUrl: url },
+          });
+        }
         return url;
       } catch (error) {
         this.logger.warn(
@@ -5909,7 +5955,7 @@ export class ComprobanteService {
       }
     }
 
-    return this.generarUrlPdfPublico(id);
+    return this.generarUrlPdfPublico(id, formato);
   }
 
   async obtenerXmlComprobante(
@@ -5985,10 +6031,11 @@ export class ComprobanteService {
       .digest('hex');
   }
 
-  generarUrlPdfPublico(id: number): string {
+  generarUrlPdfPublico(id: number, formato: FormatoPdf = 'a4'): string {
     const base = process.env.BACKEND_URL || 'http://localhost:4001';
     const token = this.tokenPdf(id);
-    return `${base}/api/comprobante/${id}/pdf-publico?token=${token}`;
+    const sufijo = formato === 'a4' ? '' : `&formato=${formato}`;
+    return `${base}/api/comprobante/${id}/pdf-publico?token=${token}${sufijo}`;
   }
 
   validarTokenPdf(id: number, token: string): boolean {

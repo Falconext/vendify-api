@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <!-- Misma fuente que usa el web para 80mm (printStyles.ts). Si no hay red se
+       cae a monospace, que es el fallback del propio navegador. -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+  <style>
+    /* Ticket 80mm. Réplica del formato del web (comprobanteImprimir.tsx, rama
+       size === 'TICKET'): misma tipografía monoespaciada, mismos separadores
+       punteados, mismo orden de bloques y mismas etiquetas. NO es el A4
+       reescalado: es el otro diseño. */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* Rollo continuo: el alto lo define el contenido, no una hoja fija. Sin
+       esto el PDF sale de 80x279mm y la térmica corta ~15cm de papel en blanco
+       por cada ticket. Requiere preferCSSPageSize en puppeteer. */
+    @page { size: 80mm auto; margin: 0; }
+
+    body {
+      width: 80mm;
+      padding: 3mm 4mm 2mm 4mm;
+      background: #fff;
+      color: #111;
+      font-family: 'VT323', monospace;
+      font-size: 16px;
+      line-height: 1.05;
+      letter-spacing: 0.1px;
+    }
+
+    .center { text-align: center; }
+    .bold { font-weight: bold; }
+    .up { text-transform: uppercase; }
+    hr { border: none; border-top: 1px dashed #222; margin: 4px 0; }
+
+    /* Filas etiqueta/valor: el valor se alinea a la derecha, como en el web. */
+    .row { display: flex; justify-content: space-between; gap: 12px; }
+    .row > span:last-child { text-align: right; }
+
+    .titulo { font-size: 16px; font-weight: bold; text-align: center; }
+
+    /* Tabla de ítems con los mismos anchos del web: 16 / 44 / 20 / 20. */
+    .items .head, .items .item { display: flex; }
+    .items .c-cant { flex: 0 0 16%; text-align: center; }
+    .items .c-desc { flex: 0 0 44%; text-align: left; }
+    .items .c-pu   { flex: 0 0 20%; text-align: center; }
+    .items .c-imp  { flex: 0 0 20%; text-align: center; }
+    /* pre-line solo respeta los saltos que ya trae la descripción; el
+       interlineado se deja igual que el resto para no separar las líneas
+       que simplemente se envuelven. */
+    .items .desc-multi { white-space: pre-line; }
+    .items .gratis { font-weight: bold; font-size: 13px; margin-left: 4px; }
+    .items .sub { font-size: 12px; display: block; }
+
+    .cuota { margin-bottom: 2px; }
+    .pie { margin-top: 16px; font-size: 15px; text-align: center; text-transform: uppercase; }
+    .gracias { font-size: 15px; text-align: center; }
+    /* QR de SUNAT (opt-in por empresa). No confundir con el QR de pago Yape/Plin. */
+    .qr-sunat { text-align: center; margin: 6px 0; }
+    .qr-sunat img { width: 26mm; height: 26mm; }
+    .qr-sunat p { font-size: 11px; }
+  </style>
+</head>
+<body>
+
+  {{#if (vis fc 'logo')}}{{#if logo}}
+  <img src="{{logo}}" alt="logo" style="display:block;margin:0 auto 4px;max-width:{{logoSize}}px;max-height:{{logoSize}}px;width:100%;height:auto;object-fit:contain">
+  {{/if}}{{/if}}
+
+  {{!-- Tamaños por elemento (tpx): los del formato configurable escalados al térmico, igual que la impresión web --}}
+  {{#if (vis fc 'razonSocial')}}<p class="center bold" style="font-size:{{tpx tpx 'razonSocial'}}px">{{razonSocial}}</p>{{/if}}
+  <p class="center">
+    {{#if (vis fc 'nombreComercial')}}{{#if nombreComercial}}<span style="font-size:{{tpx tpx 'nombreComercial'}}px">NOMBRE COMERCIAL: {{nombreComercial}}<br></span>{{/if}}{{/if}}
+    {{#if (vis fc 'direccion')}}<span style="font-size:{{tpx tpx 'direccion'}}px">DIRECCION: {{direccion}}<br></span>{{/if}}
+    {{#if (vis fc 'direccion')}}{{#if sedeNombre}}<span style="font-size:{{tpx tpx 'direccion'}}px">SEDE: {{sedeNombre}}<br></span>{{/if}}{{/if}}
+    {{#if (vis fc 'direccion')}}{{#if sedeDireccion}}<span style="font-size:{{tpx tpx 'direccion'}}px">DIRECCION SEDE: {{sedeDireccion}}<br></span>{{/if}}{{/if}}
+    {{#if (vis fc 'rubro')}}{{#if rubro}}<span style="font-size:{{tpx tpx 'rubro'}}px">RUBRO: {{rubro}}<br></span>{{/if}}{{/if}}
+    {{#if (vis fc 'celular')}}{{#if celular}}<span style="font-size:{{tpx tpx 'celular'}}px">CELULAR: {{celular}}<br></span>{{/if}}{{/if}}
+    {{#if (vis fc 'email')}}{{#if email}}<span style="font-size:{{tpx tpx 'email'}}px">EMAIL: {{email}}<br></span>{{/if}}{{/if}}
+    {{#if (vis fc 'web')}}{{#if paginaWeb}}<span style="font-size:{{tpx tpx 'web'}}px">WEB: {{paginaWeb}}<br></span>{{/if}}{{/if}}
+    <span>RUC: {{ruc}}</span>
+  </p>
+
+  <hr>
+  <h2 class="titulo">{{tituloComprobante}}<br>{{serie}}-{{correlativo}}</h2>
+  <hr>
+
+  {{#if (vis fc 'datosCliente')}}
+  <div style="font-size:{{tpx tpx 'datosCliente'}}px">
+    <p>FECHA/HORA: {{#if fechaHoraTicket}}{{fechaHoraTicket}}{{else}}{{fecha}} {{hora}}{{/if}}</p>
+    <p>RAZON SOCIAL: {{clienteNombre}}</p>
+    <p>NÚMERO DE DOCUMENTO: {{clienteNumDoc}}</p>
+    <p>DIRECCION: {{clienteDireccion}}</p>
+  </div>
+  {{/if}}
+
+  {{#if (vis fc 'detraccion')}}{{#if tipoDetraccion}}
+  <hr>
+  <div style="font-size:{{tpx tpx 'detraccion'}}px">
+    <p class="bold">OPERACIÓN SUJETA A DETRACCIÓN</p>
+    <p class="row"><span class="bold">Tipo Detracción:</span><span>{{tipoDetraccion}}</span></p>
+    <p class="row"><span class="bold">Monto Detracción:</span><span>{{simboloMoneda}} {{montoDetraccion}}</span></p>
+    <p class="row"><span class="bold">Cuenta BN:</span><span>{{#if cuentaBancoNacion}}{{cuentaBancoNacion}}{{else}}-{{/if}}</span></p>
+    {{#if medioPagoDetraccion}}<p class="row"><span class="bold">Medio de Pago:</span><span>{{medioPagoDetraccion}}</span></p>{{/if}}
+  </div>
+  {{/if}}{{/if}}
+
+  <hr>
+  <div class="items" style="font-size:{{tpx tpx 'productos'}}px">
+    <div class="head">
+      <span class="c-cant">CANT.</span>
+      <span class="c-desc">DESCRIPCION</span>
+      <span class="c-pu">P.U.</span>
+      <span class="c-imp">IMP.</span>
+    </div>
+    {{#each productos}}
+    <div class="item">
+      <span class="c-cant">{{this.cantidad}}</span>
+      <span class="c-desc">
+        <span class="desc-multi">{{this.descripcion}}</span>{{#if this.gratis}}<span class="gratis" style="font-size:{{tpx ../tpx 'productos' 13}}px">[GRATIS]</span>{{/if}}
+        {{#each this.lotes}}<span class="sub" style="font-size:{{tpx ../../tpx 'productos' 12}}px">Lote: {{this.lote}} Venc: {{this.fechaVencimiento}}</span>{{/each}}
+      </span>
+      <span class="c-pu">{{this.precioUnitario}}</span>
+      <span class="c-imp">{{this.total}}</span>
+    </div>
+    {{/each}}
+  </div>
+  <hr>
+
+  {{#if (vis fc 'sonTexto')}}<p style="font-size:{{tpx tpx 'sonTexto'}}px">SON: {{totalEnLetras}}</p>{{/if}}
+  <hr>
+
+  {{#if (vis fc 'subTotal')}}{{#if (pos descuento)}}<p class="row" style="font-size:{{tpx tpx 'subTotal'}}px"><span>SUBTOTAL:</span><span>{{subTotalBruto}}</span></p>{{/if}}{{/if}}
+  {{#if (vis fc 'descuentos')}}{{#if (pos descuento)}}<p class="row" style="font-size:{{tpx tpx 'descuentos'}}px"><span>DESCUENTO:</span><span>- {{descuento}}</span></p>{{/if}}{{/if}}
+  {{#if (vis fc 'opGravadas')}}<p class="row" style="font-size:{{tpx tpx 'opGravadas'}}px"><span>TOTAL GRAVADAS:</span><span>{{mtoOperGravadas}}</span></p>{{/if}}
+  {{#if (vis fc 'opExoneradas')}}{{#if (pos mtoOperExoneradas)}}<p class="row" style="font-size:{{tpx tpx 'opExoneradas'}}px"><span>OP. EXONERADAS:</span><span>{{mtoOperExoneradas}}</span></p>{{/if}}{{/if}}
+  {{#if (vis fc 'opInafectas')}}{{#if (pos mtoOperInafectas)}}<p class="row" style="font-size:{{tpx tpx 'opInafectas'}}px"><span>OP. INAFECTAS:</span><span>{{mtoOperInafectas}}</span></p>{{/if}}{{/if}}
+  {{#if (vis fc 'igv')}}<p class="row" style="font-size:{{tpx tpx 'igv'}}px"><span>I.G.V 18.00 %:</span><span>{{mtoIGV}}</span></p>{{/if}}
+  {{#if (vis fc 'montoTotal')}}<p class="row" style="font-size:{{tpx tpx 'montoTotal'}}px"><span>IMPORTE TOTAL:</span><span>{{mtoImpVenta}}</span></p>{{/if}}
+  {{#if shouldShowRetention}}
+  <p class="row"><span>RETENCIÓN (3%):</span><span>{{retencionMonto}}</span></p>
+  <p class="row bold"><span>IMPORTE NETO:</span><span>{{importeNeto}}</span></p>
+  {{/if}}
+
+  <hr>
+  <p class="row"><span>CONDICIÓN DE PAGO:</span><span>{{formaPago}}</span></p>
+  {{#if esCredito}}
+    {{#if (pos pagado)}}<p class="row"><span>PAGO INICIAL:</span><span>{{medioPago}} {{simboloMoneda}} {{pagado}}</span></p>{{/if}}
+    {{#if saldoPendiente}}<p class="row"><span>SALDO CRÉDITO:</span><span>{{simboloMoneda}} {{saldoPendiente}}</span></p>{{/if}}
+  {{/if}}
+  {{#if cuotas}}
+  <div class="cuotas">
+    <p>CUOTAS:</p>
+    {{#each cuotas}}
+    <div class="cuota">
+      <p class="up">CUOTA {{inc @index}}</p>
+      <p class="row"><span>{{this.fechaVencimiento}}</span><span>{{../simboloMoneda}} {{this.monto}}</span></p>
+    </div>
+    {{/each}}
+  </div>
+  {{/if}}
+  {{#unless esCredito}}<p class="row"><span>MEDIO DE PAGO:</span><span>{{medioPago}}</span></p>{{/unless}}
+  <p class="row"><span>VUELTO:</span><span>{{simboloMoneda}} {{vuelto}}</span></p>
+  <p class="row"><span>PAGADO:</span><span>{{simboloMoneda}} {{pagado}}</span></p>
+  <p class="row"><span>VENDEDOR:</span><span>{{vendedor}}</span></p>
+  <hr>
+
+  {{#if ordenCompraCliente}}<p>N° ORDEN DE COMPRA : {{ordenCompraCliente}}</p>{{/if}}
+  {{#if (vis fc 'observaciones')}}<p style="font-size:{{tpx tpx 'observaciones'}}px">OBSERVACIONES : {{#if observaciones}}{{observaciones}}{{/if}}</p>{{/if}}
+
+  {{#if qrCode}}
+  <hr>
+  <div class="qr-sunat">
+    <img src="{{qrCode}}" alt="QR SUNAT">
+    <p>Escanea para ver tu comprobante en línea</p>
+  </div>
+  {{/if}}
+
+  {{#unless ocultarMarcaSistema}}
+  <div class="pie">
+    <p>Sistema punto de venta - {{sistemaNombre}}.</p>
+    <p>Desarrollado por {{sistemaNombre}}.</p>
+    <p>{{sistemaWeb}}.</p>
+  </div>
+  {{/unless}}
+
+  <hr>
+  {{!-- Mensaje del pie configurable (Configurar formato → Mensaje de agradecimiento); vacío = el de siempre --}}
+  {{#if (vis fc 'gracias')}}{{#if graciasLineas.length}}{{#each graciasLineas}}<p class="gracias" style="font-size:{{tpx ../tpx 'gracias'}}px">{{this}}</p>{{/each}}{{else}}<p class="gracias" style="font-size:{{tpx tpx 'gracias'}}px">GRACIAS POR SU COMPRA, VUELVA PRONTO !</p>{{/if}}<hr>{{/if}}
+
+</body>
+</html>

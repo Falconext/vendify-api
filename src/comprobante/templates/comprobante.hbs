@@ -443,8 +443,14 @@
   <!-- BRAND FOOTER -->
   <div class="brand-footer">
     {{#if (vis fc 'gracias')}}
+    {{!-- Mensaje de agradecimiento configurable (Configurar formato); vacío = el de siempre --}}
+    {{#if graciasLineas.length}}
+    {{#each graciasLineas}}<div class="brand-thanks" style="font-size: {{fsz ../fc 'gracias' 10}}px;">{{this}}</div>{{/each}}
+    <div class="brand-vuelta"></div>
+    {{else}}
     <div class="brand-thanks" style="font-size: {{fsz fc 'gracias' 10}}px;">GRACIAS POR ELEGIR {{nombreComercial}} PARA CUBRIR SUS REQUERIMIENTOS</div>
     <div class="brand-vuelta" style="font-size: {{fsz fc 'gracias' 10}}px;">VUELVA PRONTO</div>
+    {{/if}}
     {{/if}}
     <div class="brand-bottom">
       <div class="brand-left">USUARIO: {{usuario}} {{fechaImpresion}}</div>

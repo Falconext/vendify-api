@@ -14,9 +14,24 @@ import * as path from 'path';
  * para que la vista previa del modal y el PDF sean el mismo documento.
  * Se usa en los 3 flujos que generan el PDF (impresión, emisión y reemisión).
  */
+/** Tamaño de impresión del comprobante. 'a4' es el histórico y sigue por defecto. */
+export type FormatoPdf = 'ticket' | 'a4' | 'a5';
+
+export const FORMATOS_PDF: FormatoPdf[] = ['ticket', 'a4', 'a5'];
+
+export function normalizarFormatoPdf(valor?: string | null): FormatoPdf {
+  const v = String(valor ?? '').toLowerCase();
+  return (FORMATOS_PDF as string[]).includes(v) ? (v as FormatoPdf) : 'a4';
+}
+
+/** Documentos informales que comparten el perfil de formato de nota de venta. */
+export const TIPOS_INFORMALES = ['NV', 'NP', 'OT', 'TICKET', 'CP', 'RH'];
+
 export function buildFiscalFormatoFc(
   empresa: any,
   tipoDoc: string,
+  /** 'a5' aplica el tamaño propio de A5 si la empresa lo desvinculó del general. */
+  formato?: FormatoPdf,
 ): Record<string, { visible: boolean; size: number }> {
   const defaults: Record<string, number> = {
     logo: 150, nombreComercial: 12, direccion: 12, rubro: 12,
@@ -35,8 +50,14 @@ export function buildFiscalFormatoFc(
   >;
   const fc: Record<string, { visible: boolean; size: number }> = {};
   for (const [k, def] of Object.entries(defaults)) {
-    const c = raw[k] || {};
-    fc[k] = { visible: c.visible !== false, size: Number(c.size) || def };
+    const c = (raw[k] || {}) as any;
+    // A5 con tamaño propio (Configurar formato → candado del elemento), igual
+    // que elemCfg(..., 'A5') en el web.
+    const propioA5 = formato === 'a5' ? Number(c.a5?.size) : 0;
+    fc[k] = {
+      visible: c.visible !== false,
+      size: (propioA5 > 0 ? propioA5 : Number(c.size)) || def,
+    };
   }
   // QR de pago (Yape/Plin): oculto por defecto, igual que el frontend.
   fc.qrPagos = {
@@ -46,11 +67,47 @@ export function buildFiscalFormatoFc(
   return fc;
 }
 
+/**
+ * Tamaños (px) de cada elemento en el TICKET de 80mm, réplica exacta de
+ * `ticketPx()` del web (cotizFormatoElementos.ts): el ticket usa VT323 a 16px
+ * de base y el tamaño configurado (pensado para A4) se escala respecto a su
+ * default; si la empresa desvinculó el elemento (`<key>.ticket.size`) se toma
+ * ese valor tal cual. `factor` sirve para las líneas secundarias (gratis/lote).
+ */
+export function buildTicketPx(
+  raw: Record<string, any> | null | undefined,
+  fiscal: boolean,
+): Record<string, { px: number; factor: number }> {
+  // Mismos defaults del catálogo del web (COTIZ_ELEMENTOS).
+  const defaults: Record<string, number> = {
+    logo: 150, nombreComercial: 12, direccion: 12, rubro: 12, razonSocial: fiscal ? 20 : 12,
+    celular: 12, email: 12, web: 12, datosCliente: 12, datosCotizacion: 12,
+    productos: 12, sonTexto: 18, observaciones: 12, detraccion: 12,
+    opGravadas: 12, opExoneradas: 12, opInafectas: 12, opGratuitas: 12,
+    icbper: 12, subTotal: 12, descuentos: 12, igv: 12, montoTotal: 14,
+    cuentas: 10, gracias: 10,
+  };
+  const ticketBase: Record<string, number> = { gracias: 15 };
+  const out: Record<string, { px: number; factor: number }> = {};
+  for (const [k, def] of Object.entries(defaults)) {
+    const c = (raw || {})[k] || {};
+    const tb = ticketBase[k] ?? 16;
+    const propio = Number(c?.ticket?.size);
+    const px = propio > 0
+      ? Math.max(8, Math.round(propio))
+      : Math.max(8, Math.round((tb * (Number(c.size) || def)) / def));
+    out[k] = { px, factor: px / tb };
+  }
+  return out;
+}
+
 @Injectable()
 export class PdfGeneratorService {
   private readonly logger = new Logger(PdfGeneratorService.name);
   private browser: puppeteer.Browser | null = null;
   private template: HandlebarsTemplateDelegate | null = null;
+  /** Ticket 80mm: diseño propio (réplica del web), no el A4 reescalado. */
+  private ticketTemplate: HandlebarsTemplateDelegate | null = null;
   private cotizacionTemplate: HandlebarsTemplateDelegate | null = null;
   private guiaTemplate: HandlebarsTemplateDelegate | null = null;
 
@@ -111,10 +168,44 @@ export class PdfGeneratorService {
       const n = Number(fc?.[key]?.size);
       return n > 0 ? n : Number(def) || 12;
     });
+    // Número positivo (para mostrar filas solo cuando el monto es > 0).
+    Handlebars.registerHelper('pos', (v: any) => Number(v) > 0);
+    // Tamaño (px) de un elemento en el ticket (ver buildTicketPx). Con `base`
+    // devuelve esa base escalada en la misma proporción que el elemento (para
+    // sub-líneas como [GRATIS] o el lote), igual que tpx(key, base) en el web.
+    Handlebars.registerHelper('tpx', (m: any, key: string, base?: any) => {
+      const e = m?.[key];
+      const b = Number(base);
+      if (!e) return b > 0 ? b : 16;
+      return b > 0 ? Math.max(8, Math.round(b * e.factor)) : e.px;
+    });
 
     const templateSource = fs.readFileSync(foundPath, 'utf-8');
     this.template = Handlebars.compile(templateSource);
     this.logger.log(`✅ Template de comprobante cargado: ${foundPath}`);
+
+    // Template del ticket 80mm (diseño distinto al A4/A5, igual al del web).
+    const ticketCandidates = [
+      path.join(__dirname, 'templates', 'comprobante-ticket.hbs'),
+      path.join(
+        process.cwd(),
+        'src',
+        'comprobante',
+        'templates',
+        'comprobante-ticket.hbs',
+      ),
+    ];
+    const ticketPath = ticketCandidates.find((c) => fs.existsSync(c));
+    if (ticketPath) {
+      this.ticketTemplate = Handlebars.compile(
+        fs.readFileSync(ticketPath, 'utf-8'),
+      );
+      this.logger.log(`✅ Template de ticket 80mm cargado: ${ticketPath}`);
+    } else {
+      this.logger.warn(
+        '⚠️ No se encontró comprobante-ticket.hbs; el formato ticket usará el A4',
+      );
+    }
 
     // Cargar template de cotización
     const cotizacionCandidates = [
@@ -272,10 +363,44 @@ export class PdfGeneratorService {
     });
   }
 
+  /**
+   * Tamaños de impresión soportados. Son los mismos que ofrecen el web y la app,
+   * para que los tres botones (Ticket / A4 / A5) rindan la MISMA plantilla y no
+   * cada cliente la suya.
+   */
+  private static readonly PAGE_OPTIONS: Record<
+    FormatoPdf,
+    Parameters<puppeteer.Page['pdf']>[0]
+  > = {
+    ticket: {
+      width: '80mm',
+      printBackground: true,
+      // El alto se calcula midiendo el contenido (ver autoHeight en
+      // renderPdfBuffer): rollo continuo, sin hoja fija.
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+    },
+    a4: {
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
+    },
+    a5: {
+      format: 'A5',
+      printBackground: true,
+      margin: { top: '8mm', right: '8mm', bottom: '8mm', left: '8mm' },
+    },
+  };
+
   private async renderPdfBuffer(
     html: string,
     options: Parameters<puppeteer.Page['pdf']>[0],
     successMessage: string,
+    /**
+     * Rollo continuo (ticket): el alto del papel se toma del contenido. Chrome
+     * ignora `@page { size: 80mm auto }` para el alto y cae a carta, así que hay
+     * que medir la página y pasarlo explícito.
+     */
+    autoHeight = false,
   ): Promise<Buffer> {
     let lastError: any;
 
@@ -301,7 +426,23 @@ export class PdfGeneratorService {
             );
           });
 
-        const pdfBuffer = await page.pdf(options);
+        // Las plantillas pueden traer fuentes web (el ticket usa VT323, igual
+        // que el web); sin esto el PDF puede salir con la fuente de respaldo.
+        await page
+          .evaluate(() => (document as any).fonts?.ready)
+          .catch(() => undefined);
+
+        const pdfOptions = { ...options };
+        if (autoHeight) {
+          // Medir con el viewport del ancho real del papel (80mm ≈ 302px a 96dpi),
+          // si no el contenido se maqueta a 800px y el alto sale inflado.
+          await page.setViewport({ width: 302, height: 600 });
+          const alto = await page.evaluate(
+            () => document.documentElement.scrollHeight,
+          );
+          pdfOptions.height = `${Math.ceil(alto) + 2}px`;
+        }
+        const pdfBuffer = await page.pdf(pdfOptions);
         this.logger.log(successMessage);
         return Buffer.from(pdfBuffer);
       } catch (error: any) {
@@ -399,8 +540,11 @@ export class PdfGeneratorService {
     // Formato configurable (visibilidad + tamaño por elemento). Opcional:
     // si no se envía, todo se muestra con tamaños por defecto (helpers `vis`/`fsz`).
     fc?: Record<string, { visible: boolean; size: number }>;
-    // Cuentas bancarias (solo se dibujan si el formato las activa).
+    // Cuentas bancarias y mensaje del pie propio (solo si el formato los activa).
     cuentasBancarias?: Array<{ banco: string; moneda: string; numeroCuenta: string; cci: string }>;
+    graciasLineas?: string[];
+    /** Tamaños por elemento para el ticket 80mm (ver buildTicketPx). */
+    tpx?: Record<string, { px: number; factor: number }>;
 
     // Otros
     formaPago: string;
@@ -423,7 +567,7 @@ export class PdfGeneratorService {
     yapeQrUrl?: string;
     plinNumero?: string;
     plinQrUrl?: string;
-  }): Promise<Buffer> {
+  }, formato: FormatoPdf = 'a4'): Promise<Buffer> {
     try {
       if (!this.template) {
         throw new Error('Template no cargado');
@@ -448,22 +592,32 @@ export class PdfGeneratorService {
         ).toFixed(2);
       }
 
-      // Generar HTML desde template
-      const html = this.template(data);
+      // El ticket 80mm tiene su propio diseño (el mismo que imprime el web),
+      // no es el A4 reescalado: usa otra plantilla y algunos campos extra.
+      const usaTicket = formato === 'ticket' && !!this.ticketTemplate;
+      if (usaTicket) {
+        const d = data as any;
+        const receipt = String(d.tipoDocumento || 'COMPROBANTE').toUpperCase();
+        d.tituloComprobante =
+          receipt === 'COTIZACIÓN'
+            ? 'COTIZACIÓN DE VENTA ELECTRÓNICA'
+            : /VENTA$/.test(receipt)
+              ? `${receipt} ELECTRÓNICA`
+              : `${receipt} DE VENTA ELECTRÓNICA`;
+        // SUBTOTAL del ticket = importe antes del descuento (igual que el web).
+        d.subTotalBruto = (
+          Number(d.mtoImpVenta || 0) + Number(d.descuento || 0)
+        ).toFixed(2);
+        d.esCredito = String(d.formaPago || '').toUpperCase().includes('CRÉDITO');
+      }
+
+      const html = usaTicket ? this.ticketTemplate!(data) : this.template(data);
 
       return this.renderPdfBuffer(
         html,
-        {
-          format: 'A4',
-          printBackground: true,
-          margin: {
-            top: '10mm',
-            right: '10mm',
-            bottom: '10mm',
-            left: '10mm',
-          },
-        },
-        '✅ PDF generado exitosamente',
+        PdfGeneratorService.PAGE_OPTIONS[formato],
+        `✅ PDF ${formato.toUpperCase()} generado exitosamente`,
+        usaTicket,
       );
     } catch (error) {
       this.logger.error(
@@ -475,51 +629,11 @@ export class PdfGeneratorService {
   }
 
   /**
-   * Genera PDF en formato ticket (80mm)
+   * Genera PDF en formato ticket (80mm). Alias de generarPDFComprobante para no
+   * mantener dos veces la preparación de datos de la misma plantilla.
    */
   async generarPDFTicket(data: any): Promise<Buffer> {
-    try {
-      if (!this.template) {
-        throw new Error('Template no cargado');
-      }
-
-      {
-        const esUSD = String(data?.tipoMoneda || 'PEN').toUpperCase() === 'USD';
-        data.simboloMoneda = esUSD ? 'US$' : 'S/';
-        data.monedaNombre = esUSD ? 'DÓLARES' : 'SOLES';
-      }
-
-      if (data.subTotal === undefined || data.subTotal === null) {
-        data.subTotal = (
-          Number(data.mtoOperGravadas || 0) +
-          Number(data.mtoOperExoneradas || 0) +
-          Number(data.mtoOperInafectas || 0)
-        ).toFixed(2);
-      }
-
-      const html = this.template(data);
-
-      return this.renderPdfBuffer(
-        html,
-        {
-          width: '80mm',
-          printBackground: true,
-          margin: {
-            top: '5mm',
-            right: '5mm',
-            bottom: '5mm',
-            left: '5mm',
-          },
-        },
-        '✅ PDF ticket generado exitosamente',
-      );
-    } catch (error) {
-      this.logger.error(
-        `❌ Error generando PDF ticket: ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    }
+    return this.generarPDFComprobante(data, 'ticket');
   }
 
   /**
@@ -592,7 +706,7 @@ export class PdfGeneratorService {
     usuario?: string;
     sistemaUrl?: string;
     sistemaNombre?: string;
-  }): Promise<Buffer> {
+  }, formato: Exclude<FormatoPdf, 'ticket'> = 'a4'): Promise<Buffer> {
     try {
       // Usar template de cotización si existe, sino el genérico
       const template = this.cotizacionTemplate || this.template;
@@ -605,16 +719,7 @@ export class PdfGeneratorService {
 
       return this.renderPdfBuffer(
         html,
-        {
-          format: 'A4',
-          printBackground: true,
-          margin: {
-            top: '10mm',
-            right: '10mm',
-            bottom: '10mm',
-            left: '10mm',
-          },
-        },
+        PdfGeneratorService.PAGE_OPTIONS[formato],
         '✅ PDF de cotización generado exitosamente',
       );
     } catch (error) {
