@@ -1138,11 +1138,28 @@ export class AnalisisFinancieroService {
 
   async getRentabilidadCategorias(
     empresaId: number,
-    mes: number,
-    anio: number,
+    mes?: number,
+    anio?: number,
     sedeId?: number | null,
+    fechaInicio?: string,
+    fechaFin?: string,
   ) {
-    const range = this.periodoToRange(mes, anio);
+    // Mismo criterio que getMetodosPago/getProductosVendidos: si llega un
+    // rango explícito (filtro "Día" o "Rango") manda; si no, el mes/año.
+    const now = new Date();
+    const mesFinal = mes && mes >= 1 && mes <= 12 ? mes : now.getMonth() + 1;
+    const anioFinal =
+      anio && anio >= 2020 && anio <= 2100 ? anio : now.getFullYear();
+    const range =
+      this.fechasToRange(fechaInicio, fechaFin) ??
+      this.periodoToRange(mesFinal, anioFinal);
+    // Un solo día se etiqueta con la fecha sola (este label sale en el PDF).
+    const periodoLabel =
+      fechaInicio && fechaFin
+        ? fechaInicio === fechaFin
+          ? fechaInicio
+          : `${fechaInicio} al ${fechaFin}`
+        : `${this.mesLabel(mesFinal)} ${anioFinal}`;
 
     const comprobantes = await this.prisma.comprobante.findMany({
       where: {
@@ -1280,7 +1297,13 @@ export class AnalisisFinancieroService {
       ingresoTotal > 0 ? this.r2((gananciaTotal / ingresoTotal) * 100) : 0;
 
     return {
-      periodo: { mes, anio, label: `${this.mesLabel(mes)} ${anio}` },
+      periodo: {
+        mes: mesFinal,
+        anio: anioFinal,
+        fechaInicio: fechaInicio ?? null,
+        fechaFin: fechaFin ?? null,
+        label: periodoLabel,
+      },
       ingresoTotal,
       gananciaTotal,
       margenPromedio,
