@@ -30,6 +30,7 @@ import {
   TIPOS_INFORMALES,
   type FormatoPdf,
 } from './pdf-generator.service';
+import { generarQrSunatDataUrl } from './qr-sunat.util';
 import { numeroALetras } from './utils/numero-a-letras';
 import { ProductoLoteService } from '../producto/producto-lote.service';
 import { EnviarSunatService } from './enviar-sunat.service';
@@ -5598,6 +5599,10 @@ export class ComprobanteService {
 
     const mtoImpVenta = Number(full.mtoImpVenta || 0);
     const isDocumentoFiscal = ['01', '03', '07', '08'].includes(full.tipoDoc);
+
+    // QR de SUNAT al pie (opt-in por empresa). Apunta al PDF en línea si ya
+    // existe; si no, lleva la cadena normativa. Nunca rompe la generación.
+    const qrSunat = await generarQrSunatDataUrl(full, full.empresa);
     const descuento = (
       Number((full as any).mtoDescuentoGlobal || 0) + totalDescuentoItems
     ).toFixed(2);
@@ -5700,7 +5705,7 @@ export class ComprobanteService {
       shouldShowRetention,
       retencionMonto: retencionMonto.toFixed(2),
       importeNeto: (mtoImpVenta - retencionMonto).toFixed(2),
-      qrCode: undefined,
+      qrCode: qrSunat,
       tipoDetraccion: full.tipoDetraccion
         ? `${full.tipoDetraccion.codigo} - ${full.tipoDetraccion.descripcion} (${full.tipoDetraccion.porcentaje}%)`
         : undefined,
@@ -5716,6 +5721,9 @@ export class ComprobanteService {
       plinNumero: (full.empresa as any).plinNumero || undefined,
       plinQrUrl: buildLogoDataUrl(plinQrSigned),
       usuario: 'ADMIN',
+      // Perfil → Configuración → "Mostrar la marca del sistema": apaga el pie de
+      // marca en ticket, A4/A5 y cotización.
+      ocultarMarcaSistema: (full.empresa as any).mostrarMarcaSistema === false,
       sistemaNombre: process.env.APP_NAME || 'Vendify',
       sistemaWeb: (
         process.env.APP_URL ||
@@ -5892,6 +5900,8 @@ export class ComprobanteService {
           process.env.FRONTEND_URL ||
           'https://vendify.pe',
         sistemaNombre: process.env.APP_NAME || 'Vendify',
+        // Perfil → Configuración → "Mostrar la marca del sistema" apagado.
+        ocultarMarcaSistema: (full.empresa as any).mostrarMarcaSistema === false,
       };
       buffer = await this.pdfGenerator.generarPDFCotizacion(
         cotizacionData,

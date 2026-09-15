@@ -545,6 +545,8 @@ export class PdfGeneratorService {
     graciasLineas?: string[];
     /** Tamaños por elemento para el ticket 80mm (ver buildTicketPx). */
     tpx?: Record<string, { px: number; factor: number }>;
+    // Perfil → Configuración → "Mostrar la marca del sistema" apagado.
+    ocultarMarcaSistema?: boolean;
 
     // Otros
     formaPago: string;
@@ -706,6 +708,8 @@ export class PdfGeneratorService {
     usuario?: string;
     sistemaUrl?: string;
     sistemaNombre?: string;
+    // Perfil → Configuración → "Mostrar la marca del sistema" apagado.
+    ocultarMarcaSistema?: boolean;
   }, formato: Exclude<FormatoPdf, 'ticket'> = 'a4'): Promise<Buffer> {
     try {
       // Usar template de cotización si existe, sino el genérico

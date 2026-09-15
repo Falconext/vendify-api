@@ -194,6 +194,10 @@
     .bank-table th, .bank-table td { border: 1px solid #000; padding: 2px 8px; text-align: center; }
     .bank-table th { background: #f3f4f6; font-weight: 700; }
     .bank-table .bank-td-name { font-weight: 700; }
+    /* QR de SUNAT (opt-in por empresa). No confundir con el QR de pago Yape/Plin. */
+    .qr-sunat { text-align: center; margin-top: 18px; }
+    .qr-sunat img { width: 110px; height: 110px; }
+    .qr-sunat p { font-size: 9px; color: #6b7280; margin-top: 4px; }
     .brand-footer { margin-top: 32px; text-align: center; font-size: 11px; }
     .brand-thanks { font-weight: 700; margin-bottom: 4px; }
     .brand-vuelta { font-weight: 700; margin-bottom: 32px; }
@@ -440,6 +444,14 @@
   {{/if}}
   {{/if}}
 
+  <!-- QR DE SUNAT (opt-in por empresa: Empresa.mostrarQrSunat) -->
+  {{#if qrCode}}
+  <div class="qr-sunat">
+    <img src="{{qrCode}}" alt="QR SUNAT">
+    <p>Escanea para ver tu comprobante en línea</p>
+  </div>
+  {{/if}}
+
   <!-- BRAND FOOTER -->
   <div class="brand-footer">
     {{#if (vis fc 'gracias')}}
@@ -454,10 +466,12 @@
     {{/if}}
     <div class="brand-bottom">
       <div class="brand-left">USUARIO: {{usuario}} {{fechaImpresion}}</div>
+      {{#unless ocultarMarcaSistema}}
       <div class="brand-right">
         <div class="brand-name">{{sistemaNombre}} ™</div>
         <div>Comprobante emitido a través de {{sistemaWeb}}</div>
       </div>
+      {{/unless}}
     </div>
   </div>
 

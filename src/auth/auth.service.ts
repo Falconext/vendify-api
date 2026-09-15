@@ -181,8 +181,17 @@ export class AuthService {
         );
       }
 
+      // Sede por defecto del usuario (Usuario.sedeId): si está seteada y sigue
+      // entre sus sedes activas, se usa directo y se evita el selector aunque
+      // tenga 2+ sedes asignadas.
+      const sedeDefaultValida =
+        user.sedeId != null &&
+        sedesActivas.some((s) => s.id === user.sedeId);
+
       if (sedesActivas.length === 1) {
         sedeIdFinal = sedesActivas[0].id;
+      } else if (sedeDefaultValida) {
+        sedeIdFinal = user.sedeId;
       } else {
         // Múltiples sedes → necesita seleccionar
         requiresSedeSelection = true;
@@ -406,6 +415,7 @@ export class AuthService {
         sistemaNegocio: true,
         sistemaProducto: true,
         puedeAnularComprobantes: true,
+        sedeId: true,
         sedesAsignadas: {
           select: {
             sede: {
@@ -464,6 +474,10 @@ export class AuthService {
             notaVentaFormatoConfig: true,
             facturaFormatoConfig: true,
             boletaFormatoConfig: true,
+            mostrarQrSunat: true,
+            mostrarMarcaSistema: true,
+            formatoImpresionDefault: true,
+            imprimirAutomatico: true,
             tipoEmpresa: true,
             rubroId: true,
             cuentasBancarias: {
@@ -664,6 +678,10 @@ export class AuthService {
             notaVentaFormatoConfig: true,
             facturaFormatoConfig: true,
             boletaFormatoConfig: true,
+            mostrarQrSunat: true,
+            mostrarMarcaSistema: true,
+            formatoImpresionDefault: true,
+            imprimirAutomatico: true,
             directorTecnico: true,
             sunatClientId: true,
             sunatClientSecret: true,

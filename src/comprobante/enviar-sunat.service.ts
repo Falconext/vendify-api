@@ -13,6 +13,7 @@ import {
   PdfGeneratorService,
   buildFiscalFormatoFc,
 } from './pdf-generator.service';
+import { generarQrSunatDataUrl } from './qr-sunat.util';
 import { numeroALetras } from './utils/numero-a-letras';
 import axios from 'axios';
 import { QpseClient, QpseSendResponse } from '../common/utils/qpse.client';
@@ -2439,6 +2440,8 @@ export class EnviarSunatService {
                 : undefined,
               // Formato configurable por empresa (visibilidad por elemento).
               fc: buildFiscalFormatoFc(comp.empresa, comp.tipoDoc),
+              ocultarMarcaSistema:
+                (comp.empresa as any).mostrarMarcaSistema === false,
             };
 
             const pdfBuffer =
@@ -3586,6 +3589,8 @@ export class EnviarSunatService {
 
       const fechaEmision = new Date(comp.fechaEmision as any);
 
+      const qrSunat = await generarQrSunatDataUrl(comp, comp.empresa);
+
       // Dirección de la sede emisora: solo se muestra si tiene una
       // dirección propia distinta a la fiscal del RUC.
       const sedeDir = ((comp as any).sede?.direccion || '')
@@ -3648,7 +3653,9 @@ export class EnviarSunatService {
         observaciones: comp.observaciones
           ? comp.observaciones.toUpperCase()
           : undefined,
-        qrCode: qrCode ? `data:image/png;base64,${qrCode}` : undefined,
+        // QR de SUNAT: el que llegue por parámetro manda; si no, se arma con
+        // la config de la empresa (opt-in `mostrarQrSunat`).
+        qrCode: qrCode ? `data:image/png;base64,${qrCode}` : qrSunat,
         // Detracción
         tipoDetraccion: (comp as any).tipoDetraccion
           ? `${(comp as any).tipoDetraccion.codigo} - ${(comp as any).tipoDetraccion.descripcion} (${(comp as any).tipoDetraccion.porcentaje}%)`
@@ -3662,6 +3669,8 @@ export class EnviarSunatService {
           : undefined,
         // Formato configurable por empresa (visibilidad por elemento).
         fc: buildFiscalFormatoFc((comp as any).empresa, comp.tipoDoc),
+        ocultarMarcaSistema:
+          (comp as any).empresa?.mostrarMarcaSistema === false,
       };
 
       const pdfBuffer = await this.pdfGenerator.generarPDFComprobante(pdfData);

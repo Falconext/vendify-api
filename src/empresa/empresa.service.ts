@@ -1175,6 +1175,15 @@ export class EmpresaService {
         updateData.facturaFormatoConfig = dto.facturaFormatoConfig as any;
       if (dto.boletaFormatoConfig !== undefined)
         updateData.boletaFormatoConfig = dto.boletaFormatoConfig as any;
+      // Impresión de comprobantes (Perfil → Configuración).
+      if (dto.mostrarQrSunat !== undefined)
+        updateData.mostrarQrSunat = dto.mostrarQrSunat;
+      if (dto.mostrarMarcaSistema !== undefined)
+        updateData.mostrarMarcaSistema = dto.mostrarMarcaSistema;
+      if (dto.formatoImpresionDefault !== undefined)
+        updateData.formatoImpresionDefault = dto.formatoImpresionDefault;
+      if (dto.imprimirAutomatico !== undefined)
+        updateData.imprimirAutomatico = dto.imprimirAutomatico;
       if (dto.cotizTerminosDefault !== undefined)
         updateData.cotizTerminosDefault = dto.cotizTerminosDefault || null;
       if (dto.cotizObservacionesDefault !== undefined)

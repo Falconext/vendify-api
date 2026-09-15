@@ -126,6 +126,27 @@ export class UpdateEmpresaDto {
   @IsObject()
   boletaFormatoConfig?: Record<string, { visible?: boolean; size?: number }>;
 
+  // ── Impresión de comprobantes (Perfil → Configuración) ────────────────────
+  /** QR de SUNAT al pie del comprobante (ticket / A4 / A5). */
+  @IsOptional()
+  @IsBoolean()
+  mostrarQrSunat?: boolean;
+
+  /** Pie con la marca del sistema en ticket, A4/A5 y cotización. */
+  @IsOptional()
+  @IsBoolean()
+  mostrarMarcaSistema?: boolean;
+
+  /** Formato preseleccionado al imprimir: TICKET | A4 | A5. */
+  @IsOptional()
+  @IsIn(['TICKET', 'A4', 'A5'])
+  formatoImpresionDefault?: 'TICKET' | 'A4' | 'A5';
+
+  /** Abrir el diálogo de impresión apenas se emite el comprobante. */
+  @IsOptional()
+  @IsBoolean()
+  imprimirAutomatico?: boolean;
+
   @IsOptional()
   @IsBoolean()
   usaCodigoBarrasManual?: boolean;
