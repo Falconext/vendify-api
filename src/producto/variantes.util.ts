@@ -185,6 +185,21 @@ export async function sincronizarVariantes(
         : existe
           ? Number((existe as any).stock ?? 0)
           : 0;
+    // El costo NO viene en variantesConfig: al crear una variante quedaba en 0
+    // aunque el padre tuviera costo (Excel de inventario con Costo / Valor
+    // inventario en S/0). Se hereda del padre al crearla y también cuando la
+    // variante existente sigue en 0 (nunca se compró); un costo propio (> 0,
+    // calculado por compras) nunca se pisa.
+    const costoVarianteExistente = Number((existe as any)?.costoPromedio ?? 0);
+    const costoPromedio =
+      existe && costoVarianteExistente > 0
+        ? costoVarianteExistente
+        : Number(productoPadre.costoPromedio ?? 0);
+    const costoFijoExistente = Number((existe as any)?.costoFijo ?? 0);
+    const costoFijo =
+      existe && costoFijoExistente > 0
+        ? costoFijoExistente
+        : Number(productoPadre.costoFijo ?? 0);
     const codigoSugerido = `${productoPadre.codigo}-${Object.values(combo)
       .map((value) => normalizeCodeToken(String(value)))
       .filter(Boolean)
@@ -204,6 +219,8 @@ export async function sincronizarVariantes(
       tipoAfectacionIGV: productoPadre.tipoAfectacionIGV,
       precioUnitario: new Decimal(precioUnitario),
       valorUnitario: new Decimal(valorUnitario),
+      costoPromedio: new Decimal(costoPromedio),
+      costoFijo: new Decimal(costoFijo),
       igvPorcentaje: productoPadre.igvPorcentaje,
       categoriaId: productoPadre.categoriaId,
       marcaId: productoPadre.marcaId,
