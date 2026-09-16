@@ -401,6 +401,8 @@ export class ComprobanteService {
                     nombre: { contains: search, mode: 'insensitive' },
                   },
                 },
+                // Empresas que registran clientes solo con celular (WhatsApp).
+                { cliente: { telefono: { contains: search } } },
               ],
             }
           : {}),
@@ -672,6 +674,8 @@ export class ComprobanteService {
                 : [{ correlativo: parseInt(search, 10) }]),
               { cliente: { nroDoc: { contains: search, mode: 'insensitive' } } },
               { cliente: { nombre: { contains: search, mode: 'insensitive' } } },
+              // Empresas que registran clientes solo con celular (WhatsApp).
+              { cliente: { telefono: { contains: search } } },
             ],
           }
         : {}),
@@ -4633,6 +4637,8 @@ export class ComprobanteService {
             ? []
             : [{ correlativo: searchAsNumber }]),
           { cliente: { nombre: { contains: search, mode: 'insensitive' } } },
+          // Empresas que registran clientes solo con celular (WhatsApp).
+          { cliente: { telefono: { contains: search } } },
           { cliente: { nroDoc: { contains: search, mode: 'insensitive' } } },
         ],
       });
