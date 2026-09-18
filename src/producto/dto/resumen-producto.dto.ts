@@ -19,6 +19,12 @@ export class ResumenProductoDto {
   @Min(1)
   categoriaId?: number;
 
+  /** Filtra por localización física (estante/zona) tal como está guardada en el producto. */
+  @IsOptional()
+  @Type(() => String)
+  @IsString()
+  localizacion?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

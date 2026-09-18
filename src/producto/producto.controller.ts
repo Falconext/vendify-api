@@ -970,6 +970,7 @@ export class ProductoController {
       order: query.order,
       marcaId: query.marcaId,
       categoriaId: query.categoriaId,
+      localizacion: query.localizacion,
       soloVendibles: query.soloVendibles,
       usarPrecioSede: query.usarPrecioSede,
       usuarioId: user.id,
@@ -1079,8 +1080,21 @@ export class ProductoController {
       search: query.search,
       marcaId: query.marcaId,
       categoriaId: query.categoriaId,
+      localizacion: query.localizacion,
     });
     res.locals.message = 'Resumen de productos obtenido correctamente';
+    return resultado;
+  }
+
+  /** Localizaciones (estante/zona) distintas usadas por los productos de la empresa, para el filtro del inventario. */
+  @Get('localizaciones')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  async localizaciones(
+    @User() user: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const resultado = await this.service.listarLocalizaciones(user.empresaId);
+    res.locals.message = 'Localizaciones listadas correctamente';
     return resultado;
   }
 

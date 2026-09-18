@@ -860,6 +860,34 @@ export class ProductoService {
    * completo ni respetar el orden. Devuelve el arreglo para `where.AND` (o
    * undefined si no hay término).
    */
+  /** Condición Prisma para el filtro de localización (vacío = sin filtro). */
+  private filtroLocalizacion(localizacion?: string): { localizacion?: any } {
+    const value = String(localizacion ?? '').trim();
+    if (!value) return {};
+    return { localizacion: { equals: value, mode: 'insensitive' } };
+  }
+
+  /** Valores distintos de localización (normalizados en mayúsculas) de los productos activos de la empresa. */
+  async listarLocalizaciones(empresaId: number): Promise<string[]> {
+    const filas = await this.prisma.producto.findMany({
+      where: {
+        empresaId,
+        estado: { in: [EstadoType.ACTIVO, EstadoType.INACTIVO] },
+        localizacion: { not: null },
+      },
+      select: { localizacion: true },
+      distinct: ['localizacion'],
+    });
+    const unicas = new Set<string>();
+    for (const f of filas) {
+      const v = String(f.localizacion ?? '').trim().toUpperCase();
+      if (v) unicas.add(v);
+    }
+    return Array.from(unicas).sort((a, b) =>
+      a.localeCompare(b, 'es', { numeric: true }),
+    );
+  }
+
   private busquedaPorPalabras(searchTerm?: string): any[] | undefined {
     const t = searchTerm?.trim();
     if (!t) return undefined;
@@ -879,6 +907,8 @@ export class ProductoService {
     order?: 'asc' | 'desc';
     marcaId?: number;
     categoriaId?: number;
+    /** Localización física (estante/zona); comparación sin distinguir mayúsculas. */
+    localizacion?: string;
     incluirVariantes?: string | boolean;
     soloVendibles?: boolean;
     usarPrecioSede?: boolean;
@@ -914,6 +944,7 @@ export class ProductoService {
       codigo: { notIn: productosDelSistema },
       marcaId: marcaId ? Number(marcaId) : undefined,
       categoriaId: categoriaId ? Number(categoriaId) : undefined,
+      ...this.filtroLocalizacion(params.localizacion),
     };
 
     // Búsqueda flexible por palabras (cada palabra debe aparecer en algún campo).
@@ -1361,6 +1392,7 @@ export class ProductoService {
     search?: string;
     marcaId?: number;
     categoriaId?: number;
+    localizacion?: string;
   }) {
     const { empresaId, marcaId, categoriaId } = params;
     const productosDelSistema = ['PLD', 'IPM', 'DGD'];
@@ -1373,6 +1405,7 @@ export class ProductoService {
       productoPadreId: null,
       marcaId: marcaId ? Number(marcaId) : undefined,
       categoriaId: categoriaId ? Number(categoriaId) : undefined,
+      ...this.filtroLocalizacion(params.localizacion),
     };
 
     // Búsqueda flexible por palabras (misma lógica que `listar`).
