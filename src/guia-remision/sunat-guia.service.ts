@@ -290,12 +290,23 @@ export class SunatGuiaService {
         ? String(guia.destinatarioNumDoc || '').trim()
         : '';
 
-    const partidaListId = isCompra
-      ? destinatarioRuc || remitenteRuc
+    // listID = RUC dueño del establecimiento (código anexo). En una venta el
+    // punto de llegada es del destinatario; en una compra, el de partida es del
+    // proveedor. Si esa contraparte no tiene RUC (persona con DNI) NO se puede
+    // usar el RUC del remitente como relleno: SUNAT lo rechaza con el error 3411
+    // ("el RUC del punto de llegada no debe ser igual al del remitente"). En ese
+    // caso se omite el código de establecimiento (es opcional en el UBL).
+    // Motivo 04 (traslado entre establecimientos de la misma empresa): ambos
+    // puntos pertenecen al remitente.
+    const mismaEmpresa =
+      guia.tipoTraslado === '04' ||
+      (!!destinatarioRuc && destinatarioRuc === remitenteRuc);
+    const partidaListId = isCompra && !mismaEmpresa
+      ? destinatarioRuc
       : remitenteRuc;
-    const llegadaListId = isCompra
+    const llegadaListId = isCompra || mismaEmpresa
       ? remitenteRuc
-      : destinatarioRuc || remitenteRuc;
+      : destinatarioRuc;
 
     const deliveryCustomerParty = isCompra
       ? this.buildPartyCac('6', remitenteRuc, guia.remitenteRazonSocial)
@@ -357,7 +368,7 @@ export class SunatGuiaService {
         'cac:Delivery': {
           'cac:DeliveryAddress': {
             'cbc:ID': { _text: guia.llegadaUbigeo },
-            ...(!isEmisorItineranteCp
+            ...(!isEmisorItineranteCp && llegadaListId
               ? {
                   'cbc:AddressTypeCode': {
                     _attributes: { listID: llegadaListId },
@@ -373,7 +384,7 @@ export class SunatGuiaService {
           'cac:Despatch': {
             'cac:DespatchAddress': {
               'cbc:ID': { _text: guia.partidaUbigeo },
-              ...(!isEmisorItineranteCp
+              ...(!isEmisorItineranteCp && partidaListId
                 ? {
                     'cbc:AddressTypeCode': {
                       _attributes: { listID: partidaListId },
