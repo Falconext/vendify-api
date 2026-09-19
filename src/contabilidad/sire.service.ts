@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as XLSX from 'xlsx';
 import * as nodemailer from 'nodemailer';
+import { factorCompraASoles } from '../common/utils/moneda-compra';
 
 // Map compras tipoDoc text → SUNAT código catálogo 01
 const TIPO_DOC_COMPRA_MAP: Record<string, string> = {
@@ -331,12 +332,48 @@ export class SireService {
         empresaId,
         ...(sedeId ? { sedeId } : {}),
         fechaEmision,
+        // Solo compras vigentes: las anuladas, rechazadas o pendientes de
+        // aprobación nunca aplicaron efectos (ni stock ni crédito fiscal).
+        estado: 'REGISTRADO' as any,
       },
       orderBy: { fechaEmision: 'asc' },
       include: {
         proveedor: { include: { tipoDocumento: true } },
+        // Para separar la base gravada de las adquisiciones no gravadas:
+        // líneas de productos exonerados/inafectos van sin IGV.
+        detalles: { select: { subtotal: true, igv: true } },
       },
     });
+  }
+
+  private r2(n: number): number {
+    return Number((n || 0).toFixed(2));
+  }
+
+  /**
+   * Base gravada vs. no gravada de una compra según sus líneas: las que
+   * llevan IGV suman a la base imponible; las de productos exonerados/inafectos
+   * (IGV 0) van como adquisiciones no gravadas. Sin detalle (compras antiguas)
+   * todo se toma como gravado.
+   */
+  private desgloseBaseCompra(c: {
+    subtotal: any;
+    igv: any;
+    detalles?: Array<{ subtotal: any; igv: any }>;
+  }) {
+    const dets = c.detalles ?? [];
+    if (!dets.length) {
+      return { gravada: Number(c.subtotal ?? 0), noGravada: 0 };
+    }
+    let gravada = 0;
+    let noGravada = 0;
+    for (const d of dets) {
+      if (Number(d.igv ?? 0) > 0) gravada += Number(d.subtotal ?? 0);
+      else noGravada += Number(d.subtotal ?? 0);
+    }
+    if (noGravada === 0) return { gravada: Number(c.subtotal ?? 0), noGravada: 0 };
+    if (gravada === 0) return { gravada: 0, noGravada: Number(c.subtotal ?? 0) };
+    return { gravada: this.r2(gravada), noGravada: this.r2(noGravada) };
   }
 
   async generarTxtCompras(
@@ -361,15 +398,21 @@ export class SireService {
       );
       const nroDocProveedor = c.proveedor?.nroDoc ?? '';
       const razonSocial = (c.proveedor?.nombre ?? '').replace(/\|/g, ' ');
-      const igvN = Number(c.igv ?? 0);
-      const subtotalN = Number(c.subtotal ?? 0);
-      const totalN = Number(c.total ?? 0);
-      const baseGravada = this.fmt(subtotalN);
+      // Importes en soles (factura en US$ × TC de la compra); las notas de
+      // crédito de compra restan crédito fiscal (negativo). Los exonerados/
+      // inafectos van como adquisiciones no gravadas (campo 19).
+      const signo = tipoDocSunat === '07' ? -1 : 1;
+      const factor = factorCompraASoles(c) * signo;
+      const base = this.desgloseBaseCompra(c);
+      const igvN = Number(c.igv ?? 0) * factor;
+      const totalN = Number(c.total ?? 0) * factor;
+      const baseGravada = this.fmt(base.gravada * factor);
+      const noGravadas = this.fmt(base.noGravada * factor);
       const igvStr = this.fmt(igvN);
       const totalStr = this.fmt(totalN);
       const tipoCambio =
         (c.moneda ?? 'PEN') === 'USD'
-          ? this.fmt(Number(c.tipoCambio ?? 1))
+          ? Number(c.tipoCambio ?? 1).toFixed(3)
           : '1.000';
 
       if (simple) {
@@ -393,7 +436,7 @@ export class SireService {
             '0.00',
             '0.00',
             '0.00',
-            '0.00',
+            noGravadas,
             '0.00',
             '0.00',
             '0.00',
@@ -423,7 +466,7 @@ export class SireService {
             '0.00', // 16 IGV adq. gravadas (op. gravadas y no gravadas)
             '0.00', // 17 Base adq. gravadas (op. no gravadas)
             '0.00', // 18 IGV adq. gravadas (op. no gravadas)
-            '0.00', // 19 Valor adq. no gravadas
+            noGravadas, // 19 Valor adq. no gravadas (exonerados/inafectos)
             '0.00', // 20 ISC
             '0.00', // 21 ICBPER
             '0.00', // 22 Otros tributos
@@ -465,9 +508,14 @@ export class SireService {
         c.proveedor?.nroDoc ?? '',
         c.proveedor?.tipoDocumento?.codigo,
       );
-      const subtotalN = Number(c.subtotal ?? 0);
-      const igvN = Number(c.igv ?? 0);
-      const totalN = Number(c.total ?? 0);
+      // Mismo criterio que el TXT: soles, NC en negativo, no gravadas aparte.
+      const signo = tipoDocSunat === '07' ? -1 : 1;
+      const factor = factorCompraASoles(c) * signo;
+      const base = this.desgloseBaseCompra(c);
+      const subtotalN = base.gravada * factor;
+      const noGravadasN = base.noGravada * factor;
+      const igvN = Number(c.igv ?? 0) * factor;
+      const totalN = Number(c.total ?? 0) * factor;
 
       if (simple) {
         return {
@@ -507,7 +555,7 @@ export class SireService {
         'IGV ADQ. GRAV. (MX)': 0,
         'BASE ADQ. GRAV. (NG)': 0,
         'IGV ADQ. GRAV. (NG)': 0,
-        'ADQ. NO GRAVADAS': 0,
+        'ADQ. NO GRAVADAS': +noGravadasN.toFixed(2),
         ISC: 0,
         ICBPER: 0,
         'OTROS TRIBUTOS': 0,
