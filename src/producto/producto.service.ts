@@ -3932,12 +3932,17 @@ export class ProductoService {
             { codigo: { contains: search, mode: 'insensitive' } },
           ]
         : undefined,
-      // Por sede: solo lo disponible en ella (misma regla que `listar`).
+      // Por sede: solo los productos que TIENEN stock en esa sede. Antes salía
+      // todo lo "asignado" a la sede (visibleEnSede), y como una importación
+      // asigna el producto a ambas sedes, el Excel de una sede traía también
+      // los productos que solo existen en la otra, con STOCK 0.
       ...(sedeId
         ? {
-            NOT: {
-              stocks: {
-                some: { sedeId: Number(sedeId), visibleEnSede: false },
+            stocks: {
+              some: {
+                sedeId: Number(sedeId),
+                visibleEnSede: { not: false },
+                stock: { gt: 0 },
               },
             },
           }
@@ -3946,7 +3951,8 @@ export class ProductoService {
 
     const productos = await this.prisma.producto.findMany({
       where,
-      orderBy: { id: 'desc' },
+      // Ascendente por código (PR001, PR002…), como lo lee el empresario.
+      orderBy: [{ codigo: 'asc' }, { id: 'asc' }],
       include: {
         unidadMedida: true,
         categoria: true,
@@ -3992,15 +3998,19 @@ export class ProductoService {
       // Sin el fallback a producto.localizacion, si el usuario solo llenó el
       // campo general del formulario (el uso normal), esta columna mostraba
       // solo el nombre de la sede, ignorando lo que sí configuró.
-      const ubicaciones = (p.stocks || [])
-        .filter(
-          (s: any) => Number(s.stock) > 0 || s.ubicacion || p.localizacion,
-        )
-        .map((s: any) => {
-          const nombreSede = s.sede?.nombre || `Sede ${s.sedeId}`;
-          const lugar = s.ubicacion || p.localizacion;
-          return lugar ? `${nombreSede}: ${lugar}` : nombreSede;
-        })
+      // LOCALIZACION = el campo "Ubicación / Localización" de la ficha del
+      // producto. Si además hay ubicación por almacén (ProductoStock.ubicacion)
+      // se agrega; con una sede concreta va sola, con todas va con el nombre de
+      // la sede. Ya no se exportan los nombres de sede como "ubicación".
+      const ubicacionesSede = (p.stocks || [])
+        .filter((s: any) => s.ubicacion)
+        .map((s: any) =>
+          sedeId
+            ? String(s.ubicacion)
+            : `${s.sede?.nombre || `Sede ${s.sedeId}`}: ${s.ubicacion}`,
+        );
+      const localizacion = [p.localizacion, ...ubicacionesSede]
+        .filter((v: any) => v != null && String(v).trim() !== '')
         .join(' | ');
 
       return {
@@ -4016,7 +4026,7 @@ export class ProductoService {
         'STOCK MINIMO': stockMinimo,
         CATEGORIA: producto.categoria?.nombre || '',
         MARCA: p?.marca?.nombre || '',
-        UBICACIONES: ubicaciones || '-',
+        LOCALIZACION: localizacion || '',
       };
     });
 
@@ -4036,7 +4046,7 @@ export class ProductoService {
       'STOCK MINIMO': '',
       CATEGORIA: '',
       MARCA: '',
-      UBICACIONES: '',
+      LOCALIZACION: '',
     });
 
     const worksheet = XLSX.utils.json_to_sheet(datosExcel);
@@ -4055,7 +4065,7 @@ export class ProductoService {
       { wch: 13 }, // STOCK MINIMO
       { wch: 20 }, // CATEGORIA
       { wch: 20 }, // MARCA
-      { wch: 40 }, // UBICACIONES
+      { wch: 30 }, // LOCALIZACION
     ];
 
     const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
