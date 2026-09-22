@@ -119,6 +119,21 @@ export class UpdateEmpresaDto {
   @IsString()
   ventaObservacionesDefault?: string;
 
+  /** POS: mantener la búsqueda al agregar un producto (seguir agregando de la misma lista). */
+  @IsOptional()
+  @IsBoolean()
+  posMantenerBusqueda?: boolean;
+
+  /** POS: comprobante con el que arranca cada venta (MANTENER_ULTIMO | NOTA_DE_VENTA | BOLETA | FACTURA). */
+  @IsOptional()
+  @IsIn(['MANTENER_ULTIMO', 'NOTA_DE_VENTA', 'BOLETA', 'FACTURA'])
+  posComprobanteDefault?: 'MANTENER_ULTIMO' | 'NOTA_DE_VENTA' | 'BOLETA' | 'FACTURA';
+
+  /** POS: con Yape/Plin/Transferencia/Tarjeta exigir Boleta/Factura (no comprobante interno). */
+  @IsOptional()
+  @IsBoolean()
+  posExigirCpeMedioPago?: boolean;
+
   @IsOptional()
   @IsObject()
   notaVentaFormatoConfig?: Record<string, { visible?: boolean; size?: number }>;

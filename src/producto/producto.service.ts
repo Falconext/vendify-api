@@ -2331,6 +2331,41 @@ export class ProductoService {
     return null;
   }
 
+  /**
+   * Baja el costo nuevo del padre a las variantes que venían heredando el
+   * anterior: costo igual al del padre, 0, o el del padre ×1.18 (variantes
+   * creadas cuando el costo aún se guardaba CON IGV y quedaron desfasadas al
+   * normalizar el padre a NETO — el Excel/tabla les volvía a sumar el IGV y
+   * salían con S/ 112.10 en vez de S/ 95). Una variante con costo propio
+   * distinto (compras a otro precio) no se toca.
+   */
+  private async propagarCostoAVariantes(
+    padreId: number,
+    empresaId: number,
+    costoAnterior: number,
+    costoNuevo: number,
+  ) {
+    if (!(costoNuevo >= 0) || Math.abs(costoNuevo - costoAnterior) < 0.00005) {
+      return;
+    }
+    const variantes = await this.prisma.producto.findMany({
+      where: { productoPadreId: padreId, empresaId },
+      select: { id: true, costoPromedio: true },
+    });
+    const espejaba = (c: number) =>
+      c === 0 ||
+      Math.abs(c - costoAnterior) < 0.01 ||
+      (costoAnterior > 0 && Math.abs(c / costoAnterior - 1.18) < 0.005);
+    const ids = variantes
+      .filter((v) => espejaba(Number(v.costoPromedio ?? 0)))
+      .map((v) => v.id);
+    if (ids.length === 0) return;
+    await this.prisma.producto.updateMany({
+      where: { id: { in: ids } },
+      data: { costoPromedio: new Decimal(costoNuevo) },
+    });
+  }
+
   async actualizar(
     data: {
       id: number;
@@ -2869,6 +2904,18 @@ export class ProductoService {
             : undefined,
       },
     });
+
+    // Si el empresario cambió el costo del padre, las tallas/colores que solo
+    // "espejaban" ese costo (nunca tuvieron compra propia) lo siguen. Va antes
+    // de sincronizarVariantes, que preserva el costo existente de cada variante.
+    if (data.costoUnitario !== undefined) {
+      await this.propagarCostoAVariantes(
+        actualizado.id,
+        data.empresaId,
+        Number(producto.costoPromedio ?? 0),
+        Number(data.costoUnitario),
+      );
+    }
 
     if (actualizado.opcionesAtributos) {
       const sedesSync = await this.prisma.sede.findMany({
@@ -3822,7 +3869,7 @@ export class ProductoService {
     nombre: string,
     marca?: string,
     categoria?: string,
-  ): Promise<{ url: string; clave: string } | null> {
+  ): Promise<{ url: string; clave: string; candidatos: string[] } | null> {
     const claves = this.construirClavesBusquedaImagen(nombre, marca, categoria);
     if (claves.length === 0) return null;
 
@@ -3844,7 +3891,12 @@ export class ProductoService {
             ultimoUsoEn: new Date(),
           },
         });
-        return { url: match.imagenUrl, clave: claveBusqueda };
+        const candidatos = Array.isArray(match.candidatos)
+          ? (match.candidatos as unknown[]).filter(
+              (u): u is string => typeof u === 'string' && /^https?:\/\//i.test(u),
+            )
+          : [];
+        return { url: match.imagenUrl, clave: claveBusqueda, candidatos };
       }
     }
 
@@ -3857,11 +3909,22 @@ export class ProductoService {
     marca?: string;
     categoria?: string;
     url: string;
+    /** Opciones completas de la búsqueda; si no vienen, se conservan las guardadas. */
+    candidatos?: string[];
   }) {
     const url = String(params.url || '').trim();
     if (!/^https?:\/\//i.test(url)) {
       throw new BadRequestException('La URL de imagen no es válida.');
     }
+    const candidatos = Array.isArray(params.candidatos)
+      ? Array.from(
+          new Set(
+            params.candidatos
+              .map((u) => String(u || '').trim())
+              .filter((u) => /^https?:\/\//i.test(u)),
+          ),
+        ).slice(0, 12)
+      : undefined;
 
     const nombreNorm = this.normalizarTextoImagen(params.nombre);
     if (!nombreNorm) {
@@ -3896,11 +3959,13 @@ export class ProductoService {
           marcaNorm: marcaNorm || null,
           categoriaNorm: categoriaNorm || null,
           imagenUrl: url,
+          ...(candidatos ? { candidatos } : {}),
           vecesUsada: 1,
           ultimoUsoEn: new Date(),
         },
         update: {
           imagenUrl: url,
+          ...(candidatos && candidatos.length > 0 ? { candidatos } : {}),
           nombreNorm,
           marcaNorm: marcaNorm || null,
           categoriaNorm: categoriaNorm || null,
