@@ -977,6 +977,13 @@ export class GuiaRemisionService {
       fechaImpresion,
       // Perfil → Configuración → "Mostrar la marca del sistema" apagado.
       ocultarMarcaSistema: empresa.mostrarMarcaSistema === false,
+      // La web del sistema va OCULTA salvo que la empresa la encienda en
+      // Comprobantes → Configurar formato → "Web del sistema en el pie"
+      // (mismo interruptor que factura/boleta; en white-label imprimir la web
+      // del proveedor delata al fabricante).
+      mostrarWebSistema:
+        ((empresa as any).facturaFormatoConfig?.marcaWeb?.visible === true) ||
+        ((empresa as any).boletaFormatoConfig?.marcaWeb?.visible === true),
       sistemaNombre: process.env.APP_NAME || 'Falconext',
       sistemaWeb: (
         process.env.APP_URL ||

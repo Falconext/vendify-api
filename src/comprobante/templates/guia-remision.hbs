@@ -123,7 +123,7 @@
         <h1>{{razonSocial}}</h1>
         <div class="linea">{{direccion}}</div>
         {{#if rubro}}<div class="linea">{{rubro}}</div>{{/if}}
-        {{#if nombreComercial}}{{#unless (eq nombreComercial razonSocial)}}<div class="linea">NOMBRE COMERCIAL: {{nombreComercial}}</div>{{/unless}}{{/if}}
+        {{#if nombreComercial}}{{#unless (eq nombreComercial razonSocial)}}<div class="linea">{{nombreComercial}}</div>{{/unless}}{{/if}}
         {{#if celular}}<div class="linea">CELULAR: {{celular}}</div>{{/if}}
         {{#if email}}<div class="linea">EMAIL: {{email}}</div>{{/if}}
         {{#if paginaWeb}}<div class="linea">WEB: {{paginaWeb}}</div>{{/if}}
@@ -266,8 +266,8 @@
     <div class="usuario-label">USUARIO: {{usuario}} {{fechaImpresion}}</div>
     {{#unless ocultarMarcaSistema}}
     <div class="marca-label">
-      <span class="marca-name">{{sistemaNombre}} ™</span><br>
-      Guía emitida a través de {{sistemaWeb}}
+      <span class="marca-name">{{sistemaNombre}} ™</span>
+      {{#if mostrarWebSistema}}<br>Guía emitida a través de {{sistemaWeb}}{{/if}}
     </div>
     {{/unless}}
   </div>

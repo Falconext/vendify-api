@@ -223,7 +223,7 @@
         {{#if (vis fc 'direccion')}}<span style="font-size: {{fsz fc 'direccion' 12}}px;">{{direccion}}</span><br>
         {{#if sedeDireccion}}<span style="font-size: {{fsz fc 'direccion' 12}}px;">SEDE: {{sedeDireccion}}</span><br>{{/if}}{{/if}}
         {{#if (vis fc 'rubro')}}{{#if rubro}}<span style="font-size: {{fsz fc 'rubro' 12}}px;">{{rubro}}</span><br>{{/if}}{{/if}}
-        {{#if (vis fc 'nombreComercial')}}{{#unless (eq nombreComercial razonSocial)}}<span style="font-size: {{fsz fc 'nombreComercial' 12}}px;">NOMBRE COMERCIAL: {{nombreComercial}}</span><br>{{/unless}}{{/if}}
+        {{#if (vis fc 'nombreComercial')}}{{#unless (eq nombreComercial razonSocial)}}<span style="font-size: {{fsz fc 'nombreComercial' 12}}px;">{{nombreComercial}}</span><br>{{/unless}}{{/if}}
         {{#if (vis fc 'celular')}}{{#if celular}}<span style="font-size: {{fsz fc 'celular' 12}}px;">CELULAR: {{celular}}</span><br>{{/if}}{{/if}}
         {{#if (vis fc 'email')}}{{#if email}}<span style="font-size: {{fsz fc 'email' 12}}px;">EMAIL: {{email}}</span><br>{{/if}}{{/if}}
         {{#if (vis fc 'web')}}{{#if paginaWeb}}<span style="font-size: {{fsz fc 'web' 12}}px;">WEB: {{paginaWeb}}</span>{{/if}}{{/if}}
@@ -470,7 +470,7 @@
       {{#unless ocultarMarcaSistema}}
       <div class="brand-right">
         <div class="brand-name">{{sistemaNombre}} ™</div>
-        <div>Comprobante emitido a través de {{sistemaWeb}}</div>
+        {{#if (vis fc 'marcaWeb')}}<div>Comprobante emitido a través de {{sistemaWeb}}</div>{{/if}}
       </div>
       {{/unless}}
     </div>

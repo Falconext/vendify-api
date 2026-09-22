@@ -5815,6 +5815,8 @@ export class ComprobanteService {
         observaciones: 12, detraccion: 12, opGravadas: 12, opExoneradas: 12,
         opInafectas: 12, opGratuitas: 12, subTotal: 12, descuentos: 12,
         igv: 12, montoTotal: 18, cuentas: 10, gracias: 10,
+        // Web del sistema en el pie (interruptor propio, ver buildFiscalFormatoFc).
+        marcaWeb: 10,
       };
       const rawFormatoCfg = ((full.empresa as any).cotizFormatoConfig ||
         {}) as Record<string, { visible?: boolean; size?: number }>;
@@ -5826,6 +5828,11 @@ export class ComprobanteService {
         const c = rawFormatoCfg[k] || {};
         fc[k] = { visible: c.visible !== false, size: Number(c.size) || def };
       }
+      // Web del sistema en el pie: OCULTA por defecto (white-label).
+      fc.marcaWeb = {
+        visible: rawFormatoCfg.marcaWeb?.visible === true,
+        size: Number(rawFormatoCfg.marcaWeb?.size) || 10,
+      };
       // QR de pago (Yape/Plin): OCULTO por defecto (igual que el frontend); solo se
       // muestra si se activó explícitamente en el formato de la cotización.
       fc.qrPagos = {

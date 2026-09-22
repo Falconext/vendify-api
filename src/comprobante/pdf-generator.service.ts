@@ -41,6 +41,9 @@ export function buildFiscalFormatoFc(
     opGravadas: 12, opExoneradas: 12, opInafectas: 12, opGratuitas: 12,
     icbper: 12, subTotal: 12, descuentos: 12, igv: 12, montoTotal: 18,
     cuentas: 10, gracias: 10,
+    // Web del sistema en el pie: interruptor propio, para dejar "Sistema punto
+    // de venta / Desarrollado por …" sin la URL impresa.
+    marcaWeb: 10,
   };
   const raw = ((tipoDoc === '03'
     ? empresa?.boletaFormatoConfig
@@ -59,6 +62,12 @@ export function buildFiscalFormatoFc(
       size: (propioA5 > 0 ? propioA5 : Number(c.size)) || def,
     };
   }
+  // Web del sistema en el pie: OCULTA por defecto (en white-label imprimir la
+  // web del proveedor delata al fabricante). Se enciende en Configurar formato.
+  fc.marcaWeb = {
+    visible: raw.marcaWeb?.visible === true,
+    size: Number(raw.marcaWeb?.size) || 10,
+  };
   // QR de pago (Yape/Plin): oculto por defecto, igual que el frontend.
   fc.qrPagos = {
     visible: raw.qrPagos?.visible === true,

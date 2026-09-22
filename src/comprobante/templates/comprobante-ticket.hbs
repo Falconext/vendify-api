@@ -71,7 +71,7 @@
   {{!-- Tamaños por elemento (tpx): los del formato configurable escalados al térmico, igual que la impresión web --}}
   {{#if (vis fc 'razonSocial')}}<p class="center bold" style="font-size:{{tpx tpx 'razonSocial'}}px">{{razonSocial}}</p>{{/if}}
   <p class="center">
-    {{#if (vis fc 'nombreComercial')}}{{#if nombreComercial}}<span style="font-size:{{tpx tpx 'nombreComercial'}}px">NOMBRE COMERCIAL: {{nombreComercial}}<br></span>{{/if}}{{/if}}
+    {{#if (vis fc 'nombreComercial')}}{{#if nombreComercial}}<span style="font-size:{{tpx tpx 'nombreComercial'}}px">{{nombreComercial}}<br></span>{{/if}}{{/if}}
     {{#if (vis fc 'direccion')}}<span style="font-size:{{tpx tpx 'direccion'}}px">DIRECCION: {{direccion}}<br></span>{{/if}}
     {{#if (vis fc 'direccion')}}{{#if sedeNombre}}<span style="font-size:{{tpx tpx 'direccion'}}px">SEDE: {{sedeNombre}}<br></span>{{/if}}{{/if}}
     {{#if (vis fc 'direccion')}}{{#if sedeDireccion}}<span style="font-size:{{tpx tpx 'direccion'}}px">DIRECCION SEDE: {{sedeDireccion}}<br></span>{{/if}}{{/if}}
@@ -181,7 +181,7 @@
   <div class="pie">
     <p>Sistema punto de venta - {{sistemaNombre}}.</p>
     <p>Desarrollado por {{sistemaNombre}}.</p>
-    <p>{{sistemaWeb}}.</p>
+    {{#if (vis fc 'marcaWeb')}}<p>{{sistemaWeb}}.</p>{{/if}}
   </div>
   {{/unless}}
 
