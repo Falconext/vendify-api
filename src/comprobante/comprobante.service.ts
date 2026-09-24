@@ -3553,6 +3553,9 @@ export class ComprobanteService {
     );
 
     let conciliado = false;
+    // Estado en que queda el comprobante tras la verificación, para que la UI
+    // repinte la fila y ofrezca las acciones que ese estado sí permite.
+    let estadoResultante = String(comp.estadoEnvioSunat);
     if (result.estado === 'ACEPTADO' && conciliable) {
       await this.prisma.comprobante.update({
         where: { id: comp.id },
@@ -3564,11 +3567,37 @@ export class ComprobanteService {
         },
       });
       conciliado = true;
+      estadoResultante = 'EMITIDO';
       // El comprobante pasa a aceptado por esta vía, no por un CDR: hay que
       // disparar a mano los efectos que `execute()` aplica al recibir el CDR.
       // Para una nota de crédito de anulación, esto es lo que efectivamente
       // anula el documento afectado.
       await this.enviarSunatService.aplicarEfectosDeAceptacion(comp.id);
+    } else if (
+      result.estado === 'NO_EXISTE' &&
+      String(comp.estadoEnvioSunat) === 'PENDIENTE'
+    ) {
+      // SUNAT no tiene el comprobante: el envío nunca llegó. Dejarlo "En
+      // procesamiento" no solo es falso, además lo deja sin ninguna acción
+      // posible — reemitir exige RECHAZADO o FALLIDO_ENVIO. FALLIDO_ENVIO es
+      // lo que de verdad pasó, y habilita tanto el reintento automático del
+      // Job 2 como el botón "Reemitir a SUNAT".
+      //
+      // Solo desde PENDIENTE: un PENDIENTE_CONCILIACION nace de un 1033 de la
+      // propia SUNAT ("ya registrado"), evidencia más específica que un
+      // NO_EXISTE que puede venir de un monto o una fecha que no casan.
+      await this.prisma.comprobante.update({
+        where: { id: comp.id },
+        data: {
+          estadoEnvioSunat: 'FALLIDO_ENVIO' as any,
+          // Elegible de inmediato para el Job 2 (filtra por sunatNextRetryAt <= now).
+          sunatNextRetryAt: new Date(),
+          sunatErrorMsg:
+            'Verificado en SUNAT (Consulta de Validez): el comprobante NO figura como registrado. ' +
+            'El envío nunca llegó a SUNAT; se reintentará automáticamente y puede reemitirse a mano.',
+        },
+      });
+      estadoResultante = 'FALLIDO_ENVIO';
     } else if (result.estado === 'ANULADO' && conciliable) {
       // SUNAT lo tiene dado de baja. Dejarlo en PENDIENTE haría que el scheduler
       // lo reenviara indefinidamente contra un número que ya no existe.
@@ -3581,12 +3610,14 @@ export class ComprobanteService {
             'Verificado en SUNAT (Consulta de Validez): comprobante ANULADO / dado de baja.',
         },
       });
+      estadoResultante = 'ANULADO';
     }
 
     return {
       estado: result.estado, // ACEPTADO | NO_EXISTE | ANULADO | DESCONOCIDO
       estadoCp: result.estadoCp,
       conciliado, // true si se marcó EMITIDO en este llamado
+      estadoEnvioSunat: estadoResultante,
       serie: comp.serie,
       correlativo: comp.correlativo,
       observaciones: result.observaciones,
