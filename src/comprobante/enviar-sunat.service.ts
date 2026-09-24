@@ -354,6 +354,36 @@ export class EnviarSunatService {
   }
 
   /**
+   * Aplica los efectos de una ACEPTACIÓN que se confirmó FUERA del flujo de
+   * envío — hoy, cuando la Consulta de Validez de SUNAT revela que un
+   * comprobante que figuraba "En procesamiento" ya estaba aceptado y su CDR
+   * simplemente nunca llegó. Reproduce lo mismo que hace `execute()` al recibir
+   * un CDR conforme: comisión del vendedor y, si es nota de crédito/débito, el
+   * efecto sobre el comprobante afectado (la anulación de la boleta/factura).
+   *
+   * Sin esto, una nota de crédito conciliada por consulta quedaba EMITIDA pero
+   * nunca llegaba a anular su documento afectado.
+   *
+   * Idempotente (ambos efectos ya lo son) y silencioso: nunca lanza, para no
+   * tumbar al scheduler ni al endpoint manual que lo invocan.
+   */
+  async aplicarEfectosDeAceptacion(comprobanteId: number): Promise<void> {
+    try {
+      const comp = await this.prisma.comprobante.findUnique({
+        where: { id: comprobanteId },
+        include: { detalles: true, motivo: true },
+      });
+      if (!comp) return;
+      await this.registrarComisionesAlAceptar(comp);
+      await this.procesarEfectoEnComprobanteAfectado(comp, 'ACEPTADO');
+    } catch (err: any) {
+      this.logger.warn(
+        `[aplicarEfectosDeAceptacion] comprobante ${comprobanteId}: ${err?.message}`,
+      );
+    }
+  }
+
+  /**
    * Revierte las comisiones de un comprobante anulado (por nota de crédito de
    * anulación/devolución total). Elimina las comisiones PENDIENTES. Si alguna ya
    * fue liquidada (PAGADO), la conserva y avisa para revisión contable manual.

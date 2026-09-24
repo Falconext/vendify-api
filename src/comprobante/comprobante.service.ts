@@ -1,5 +1,8 @@
 import { num, round3 } from '../common/utils/stock';
-import { SunatValidezClient } from '../common/utils/sunat-validez.client';
+import {
+  SunatValidezClient,
+  SunatValidezResult,
+} from '../common/utils/sunat-validez.client';
 import { resolverCuentaVinculada } from '../common/utils/cuenta-vinculada.util';
 import { DEMO_MAX_COMPROBANTES } from '../common/demo-limits';
 import {
@@ -557,6 +560,62 @@ export class ComprobanteService {
         }
       };
 
+      // Anulaciones aún no confirmadas por SUNAT.
+      //
+      // Una factura/boleta se marca ANULADO en cuanto se emite su nota de crédito
+      // de anulación (motivo 01/06), sin esperar el CDR: así deja de contar en
+      // caja, reportes y cobranzas de inmediato. Pero mientras esa nota no sea
+      // aceptada, la anulación NO existe ante SUNAT — y la pantalla mostraba
+      // "Anulado" a secas, que es afirmar algo que todavía no es cierto.
+      // Este flag deja que la UI lo diga con precisión ("Anulación en trámite").
+      const anulacionEnTramite = new Set<number>();
+      try {
+        const anulados = (rawItems as any[]).filter(
+          (it) =>
+            String(it.estadoEnvioSunat) === 'ANULADO' &&
+            ['01', '03'].includes(it.tipoDoc),
+        );
+        if (anulados.length > 0) {
+          // `numDocAfectado` se guarda tal cual lo manda el emisor, con el
+          // correlativo con o sin ceros a la izquierda: se buscan ambas formas.
+          const refs = new Map<string, number>();
+          for (const it of anulados) {
+            for (const corr of [
+              String(it.correlativo),
+              String(it.correlativo).padStart(8, '0'),
+            ]) {
+              refs.set(`${it.serie}-${corr}`.toUpperCase(), it.id);
+            }
+          }
+          const notasSinAceptar = await this.prisma.comprobante.findMany({
+            where: {
+              empresaId,
+              tipoDoc: '07',
+              numDocAfectado: { in: [...refs.keys()] },
+              estadoEnvioSunat: {
+                in: [
+                  EstadoSunat.PENDIENTE,
+                  EstadoSunat.FALLIDO_ENVIO,
+                  EstadoSunat.RECHAZADO,
+                  EstadoSunat.PENDIENTE_CONCILIACION,
+                ],
+              },
+              motivo: { codigo: { in: ['01', '06'] } },
+            },
+            select: { numDocAfectado: true },
+          });
+          for (const nota of notasSinAceptar) {
+            const id = refs.get(String(nota.numDocAfectado).toUpperCase());
+            if (id != null) anulacionEnTramite.add(id);
+          }
+        }
+      } catch (e: any) {
+        // Es solo un matiz de presentación: si falla, la lista sigue igual que antes.
+        this.logger.warn(
+          `No se pudo calcular anulaciones en trámite: ${e?.message}`,
+        );
+      }
+
       // Mapear etiqueta de comprobante (estadoPago/saldo ya vienen de DB si existen)
       const mapped = await Promise.all(
         rawItems.map(async (it) => {
@@ -582,7 +641,12 @@ export class ComprobanteService {
               };
             }),
           );
-          return { ...it, detalles, comprobante } as any;
+          return {
+            ...it,
+            detalles,
+            comprobante,
+            anulacionEnTramite: anulacionEnTramite.has(it.id),
+          } as any;
         }),
       );
 
@@ -3372,15 +3436,26 @@ export class ComprobanteService {
    * así que se concilia dejando constancia. No toca stock ni reenvía a SUNAT.
    */
   /**
-   * Verifica en SUNAT (API "Consulta de Validez de CPE") si un comprobante fue
-   * ACEPTADO. Si lo está y estaba en PENDIENTE_CONCILIACION/PENDIENTE/FALLIDO_ENVIO,
-   * lo marca EMITIDO dejando constancia. No reenvía nada a SUNAT ni toca stock.
-   * Requiere que la empresa tenga cargadas las credenciales de API SUNAT
-   * (sunatClientId / sunatClientSecret) generadas en el portal SOL.
+   * Núcleo compartido de la Consulta de Validez. Nunca lanza: devuelve el
+   * resultado de SUNAT, o `motivo` explicando por qué no se pudo consultar
+   * (comprobante inexistente, tipo no soportado, faltan credenciales de API
+   * SUNAT, o la llamada falló).
+   *
+   * Dos consumidores con necesidades opuestas: el endpoint manual convierte
+   * `motivo` en un error explicativo para el usuario, y el scheduler solo
+   * necesita saber si obtuvo respuesta para no reenviar a ciegas — un fallo de
+   * consulta jamás debe tumbar el job.
    */
-  async verificarValidezSunat(id: number, empresaId: number) {
+  async consultarValidezSunat(
+    id: number,
+    empresaId?: number,
+  ): Promise<{
+    comp: any | null;
+    result: SunatValidezResult | null;
+    motivo: string | null;
+  }> {
     const comp = await this.prisma.comprobante.findFirst({
-      where: { id, empresaId },
+      where: { id, ...(empresaId != null ? { empresaId } : {}) },
       select: {
         id: true,
         tipoDoc: true,
@@ -3398,19 +3473,27 @@ export class ComprobanteService {
         },
       },
     });
-    if (!comp) throw new NotFoundException('Comprobante no encontrado');
+    if (!comp) {
+      return { comp: null, result: null, motivo: 'Comprobante no encontrado' };
+    }
     if (!['01', '03', '07', '08'].includes(comp.tipoDoc)) {
-      throw new BadRequestException(
-        'Solo se puede verificar en SUNAT Facturas, Boletas y Notas (01/03/07/08).',
-      );
+      return {
+        comp,
+        result: null,
+        motivo:
+          'Solo se puede verificar en SUNAT Facturas, Boletas y Notas (01/03/07/08).',
+      };
     }
     const clientId = comp.empresa?.sunatClientId?.trim();
     const clientSecret = comp.empresa?.sunatClientSecret?.trim();
     if (!clientId || !clientSecret) {
-      throw new BadRequestException(
-        'Faltan las credenciales de API SUNAT (Consulta de Validez). Configúralas en ' +
+      return {
+        comp,
+        result: null,
+        motivo:
+          'Faltan las credenciales de API SUNAT (Consulta de Validez). Configúralas en ' +
           'Empresa → Facturación (client_id / client_secret generados en tu portal SOL).',
-      );
+      };
     }
 
     // Fecha de emisión en dd/mm/aaaa (formato que exige SUNAT).
@@ -3421,9 +3504,8 @@ export class ComprobanteService {
     const fechaEmision = `${dd}/${mm}/${yyyy}`;
 
     const client = new SunatValidezClient();
-    let result;
     try {
-      result = await client.verificar({
+      const result = await client.verificar({
         clientId,
         clientSecret,
         rucEmisor: comp.empresa!.ruc,
@@ -3433,31 +3515,72 @@ export class ComprobanteService {
         fechaEmision,
         monto: Number(comp.mtoImpVenta ?? 0).toFixed(2),
       });
+      return { comp, result, motivo: null };
     } catch (e: any) {
-      throw new BadRequestException(
-        `No se pudo consultar SUNAT: ${e?.message || 'error desconocido'}`,
-      );
+      return {
+        comp,
+        result: null,
+        motivo: `No se pudo consultar SUNAT: ${e?.message || 'error desconocido'}`,
+      };
     }
+  }
+
+  /**
+   * Verifica en SUNAT (API "Consulta de Validez de CPE") si un comprobante fue
+   * ACEPTADO. Si lo está y estaba en PENDIENTE_CONCILIACION/PENDIENTE/FALLIDO_ENVIO,
+   * lo marca EMITIDO dejando constancia. No reenvía nada a SUNAT ni toca stock.
+   * Requiere que la empresa tenga cargadas las credenciales de API SUNAT
+   * (sunatClientId / sunatClientSecret) generadas en el portal SOL.
+   */
+  async verificarValidezSunat(id: number, empresaId: number) {
+    const { comp, result, motivo } = await this.consultarValidezSunat(
+      id,
+      empresaId,
+    );
+    if (!comp) throw new NotFoundException('Comprobante no encontrado');
+    if (!result) throw new BadRequestException(motivo!);
+
+    // Estados de los que SÍ se puede salir con lo que diga SUNAT. Un comprobante
+    // ya EMITIDO o ANULADO no se toca: su estado es más específico que el que
+    // devuelve la consulta.
+    const estadosConciliables = [
+      'PENDIENTE_CONCILIACION',
+      'PENDIENTE',
+      'FALLIDO_ENVIO',
+    ];
+    const conciliable = estadosConciliables.includes(
+      String(comp.estadoEnvioSunat),
+    );
 
     let conciliado = false;
-    if (result.estado === 'ACEPTADO') {
-      const estadosConciliables = [
-        'PENDIENTE_CONCILIACION',
-        'PENDIENTE',
-        'FALLIDO_ENVIO',
-      ];
-      if (estadosConciliables.includes(String(comp.estadoEnvioSunat))) {
-        await this.prisma.comprobante.update({
-          where: { id: comp.id },
-          data: {
-            estadoEnvioSunat: 'EMITIDO' as any,
-            sunatNextRetryAt: null,
-            sunatErrorMsg:
-              'Verificado en SUNAT (Consulta de Validez): comprobante ACEPTADO.',
-          },
-        });
-        conciliado = true;
-      }
+    if (result.estado === 'ACEPTADO' && conciliable) {
+      await this.prisma.comprobante.update({
+        where: { id: comp.id },
+        data: {
+          estadoEnvioSunat: 'EMITIDO' as any,
+          sunatNextRetryAt: null,
+          sunatErrorMsg:
+            'Verificado en SUNAT (Consulta de Validez): comprobante ACEPTADO.',
+        },
+      });
+      conciliado = true;
+      // El comprobante pasa a aceptado por esta vía, no por un CDR: hay que
+      // disparar a mano los efectos que `execute()` aplica al recibir el CDR.
+      // Para una nota de crédito de anulación, esto es lo que efectivamente
+      // anula el documento afectado.
+      await this.enviarSunatService.aplicarEfectosDeAceptacion(comp.id);
+    } else if (result.estado === 'ANULADO' && conciliable) {
+      // SUNAT lo tiene dado de baja. Dejarlo en PENDIENTE haría que el scheduler
+      // lo reenviara indefinidamente contra un número que ya no existe.
+      await this.prisma.comprobante.update({
+        where: { id: comp.id },
+        data: {
+          estadoEnvioSunat: 'ANULADO' as any,
+          sunatNextRetryAt: null,
+          sunatErrorMsg:
+            'Verificado en SUNAT (Consulta de Validez): comprobante ANULADO / dado de baja.',
+        },
+      });
     }
 
     return {
