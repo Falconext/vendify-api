@@ -3243,6 +3243,39 @@ export class EnviarSunatService {
     return value.trim() || null;
   }
 
+  /**
+   * Busca un código de RECHAZO de SUNAT (rango 2000-3999 del Anexo VIII) dentro
+   * de una respuesta que el proveedor no marcó como error.
+   *
+   * QPSE devuelve algunos rechazos de SUNAT etiquetados como "INFO" y fuera de
+   * `errors`, p. ej.:
+   *   "ticket: 202622014468870 error: INFO : 2116 (nodo: ...)"
+   * Sin esto caían en el fallback PENDIENTE y el comprobante se reenviaba
+   * indefinidamente contra un rechazo que jamás se va a resolver solo.
+   *
+   * Se buscan solo códigos 2xxx/3xxx: los 4xxx son observaciones (el documento
+   * SÍ quedó aceptado) y los 1xxx incluyen el 1033 "ya registrado", que tiene su
+   * propio camino hacia PENDIENTE_CONCILIACION. Y se exige que el número venga
+   * precedido de "error"/"código" para no confundirlo con un importe.
+   */
+  private extraerCodigoRechazoSunat(response: any): string | null {
+    if (!response) return null;
+    let texto: string;
+    try {
+      texto = typeof response === 'string' ? response : JSON.stringify(response);
+    } catch {
+      return null;
+    }
+    const match = texto.match(
+      /(?:error|c[oó]d(?:igo)?)(\D{0,24}?)\b([23]\d{3})\b(?![.,]\d)/i,
+    );
+    if (!match) return null;
+    // "Error al enviar, total 2500 soles" no es el código 2500: si entre la
+    // palabra y el número hay algo que habla de dinero, es un importe.
+    if (/monto|total|importe|soles|s\//i.test(match[1])) return null;
+    return match[2];
+  }
+
   private normalizeQpseStatus(
     response: QpseSendResponse | null | undefined,
   ): 'ACEPTADO' | 'PENDIENTE' | 'RECHAZADO' {
@@ -3299,6 +3332,16 @@ export class EnviarSunatService {
       code === '98'
     ) {
       return 'PENDIENTE';
+    }
+
+    // Rechazo de SUNAT escondido en una respuesta que el proveedor no marcó como
+    // error. Es definitivo: reintentar solo repite el mismo rechazo.
+    const codigoRechazo = this.extraerCodigoRechazoSunat(response);
+    if (codigoRechazo) {
+      console.error(
+        `[normalizeQpseStatus] Rechazo de SUNAT ${codigoRechazo} detectado en una respuesta sin marca de error → RECHAZADO`,
+      );
+      return 'RECHAZADO';
     }
 
     // Respuesta ambigua/incompleta (p. ej. SUNAT lenta): NO es un rechazo definitivo.
