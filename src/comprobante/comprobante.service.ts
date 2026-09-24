@@ -569,6 +569,9 @@ export class ComprobanteService {
       // "Anulado" a secas, que es afirmar algo que todavía no es cierto.
       // Este flag deja que la UI lo diga con precisión ("Anulación en trámite").
       const anulacionEnTramite = new Set<number>();
+      // Distingue "SUNAT todavía no responde" de "el envío falló y nadie lo está
+      // procesando": la primera se resuelve sola, la segunda necesita a alguien.
+      const anulacionNoConfirmada = new Set<number>();
       try {
         const anulados = (rawItems as any[]).filter(
           (it) =>
@@ -602,11 +605,21 @@ export class ComprobanteService {
               },
               motivo: { codigo: { in: ['01', '06'] } },
             },
-            select: { numDocAfectado: true },
+            select: { numDocAfectado: true, estadoEnvioSunat: true },
           });
           for (const nota of notasSinAceptar) {
             const id = refs.get(String(nota.numDocAfectado).toUpperCase());
-            if (id != null) anulacionEnTramite.add(id);
+            if (id == null) continue;
+            anulacionEnTramite.add(id);
+            // RECHAZADO / FALLIDO_ENVIO: la nota ni siquiera está en manos de
+            // SUNAT. Llamar a eso "en trámite" sugiere que algo avanza cuando en
+            // realidad está detenido esperando que alguien intervenga.
+            if (
+              nota.estadoEnvioSunat === EstadoSunat.RECHAZADO ||
+              nota.estadoEnvioSunat === EstadoSunat.FALLIDO_ENVIO
+            ) {
+              anulacionNoConfirmada.add(id);
+            }
           }
         }
       } catch (e: any) {
@@ -646,6 +659,11 @@ export class ComprobanteService {
             detalles,
             comprobante,
             anulacionEnTramite: anulacionEnTramite.has(it.id),
+            anulacionEstado: anulacionNoConfirmada.has(it.id)
+              ? 'NO_CONFIRMADA'
+              : anulacionEnTramite.has(it.id)
+                ? 'EN_TRAMITE'
+                : null,
           } as any;
         }),
       );
