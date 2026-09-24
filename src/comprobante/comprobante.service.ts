@@ -3825,6 +3825,13 @@ export class ComprobanteService {
       );
     }
 
+    // 0) Si es una nota de crédito de anulación, devolver a la vida el documento
+    //    que anuló. Se marcó ANULADO al crear la nota, sin esperar a SUNAT; si
+    //    la nota se descarta, esa anulación nunca llegó a existir y dejar la
+    //    boleta anulada crearía una discrepancia silenciosa con SUNAT que ya
+    //    nada señalaría (el aviso depende de que la nota exista).
+    const afectadoRevivido = await this.revertirAnulacionPorNotaDescartada(comp);
+
     // 1) Revertir stock primero (antes de borrar los detalles).
     //    Si el comprobante ya estaba ANULADO, el stock ya se revirtió al anular
     //    — no revertir de nuevo para no duplicar el inventario.
@@ -3868,9 +3875,90 @@ export class ComprobanteService {
     });
 
     return {
-      message: 'Comprobante eliminado y stock revertido',
+      message: afectadoRevivido
+        ? `Comprobante eliminado y stock revertido. ${afectadoRevivido} vuelve a estar vigente y quedó como PENDIENTE DE PAGO: sus pagos se borraron al emitir la nota y hay que volver a registrarlos.`
+        : 'Comprobante eliminado y stock revertido',
       eliminado: true,
+      afectadoRevivido: afectadoRevivido ?? null,
     };
+  }
+
+  /**
+   * Devuelve a EMITIDO el documento que una nota de crédito de anulación
+   * (motivo 01/06) había marcado ANULADO, cuando esa nota se descarta.
+   *
+   * La anulación se escribe en el momento de crear la nota, sin esperar el CDR,
+   * para que la venta salga de caja y reportes de inmediato. Si la nota termina
+   * descartada, esa anulación nunca existió ante SUNAT y el documento sigue
+   * vigente: dejarlo ANULADO deja los libros y SUNAT diciendo cosas distintas.
+   *
+   * Devuelve "SERIE-CORRELATIVO" del documento revivido, o null si no aplica.
+   */
+  private async revertirAnulacionPorNotaDescartada(
+    nota: any,
+  ): Promise<string | null> {
+    try {
+      if (nota?.tipoDoc !== '07' || !nota?.numDocAfectado || !nota?.motivoId) {
+        return null;
+      }
+      const motivo = await this.prisma.motivoNota.findUnique({
+        where: { id: nota.motivoId },
+        select: { codigo: true },
+      });
+      // Solo 01 y 06 anulan el documento; el resto (descuentos, correcciones,
+      // devoluciones parciales) nunca lo tocó, así que no hay nada que revertir.
+      if (!motivo || !['01', '06'].includes(motivo.codigo)) return null;
+
+      const [serie, corr] = String(nota.numDocAfectado).split('-');
+      if (!serie || !corr) return null;
+      const correlativo = Number(corr);
+      if (Number.isNaN(correlativo)) return null;
+
+      const afectado = await this.prisma.comprobante.findFirst({
+        where: {
+          empresaId: nota.empresaId,
+          tipoDoc: { in: ['01', '03'] },
+          serie,
+          correlativo,
+          estadoEnvioSunat: EstadoSunat.ANULADO,
+        },
+        select: { id: true, serie: true, correlativo: true, mtoImpVenta: true },
+      });
+      if (!afectado) return null;
+
+      await this.prisma.comprobante.update({
+        where: { id: afectado.id },
+        data: {
+          estadoEnvioSunat: EstadoSunat.EMITIDO,
+          // Los pagos se borraron al crear la nota y no se pueden reconstruir.
+          // Vuelve como pendiente de cobro —visible en cuentas por cobrar— en
+          // vez de quedar en cero, que lo escondería de quien debe conciliarlo.
+          estadoPago: 'PENDIENTE_PAGO' as any,
+          saldo: afectado.mtoImpVenta,
+        },
+      });
+
+      // La comisión del vendedor nunca se revirtió (eso solo ocurre cuando la
+      // nota es ACEPTADA), pero se reintenta por si el documento quedó sin ella.
+      // Es idempotente: no duplica si ya existe.
+      const conDetalles = await this.prisma.comprobante.findUnique({
+        where: { id: afectado.id },
+        include: { detalles: true },
+      });
+      if (conDetalles) {
+        await this.enviarSunatService.registrarComisionesAlAceptar(conDetalles);
+      }
+
+      this.logger.log(
+        `[descartarComprobante] ${afectado.serie}-${afectado.correlativo} vuelve a EMITIDO: su nota de anulación fue descartada`,
+      );
+      return `${afectado.serie}-${String(afectado.correlativo).padStart(8, '0')}`;
+    } catch (err: any) {
+      this.logger.error(
+        `[revertirAnulacionPorNotaDescartada] ${err?.message}`,
+      );
+      return null;
+    }
   }
 
   async crearNotaCredito(
