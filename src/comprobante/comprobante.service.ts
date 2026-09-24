@@ -3464,6 +3464,7 @@ export class ComprobanteService {
         fechaEmision: true,
         mtoImpVenta: true,
         estadoEnvioSunat: true,
+        sunatErrorMsg: true,
         empresa: {
           select: {
             ruc: true,
@@ -3586,6 +3587,16 @@ export class ComprobanteService {
       // Solo desde PENDIENTE: un PENDIENTE_CONCILIACION nace de un 1033 de la
       // propia SUNAT ("ya registrado"), evidencia más específica que un
       // NO_EXISTE que puede venir de un monto o una fecha que no casan.
+      // La causa original del envío fallido es justo lo que hace falta para
+      // decidir si reemitir sirve de algo (un [CONFIG] no se arregla
+      // reintentando), así que se conserva en vez de pisarla con el veredicto.
+      // No se reencadena si ya se verificó antes, para que el mensaje no crezca
+      // sin fin al verificar varias veces.
+      const causaPrevia = String(comp.sunatErrorMsg || '').trim();
+      const yaVerificado = causaPrevia.startsWith('Verificado en SUNAT');
+      const veredicto =
+        'Verificado en SUNAT (Consulta de Validez): el comprobante NO figura como registrado. ' +
+        'El envío nunca llegó a SUNAT; se reintentará automáticamente y puede reemitirse a mano.';
       await this.prisma.comprobante.update({
         where: { id: comp.id },
         data: {
@@ -3593,8 +3604,9 @@ export class ComprobanteService {
           // Elegible de inmediato para el Job 2 (filtra por sunatNextRetryAt <= now).
           sunatNextRetryAt: new Date(),
           sunatErrorMsg:
-            'Verificado en SUNAT (Consulta de Validez): el comprobante NO figura como registrado. ' +
-            'El envío nunca llegó a SUNAT; se reintentará automáticamente y puede reemitirse a mano.',
+            causaPrevia && !yaVerificado
+              ? `${veredicto} Último error del envío: ${causaPrevia}`
+              : causaPrevia || veredicto,
         },
       });
       estadoResultante = 'FALLIDO_ENVIO';
