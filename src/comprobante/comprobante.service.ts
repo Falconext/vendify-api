@@ -3832,6 +3832,15 @@ export class ComprobanteService {
     //    nada señalaría (el aviso depende de que la nota exista).
     const afectadoRevivido = await this.revertirAnulacionPorNotaDescartada(comp);
 
+    // 0b) Deshacer la devolución de stock que hizo la nota de crédito.
+    //     Al crearla se registró un INGRESO por cada ítem (la mercadería
+    //     "volvió"); si la nota se descarta, esa devolución nunca ocurrió.
+    //     Borrar los movimientos —lo que hace el paso 2— NO revierte el stock:
+    //     `registrarMovimiento` ya escribió el saldo en ProductoStock. Sin esto
+    //     el inventario queda inflado y, al reemitir la nota corregida, el stock
+    //     se devolvería dos veces.
+    await this.deshacerDevolucionDeStockDeNota(comp);
+
     // 1) Revertir stock primero (antes de borrar los detalles).
     //    Si el comprobante ya estaba ANULADO, el stock ya se revirtió al anular
     //    — no revertir de nuevo para no duplicar el inventario.
@@ -3881,6 +3890,64 @@ export class ComprobanteService {
       eliminado: true,
       afectadoRevivido: afectadoRevivido ?? null,
     };
+  }
+
+  /**
+   * Compensa con SALIDAs los INGRESOs de stock que registró una nota de crédito,
+   * cuando esa nota se descarta.
+   *
+   * Aplica a cualquier motivo que haya movido inventario (01 anulación, 06
+   * devolución total, 07 devolución por ítem). Los movimientos originales se
+   * borran junto con el comprobante, pero el saldo que dejaron en ProductoStock
+   * no se deshace solo: hay que moverlo en sentido contrario antes.
+   *
+   * Limitación conocida: la compensación es a nivel de producto y sede. Si el
+   * ingreso original se imputó a lotes concretos, el saldo por lote puede
+   * requerir un ajuste manual.
+   */
+  private async deshacerDevolucionDeStockDeNota(nota: any): Promise<void> {
+    try {
+      if (nota?.tipoDoc !== '07') return;
+      const ingresos = await this.prisma.movimientoKardex.findMany({
+        where: {
+          comprobanteId: nota.id,
+          empresaId: nota.empresaId,
+          tipoMovimiento: 'INGRESO',
+        },
+        select: {
+          productoId: true,
+          cantidad: true,
+          sedeId: true,
+          costoUnitario: true,
+        },
+      });
+      if (ingresos.length === 0) return;
+
+      for (const mov of ingresos) {
+        if (mov.sedeId == null) continue;
+        const cantidad = Number(mov.cantidad);
+        if (!(cantidad > 0)) continue;
+        await this.kardexService.registrarMovimiento({
+          productoId: mov.productoId,
+          empresaId: nota.empresaId,
+          tipoMovimiento: 'SALIDA',
+          concepto: `Descarte de nota de crédito ${nota.serie}-${nota.correlativo}: se deshace la devolución de stock`,
+          cantidad,
+          comprobanteId: nota.id,
+          costoUnitario: Number(mov.costoUnitario) || undefined,
+          sedeId: mov.sedeId,
+        });
+      }
+      this.logger.log(
+        `[descartarComprobante] Deshecha la devolución de stock de ${nota.serie}-${nota.correlativo} (${ingresos.length} ítems)`,
+      );
+    } catch (err: any) {
+      // No bloquear el descarte, pero dejar rastro: el inventario queda inflado
+      // y hay que corregirlo a mano.
+      this.logger.error(
+        `[deshacerDevolucionDeStockDeNota] nota ${nota?.id}: ${err?.message}. Revisa el stock manualmente.`,
+      );
+    }
   }
 
   /**
