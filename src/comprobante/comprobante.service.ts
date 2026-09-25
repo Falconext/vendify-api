@@ -4305,11 +4305,34 @@ export class ComprobanteService {
     }
 
     // 9) Serie y correlativo
+    //
+    // Va `tipDocAfectadoFinal`, el tipo YA corregido a partir de la serie del
+    // documento afectado — no el que mandó el formulario. Si el emisor elegía
+    // mal el tipo (p. ej. "Factura" sobre la boleta BOA1-16), la autocorrección
+    // arreglaba lo que se guarda en BD y el DocumentTypeCode del XML, pero la
+    // serie se seguía calculando con el valor equivocado: salía FCA1 (serie de
+    // nota sobre factura) con DocumentTypeCode 03 (boleta). SUNAT ve esa
+    // contradicción y rechaza con el error 2116 ("el tipo de documento
+    // modificado debe ser factura electrónica o ticket"), y la nota nunca anula
+    // nada. La serie y el tipo tienen que salir de la misma fuente.
     const { serie, correlativo } = await this.obtenerSerieYCorrelativo(
       '07',
-      tipDocAfectado,
+      tipDocAfectadoFinal,
       empresaId,
     );
+
+    // Red de seguridad: una nota sobre boleta va en serie B*, y sobre factura en
+    // F*. Si alguna vez vuelven a divergir, es preferible fallar acá —antes de
+    // consumir un correlativo y de marcar el documento como anulado— que emitir
+    // algo que SUNAT va a rechazar y dejar la anulación a medio camino.
+    const prefijoSerieEsperado = tipDocAfectadoFinal === '03' ? 'B' : 'F';
+    if (!serie.startsWith(prefijoSerieEsperado)) {
+      throw new BadRequestException(
+        `Inconsistencia al numerar la nota de crédito: el documento afectado ${numDocAfectado} ` +
+          `es de tipo ${tipDocAfectadoFinal}, que corresponde a una serie ${prefijoSerieEsperado}*, ` +
+          `pero se asignó la serie ${serie}. No se emitió nada.`,
+      );
+    }
 
     const fecha = new Date(fechaEmision);
 
