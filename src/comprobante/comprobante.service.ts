@@ -1837,9 +1837,10 @@ export class ComprobanteService {
         !prefijoRequerido ||
         String(configuredSerie?.serie || '').startsWith(prefijoRequerido);
 
-      const serieConfigAplicada = !!configuredSerie?.serie && serieConfigCoherente;
-      if (serieConfigAplicada) {
-        serie = configuredSerie!.serie;
+      const serieConfigAplicada =
+        !!configuredSerie?.serie && serieConfigCoherente;
+      if (serieConfigAplicada && configuredSerie) {
+        serie = configuredSerie.serie;
       } else if (configuredSerie?.serie) {
         console.warn(
           `[obtenerSerieYCorrelativo] Serie configurada ${configuredSerie.serie} ignorada: ` +
