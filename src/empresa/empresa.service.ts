@@ -1340,6 +1340,8 @@ export class EmpresaService {
         }
         updateData.criterioIgvVentas = criterio;
       }
+      if (dto.leyAmazonia !== undefined)
+        updateData.leyAmazonia = Boolean(dto.leyAmazonia);
       if (dto.requiereCajaParaEmitir !== undefined)
         updateData.requiereCajaParaEmitir = dto.requiereCajaParaEmitir;
       // Catálogo por sede (Perfil → Configuración → Sedes y catálogo).
