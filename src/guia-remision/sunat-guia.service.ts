@@ -1,6 +1,7 @@
 import { Injectable, Logger, HttpException } from '@nestjs/common';
 import { QpseClient, QpseSendResponse } from '../common/utils/qpse.client';
 import { buildUblXml } from '../common/utils/ubl-xml';
+import { DOC_RELACIONADO_LABEL } from './dto/create-guia-remision.dto';
 import axios from 'axios';
 
 @Injectable()
@@ -320,6 +321,11 @@ export class SunatGuiaService {
 
     return {
       ...this.buildDocumentHeader(guia, '09'),
+      // Va aquí a propósito: el esquema espera AdditionalDocumentReference
+      // después de la cabecera y antes de DespatchSupplierParty.
+      ...(this.buildAdditionalDocumentReference(guia)
+        ? { 'cac:AdditionalDocumentReference': this.buildAdditionalDocumentReference(guia) }
+        : {}),
       'cac:DespatchSupplierParty': this.buildDespatchSupplierParty(guia),
       'cac:DeliveryCustomerParty': deliveryCustomerParty,
       ...(isCompra
@@ -432,6 +438,11 @@ export class SunatGuiaService {
 
     return {
       ...this.buildDocumentHeader(guia, '31'),
+      // Va aquí a propósito: el esquema espera AdditionalDocumentReference
+      // después de la cabecera y antes de DespatchSupplierParty.
+      ...(this.buildAdditionalDocumentReference(guia)
+        ? { 'cac:AdditionalDocumentReference': this.buildAdditionalDocumentReference(guia) }
+        : {}),
       'cac:DespatchSupplierParty': this.buildDespatchSupplierParty(guia),
       'cac:DeliveryCustomerParty': this.buildPartyCac(
         '6',
@@ -510,7 +521,7 @@ export class SunatGuiaService {
 
     stage['cac:LoadingTransportEvent'] = {
       'cbc:OccurrenceDate': {
-        _text: this.formatDate(guia.fechaInicioTraslado),
+        _text: this.formatDate(guia.fechaEntregaBienes || guia.fechaInicioTraslado),
       },
     };
 
@@ -519,7 +530,7 @@ export class SunatGuiaService {
       !guia.vehiculoM1oL &&
       String(guia.conductorNumDoc || '').trim()
     ) {
-      stage['cac:DriverPerson'] = [this.buildDriverPerson(guia)];
+      stage['cac:DriverPerson'] = this.buildDriverPersons(guia);
     }
 
     return stage;
@@ -552,22 +563,69 @@ export class SunatGuiaService {
       },
       'cac:LoadingTransportEvent': {
         'cbc:OccurrenceDate': {
-          _text: this.formatDate(guia.fechaInicioTraslado),
+          _text: this.formatDate(guia.fechaEntregaBienes || guia.fechaInicioTraslado),
         },
       },
-      'cac:DriverPerson': [this.buildDriverPerson(guia)],
+      'cac:DriverPerson': this.buildDriverPersons(guia),
     };
   }
 
   // ─── TransportHandlingUnit builders ───────────────────────────────────────
 
+  /**
+   * Vehículos secundarios (cac:AttachedTransportEquipment) y autorización
+   * especial (cac:ShipmentDocumentReference). Se comparten entre GRE-R y GRE-T.
+   */
+  private buildVehiculosSecundarios(guia: any): any[] {
+    const secundarios = Array.isArray(guia.vehiculosSecundarios)
+      ? guia.vehiculosSecundarios
+      : [];
+    return secundarios
+      .filter((v: any) => v && String(v.placa || '').trim())
+      .map((v: any) => {
+        const tuce = String(v.tuce || '').trim();
+        return {
+          'cbc:ID': { _text: String(v.placa).trim().toUpperCase() },
+          ...(tuce
+            ? {
+                'cac:ApplicableTransportMeans': {
+                  'cbc:RegistrationNationalityID': { _text: tuce },
+                },
+              }
+            : {}),
+        };
+      });
+  }
+
+  private buildAutorizacionEspecial(guia: any): any | undefined {
+    const nro = String(guia.vehiculoNroAutorizacion || '').trim();
+    if (!nro) return undefined;
+    const emisor = String(guia.vehiculoEntidadEmisora || '').trim();
+    return {
+      'cbc:ID': {
+        _attributes: {
+          ...(emisor ? { schemeID: emisor } : {}),
+          schemeName: 'Entidad Autorizadora',
+          schemeAgencyName: 'PE:SUNAT',
+        },
+        _text: nro,
+      },
+    };
+  }
+
   private buildTransportHandlingUnitRemitente(guia: any): any {
     const placa = String(guia.vehiculoPlaca || '').trim();
     if (!placa) return undefined;
+    const secundarios = this.buildVehiculosSecundarios(guia);
+    const autorizacion = this.buildAutorizacionEspecial(guia);
     return {
       'cac:TransportEquipment': {
         'cbc:ID': { _text: placa },
         // ApplicableTransportMeans excluido — causa error SUNAT 3452 en GRE-R
+        ...(secundarios.length
+          ? { 'cac:AttachedTransportEquipment': secundarios }
+          : {}),
+        ...(autorizacion ? { 'cac:ShipmentDocumentReference': autorizacion } : {}),
       },
     };
   }
@@ -575,6 +633,8 @@ export class SunatGuiaService {
   private buildTransportHandlingUnitTransportista(guia: any): any {
     const placa = String(guia.vehiculoPlaca || '').trim();
     const tuc = String(guia.vehiculoAutorizacion || '').trim();
+    const secundarios = this.buildVehiculosSecundarios(guia);
+    const autorizacion = this.buildAutorizacionEspecial(guia);
     return {
       'cac:TransportEquipment': {
         ...(placa ? { 'cbc:ID': { _text: placa } } : {}),
@@ -585,6 +645,10 @@ export class SunatGuiaService {
               },
             }
           : {}),
+        ...(secundarios.length
+          ? { 'cac:AttachedTransportEquipment': secundarios }
+          : {}),
+        ...(autorizacion ? { 'cac:ShipmentDocumentReference': autorizacion } : {}),
       },
     };
   }
@@ -652,6 +716,42 @@ export class SunatGuiaService {
     return party;
   }
 
+  /**
+   * Conductores del traslado: el principal y los que la guía traiga además.
+   * SUNAT los distingue por cbc:JobTitle ("Principal" / "Secundario").
+   */
+  private buildDriverPersons(guia: any): any[] {
+    const lista: any[] = [];
+    if (String(guia.conductorNumDoc || '').trim()) {
+      lista.push(this.buildDriverPerson(guia));
+    }
+    const secundarios = Array.isArray(guia.conductoresSecundarios)
+      ? guia.conductoresSecundarios
+      : [];
+    for (const c of secundarios) {
+      // SUNAT exige documento y licencia: un conductor a medias tumba la guía.
+      if (!c || !String(c.numDoc || '').trim() || !String(c.licencia || '').trim())
+        continue;
+      lista.push({
+        'cbc:ID': {
+          _attributes: {
+            schemeID: this.getTipoDocumentoSchemeId(c.tipoDoc || '1'),
+          },
+          _text: String(c.numDoc).trim(),
+        },
+        'cbc:FirstName': { _text: String(c.nombres || '').trim() },
+        ...(String(c.apellidos || '').trim()
+          ? { 'cbc:FamilyName': { _text: String(c.apellidos).trim() } }
+          : {}),
+        'cbc:JobTitle': { _text: 'Secundario' },
+        'cac:IdentityDocumentReference': {
+          'cbc:ID': { _text: String(c.licencia).trim().toUpperCase() },
+        },
+      });
+    }
+    return lista;
+  }
+
   private buildDriverPerson(guia: any): any {
     const firstName = String(guia.conductorNombre || '').trim();
     const familyName = String(guia.conductorApellidos || '').trim();
@@ -684,6 +784,59 @@ export class SunatGuiaService {
     return si;
   }
 
+  /**
+   * Documentos relacionados al traslado (cac:AdditionalDocumentReference):
+   * la factura/boleta que origina el envío, la DAM, la constancia de detracción…
+   * El tipo va con el Catálogo 61 y el RUC del emisor con el Catálogo 06.
+   */
+  private buildAdditionalDocumentReference(guia: any): any[] | undefined {
+    const docs = Array.isArray(guia.documentosRelacionados)
+      ? guia.documentosRelacionados
+      : [];
+    const items = docs
+      .filter((d: any) => d && String(d.tipo || '').trim() && String(d.numero || '').trim())
+      .map((d: any) => {
+        const tipo = String(d.tipo).trim();
+        const emisor = String(d.emisorNumDoc || '').trim();
+        return {
+          'cbc:ID': { _text: String(d.numero).trim().toUpperCase() },
+          'cbc:DocumentTypeCode': {
+            _attributes: {
+              listAgencyName: 'PE:SUNAT',
+              listName: 'Documento relacionado al transporte',
+              listURI: 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo61',
+            },
+            _text: tipo,
+          },
+          // Descripción legible del tipo. En el esquema UBL va justo después del
+          // código y es lo que emiten las implementaciones de referencia; SUNAT
+          // la trata como texto libre.
+          'cbc:DocumentType': {
+            _text: DOC_RELACIONADO_LABEL[tipo] || 'Documento relacionado',
+          },
+          ...(emisor
+            ? {
+                'cac:IssuerParty': {
+                  'cac:PartyIdentification': {
+                    'cbc:ID': {
+                      _attributes: {
+                        schemeID: /^\d{11}$/.test(emisor) ? '6' : '1',
+                        schemeName: 'Documento de Identidad',
+                        schemeAgencyName: 'PE:SUNAT',
+                        schemeURI:
+                          'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06',
+                      },
+                      _text: emisor,
+                    },
+                  },
+                },
+              }
+            : {}),
+        };
+      });
+    return items.length > 0 ? items : undefined;
+  }
+
   private buildDespatchLines(guia: any): any[] {
     return guia.detalles.map((detalle: any, index: number) => ({
       'cbc:ID': { _text: index + 1 },
@@ -696,6 +849,29 @@ export class SunatGuiaService {
       },
       'cac:Item': {
         'cbc:Description': { _text: detalle.descripcion },
+        // Código del bien en el catálogo del emisor. Antes no viajaba: se
+        // guardaba en la guía pero no llegaba a SUNAT ni salía en su formato.
+        ...(String(detalle.codigoProducto || '').trim()
+          ? {
+              'cac:SellersItemIdentification': {
+                'cbc:ID': { _text: String(detalle.codigoProducto).trim() },
+              },
+            }
+          : {}),
+        ...(String(detalle.codigoProductoSunat || '').trim()
+          ? {
+              'cac:CommodityClassification': {
+                'cbc:ItemClassificationCode': {
+                  _attributes: {
+                    listID: 'UNSPSC',
+                    listAgencyName: 'GS1 US',
+                    listName: 'Item Classification',
+                  },
+                  _text: String(detalle.codigoProductoSunat).trim(),
+                },
+              },
+            }
+          : {}),
       },
     }));
   }

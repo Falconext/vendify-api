@@ -11,7 +11,45 @@ import {
   Min,
   IsDecimal,
   IsEnum,
+  IsIn,
 } from 'class-validator';
+
+/**
+ * Catálogo 61 de SUNAT — documento relacionado al transporte. Son los tipos que
+ * SUNAT acepta dentro de cac:AdditionalDocumentReference en una guía.
+ */
+export const TIPOS_DOC_RELACIONADO = [
+  '01', // Factura
+  '03', // Boleta de venta
+  '04', // Liquidación de compra
+  '09', // Guía de remisión remitente
+  '12', // Ticket de máquina registradora
+  '31', // Guía de remisión transportista
+  '48', // Comprobante de operaciones - Ley 29972
+  '49', // Constancia de depósito IVAP (Ley 28211)
+  '50', // Declaración Aduanera de Mercancías (DAM)
+  '52', // Declaración Simplificada (DS)
+  '80', // Constancia de depósito - Detracción
+  '81', // Código de autorización emitido por el SCOP
+  '82', // Declaración jurada de mudanza
+] as const;
+
+/** Etiqueta para imprimir en la representación de la guía. */
+export const DOC_RELACIONADO_LABEL: Record<string, string> = {
+  '01': 'Factura',
+  '03': 'Boleta de venta',
+  '04': 'Liquidación de compra',
+  '09': 'Guía de remisión remitente',
+  '12': 'Ticket de máquina registradora',
+  '31': 'Guía de remisión transportista',
+  '48': 'Comprobante de operaciones - Ley 29972',
+  '49': 'Constancia de depósito IVAP',
+  '50': 'Declaración Aduanera de Mercancías',
+  '52': 'Declaración Simplificada',
+  '80': 'Constancia de depósito - Detracción',
+  '81': 'Autorización SCOP',
+  '82': 'Declaración jurada de mudanza',
+};
 
 export enum TipoGuiaRemision {
   REMITENTE = 'REMITENTE',
@@ -38,6 +76,67 @@ export class CreateDetalleGuiaDto {
   @IsOptional()
   @IsString()
   unidadMedida?: string = 'NIU';
+
+  /** Código del producto en el catálogo de SUNAT (UNSPSC). */
+  @IsOptional()
+  @IsString()
+  codigoProductoSunat?: string;
+}
+
+/**
+ * Documento relacionado al traslado (Catálogo 61 de SUNAT): típicamente la
+ * factura o boleta que origina el envío, pero también DAM, declaración
+ * simplificada o constancia de detracción.
+ */
+export class DocumentoRelacionadoGuiaDto {
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(TIPOS_DOC_RELACIONADO)
+  tipo: string;
+
+  @IsString()
+  @IsNotEmpty()
+  numero: string;
+
+  /** RUC de quien emitió el documento. Se omite para DAM/DS, que no lo llevan. */
+  @IsOptional()
+  @IsString()
+  emisorNumDoc?: string;
+}
+
+/** Vehículo adicional al principal. */
+export class VehiculoSecundarioDto {
+  @IsString()
+  @IsNotEmpty()
+  placa: string;
+
+  /** TUCE / Certificado de Habilitación Vehicular. */
+  @IsOptional()
+  @IsString()
+  tuce?: string;
+}
+
+/** Conductor adicional al principal. */
+export class ConductorSecundarioDto {
+  @IsOptional()
+  @IsString()
+  tipoDoc?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  numDoc: string;
+
+  @IsOptional()
+  @IsString()
+  nombres?: string;
+
+  @IsOptional()
+  @IsString()
+  apellidos?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  licencia: string;
 }
 
 export class CreateGuiaRemisionDto {
@@ -172,6 +271,27 @@ export class CreateGuiaRemisionDto {
   @IsString()
   vehiculoAutorizacion?: string;
 
+  // Autorización especial del vehículo y quién la emitió (ej. MTC)
+  @IsOptional()
+  @IsString()
+  vehiculoNroAutorizacion?: string;
+
+  @IsOptional()
+  @IsString()
+  vehiculoEntidadEmisora?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => VehiculoSecundarioDto)
+  vehiculosSecundarios?: VehiculoSecundarioDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ConductorSecundarioDto)
+  conductoresSecundarios?: ConductorSecundarioDto[];
+
   // Punto de partida
   @IsString()
   @IsNotEmpty()
@@ -202,6 +322,11 @@ export class CreateGuiaRemisionDto {
   @IsDateString()
   fechaInicioTraslado: string;
 
+  /** Fecha de entrega de los bienes al transportista. */
+  @IsOptional()
+  @IsDateString()
+  fechaEntregaBienes?: string;
+
   // Flags opcionales
   @IsOptional()
   @IsBoolean()
@@ -226,6 +351,13 @@ export class CreateGuiaRemisionDto {
   @IsOptional()
   @IsBoolean()
   datosTransportista?: boolean = false;
+
+  // Documentos relacionados al traslado (Catálogo 61)
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DocumentoRelacionadoGuiaDto)
+  documentosRelacionados?: DocumentoRelacionadoGuiaDto[];
 
   // Observaciones
   @IsOptional()

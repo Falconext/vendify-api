@@ -6,8 +6,12 @@ import {
   HttpException,
   Logger,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateGuiaRemisionDto } from './dto/create-guia-remision.dto';
+import {
+  CreateGuiaRemisionDto,
+  DOC_RELACIONADO_LABEL,
+} from './dto/create-guia-remision.dto';
 import { UpdateGuiaRemisionDto } from './dto/update-guia-remision.dto';
 import { QueryGuiaRemisionDto } from './dto/query-guia-remision.dto';
 import { SunatGuiaService } from './sunat-guia.service';
@@ -73,7 +77,17 @@ export class GuiaRemisionService {
     this.validateGuiaRemision(createDto);
 
     // Extraer detalles para crear por separado
-    const { detalles, ...guiaData } = createDto;
+    const {
+      detalles,
+      documentosRelacionados,
+      vehiculosSecundarios,
+      conductoresSecundarios,
+      ...guiaData
+    } = createDto;
+    const docsRelacionados =
+      this.normalizarDocumentosRelacionados(documentosRelacionados);
+    const vehSecundarios = this.normalizarVehiculosSecundarios(vehiculosSecundarios);
+    const condSecundarios = this.normalizarConductoresSecundarios(conductoresSecundarios);
 
     // Asegurar que correlativo esté definido
     const correlativoFinal = createDto.correlativo;
@@ -92,10 +106,19 @@ export class GuiaRemisionService {
           fechaEmision: new Date(guiaData.fechaEmision),
           fechaInicioTraslado: new Date(guiaData.fechaInicioTraslado),
           horaEmision: guiaData.horaEmision || this.getCurrentTime(),
+          ...(docsRelacionados !== undefined
+            ? { documentosRelacionados: docsRelacionados }
+            : {}),
+          ...(vehSecundarios !== undefined ? { vehiculosSecundarios: vehSecundarios } : {}),
+          ...(condSecundarios !== undefined ? { conductoresSecundarios: condSecundarios } : {}),
+          ...(guiaData.fechaEntregaBienes
+            ? { fechaEntregaBienes: new Date(guiaData.fechaEntregaBienes) }
+            : {}),
           detalles: {
             create: detalles.map((detalle, index) => ({
               numeroOrden: index + 1,
               codigoProducto: detalle.codigoProducto,
+              codigoProductoSunat: detalle.codigoProductoSunat,
               descripcion: detalle.descripcion,
               cantidad: detalle.cantidad,
               unidadMedida: detalle.unidadMedida || 'NIU',
@@ -130,6 +153,14 @@ export class GuiaRemisionService {
             fechaEmision: new Date(guiaData.fechaEmision),
             fechaInicioTraslado: new Date(guiaData.fechaInicioTraslado),
             horaEmision: guiaData.horaEmision || this.getCurrentTime(),
+            ...(docsRelacionados !== undefined
+              ? { documentosRelacionados: docsRelacionados }
+              : {}),
+            ...(vehSecundarios !== undefined ? { vehiculosSecundarios: vehSecundarios } : {}),
+            ...(condSecundarios !== undefined ? { conductoresSecundarios: condSecundarios } : {}),
+            ...(guiaData.fechaEntregaBienes
+              ? { fechaEntregaBienes: new Date(guiaData.fechaEntregaBienes) }
+              : {}),
             detalles: {
               create: detalles.map((detalle, index) => ({
                 numeroOrden: index + 1,
@@ -250,9 +281,11 @@ export class GuiaRemisionService {
           empresa: true,
           cliente: true,
         },
-        orderBy: {
-          fechaEmision: 'desc',
-        },
+        // Desempate por id: fechaEmision es solo fecha, así que todas las guías
+        // del mismo día empataban y Postgres las devolvía en orden arbitrario.
+        // Con paginación eso hacía que una fila se repitiera en una página y
+        // faltara en otra (las últimas emitidas no aparecían arriba).
+        orderBy: [{ fechaEmision: 'desc' }, { id: 'desc' }],
       }),
       this.prisma.guiaRemision.count({ where }),
     ]);
@@ -321,7 +354,17 @@ export class GuiaRemisionService {
     this.validateGuiaRemision({ ...guia, ...updateDto } as any);
 
     // Si se actualizan detalles, eliminar los anteriores y crear los nuevos
-    const { detalles, ...guiaData } = updateDto;
+    const {
+      detalles,
+      documentosRelacionados,
+      vehiculosSecundarios,
+      conductoresSecundarios,
+      ...guiaData
+    } = updateDto;
+    const docsRelacionados =
+      this.normalizarDocumentosRelacionados(documentosRelacionados);
+    const vehSecundarios = this.normalizarVehiculosSecundarios(vehiculosSecundarios);
+    const condSecundarios = this.normalizarConductoresSecundarios(conductoresSecundarios);
 
     const dataToUpdate: any = {
       ...guiaData,
@@ -338,6 +381,14 @@ export class GuiaRemisionService {
     if (guiaData.fechaInicioTraslado) {
       dataToUpdate.fechaInicioTraslado = new Date(guiaData.fechaInicioTraslado);
     }
+    if (docsRelacionados !== undefined) {
+      dataToUpdate.documentosRelacionados = docsRelacionados;
+    }
+    if (vehSecundarios !== undefined) dataToUpdate.vehiculosSecundarios = vehSecundarios;
+    if (condSecundarios !== undefined) dataToUpdate.conductoresSecundarios = condSecundarios;
+    if (guiaData.fechaEntregaBienes) {
+      dataToUpdate.fechaEntregaBienes = new Date(guiaData.fechaEntregaBienes);
+    }
 
     if (detalles && detalles.length > 0) {
       // Eliminar detalles anteriores y crear los nuevos
@@ -349,6 +400,7 @@ export class GuiaRemisionService {
         create: detalles.map((detalle, index) => ({
           numeroOrden: index + 1,
           codigoProducto: detalle.codigoProducto,
+          codigoProductoSunat: detalle.codigoProductoSunat,
           descripcion: detalle.descripcion,
           cantidad: detalle.cantidad,
           unidadMedida: detalle.unidadMedida || 'NIU',
@@ -712,6 +764,59 @@ export class GuiaRemisionService {
     return next;
   }
 
+  /**
+   * Normaliza los documentos relacionados (Catálogo 61) para guardarlos como
+   * JSON: descarta los incompletos y deja solo los campos que se imprimen y
+   * viajan a SUNAT. Devuelve undefined si no hay ninguno, para no pisar lo ya
+   * guardado en una actualización parcial.
+   */
+  private normalizarDocumentosRelacionados(
+    docs?: { tipo: string; numero: string; emisorNumDoc?: string }[],
+  ) {
+    if (!Array.isArray(docs)) return undefined;
+    const limpios = docs
+      .filter((d) => d && String(d.tipo || '').trim() && String(d.numero || '').trim())
+      .map((d) => ({
+        tipo: String(d.tipo).trim(),
+        numero: String(d.numero).trim().toUpperCase(),
+        ...(String(d.emisorNumDoc || '').trim()
+          ? { emisorNumDoc: String(d.emisorNumDoc).trim() }
+          : {}),
+      }));
+    return limpios as unknown as Prisma.InputJsonValue;
+  }
+
+  /** Limpia los vehículos secundarios antes de guardarlos como JSON. */
+  private normalizarVehiculosSecundarios(
+    v?: { placa: string; tuce?: string }[],
+  ) {
+    if (!Array.isArray(v)) return undefined;
+    const limpios = v
+      .filter((x) => x && String(x.placa || '').trim())
+      .map((x) => ({
+        placa: String(x.placa).trim().toUpperCase(),
+        ...(String(x.tuce || '').trim() ? { tuce: String(x.tuce).trim().toUpperCase() } : {}),
+      }));
+    return limpios as unknown as Prisma.InputJsonValue;
+  }
+
+  /** Limpia los conductores secundarios antes de guardarlos como JSON. */
+  private normalizarConductoresSecundarios(
+    c?: { tipoDoc?: string; numDoc: string; nombres?: string; apellidos?: string; licencia: string }[],
+  ) {
+    if (!Array.isArray(c)) return undefined;
+    const limpios = c
+      .filter((x) => x && String(x.numDoc || '').trim() && String(x.licencia || '').trim())
+      .map((x) => ({
+        tipoDoc: String(x.tipoDoc || '1').trim(),
+        numDoc: String(x.numDoc).trim(),
+        nombres: String(x.nombres || '').trim(),
+        apellidos: String(x.apellidos || '').trim(),
+        licencia: String(x.licencia).trim().toUpperCase(),
+      }));
+    return limpios as unknown as Prisma.InputJsonValue;
+  }
+
   private validateGuiaRemision(
     dto: CreateGuiaRemisionDto | UpdateGuiaRemisionDto,
   ) {
@@ -952,16 +1057,62 @@ export class GuiaRemisionService {
       transportistaRuc: guia.transportistaRuc,
       transportistaMTC: guia.transportistaMTC || '',
       vehiculoPlaca: guia.vehiculoPlaca,
+      vehiculoAutorizacion: guia.vehiculoAutorizacion || '',
+      // Autorización especial del vehículo y quién la emitió.
+      vehiculoNroAutorizacion: guia.vehiculoNroAutorizacion || '',
+      vehiculoEntidadEmisora: guia.vehiculoEntidadEmisora || '',
+      // Vehículos y conductores además del principal.
+      vehiculosSecundarios: (Array.isArray(guia.vehiculosSecundarios)
+        ? (guia.vehiculosSecundarios as any[])
+        : []
+      ).map((v: any, i: number) => ({
+        orden: i + 1,
+        placa: String(v?.placa || '').toUpperCase(),
+        tuce: String(v?.tuce || ''),
+      })),
+      conductoresSecundarios: (Array.isArray(guia.conductoresSecundarios)
+        ? (guia.conductoresSecundarios as any[])
+        : []
+      ).map((c: any, i: number) => ({
+        orden: i + 1,
+        nombre: `${String(c?.apellidos || '')} ${String(c?.nombres || '')}`.trim().toUpperCase(),
+        numDoc: String(c?.numDoc || ''),
+        licencia: String(c?.licencia || ''),
+      })),
+      fechaEntregaBienes: guia.fechaEntregaBienes
+        ? formatDate(guia.fechaEntregaBienes)
+        : '',
       conductorNombre: nombreConductor.toUpperCase(),
       conductorNumDoc: guia.conductorNumDoc || '',
       conductorLicencia: guia.conductorLicencia,
       retornoVehiculoVacio: guia.retornoVehiculoVacio,
       retornoEnvasesVacios: guia.retornoEnvasesVacios,
       transbordoProgramado: guia.transbordoProgramado,
+      vehiculoM1oL: guia.vehiculoM1oL,
+      // Handlebars no evalúa expresiones: el bloque de indicadores se muestra
+      // solo si hay alguno encendido.
+      hayIndicadores: Boolean(
+        guia.transbordoProgramado ||
+          guia.retornoVehiculoVacio ||
+          guia.retornoEnvasesVacios ||
+          guia.vehiculoM1oL,
+      ),
+      // Documentos relacionados (Catálogo 61): la factura/boleta que origina el
+      // traslado, con su etiqueta legible.
+      documentosRelacionados: (Array.isArray(guia.documentosRelacionados)
+        ? (guia.documentosRelacionados as any[])
+        : []
+      ).map((d: any) => ({
+        etiqueta: DOC_RELACIONADO_LABEL[String(d?.tipo)] || 'Documento',
+        numero: String(d?.numero || '').toUpperCase(),
+        emisor: String(d?.emisorNumDoc || ''),
+      })),
+
 
       // Items
       detalles: guia.detalles.map((d, i) => ({
         item: i + 1,
+        codigoSunat: (d as any).codigoProductoSunat || '',
         codigo: d.codigoProducto,
         descripcion: d.descripcion,
         unidad: d.unidadMedida,
@@ -1021,6 +1172,7 @@ export class GuiaRemisionService {
         detalles: {
           include: { producto: true },
         },
+        empresa: { select: { ruc: true } },
       },
     });
 
@@ -1044,6 +1196,17 @@ export class GuiaRemisionService {
       '08': 'NOTA DE DEBITO',
     };
     const refLabel = tipoLabels[comprobante.tipoDoc] || 'COMPROBANTE';
+    const numeroComprobante = `${comprobante.serie}-${String(
+      comprobante.correlativo,
+    ).padStart(8, '0')}`;
+    // Documento relacionado (Catálogo 61): solo factura, boleta y ticket están
+    // en ese catálogo. Las notas de crédito/débito no, así que no se sugieren.
+    const TIPO_EN_CATALOGO_61: Record<string, string> = {
+      '01': '01',
+      '03': '03',
+      '12': '12',
+    };
+    const tipoRelacionado = TIPO_EN_CATALOGO_61[comprobante.tipoDoc];
 
     return {
       clienteId: cliente?.id,
@@ -1052,9 +1215,18 @@ export class GuiaRemisionService {
       destinatarioRazonSocial: cliente?.nombre || '',
       llegadaDireccion: cliente?.direccion || '',
       llegadaUbigeo: cliente?.ubigeo || '',
-      observaciones: `Ref. ${refLabel} ${comprobante.serie}-${String(
-        comprobante.correlativo,
-      ).padStart(8, '0')}`,
+      observaciones: `Ref. ${refLabel} ${numeroComprobante}`,
+      // El comprobante que origina el traslado se sugiere ya cargado: es el dato
+      // que SUNAT imprime como "Documentos Relacionados" en la guía.
+      documentosRelacionados: tipoRelacionado
+        ? [
+            {
+              tipo: tipoRelacionado,
+              numero: numeroComprobante,
+              emisorNumDoc: comprobante.empresa?.ruc ?? '',
+            },
+          ]
+        : [],
       comprobanteRef: {
         id: comprobante.id,
         tipoDoc: comprobante.tipoDoc,
