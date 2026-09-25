@@ -560,6 +560,33 @@ export class ComprobanteService {
         }
       };
 
+      // Conversión: para las notas informales (NV/NP/TICKET/OT), detectar si ya
+      // fueron convertidas a un comprobante formal (boleta/factura). Se resuelve en
+      // UNA sola consulta para evitar N+1.
+      const informalIds = (rawItems as any[])
+        .filter((it) =>
+          ['NV', 'NP', 'TICKET', 'OT', 'CP', 'RH'].includes(it.tipoDoc),
+        )
+        .map((it) => it.id);
+      const convertidoMap = new Map<number, string>();
+      if (informalIds.length > 0) {
+        const derivados = await this.prisma.comprobante.findMany({
+          where: { comprobanteOrigenId: { in: informalIds } },
+          select: { comprobanteOrigenId: true, serie: true, correlativo: true },
+        });
+        for (const d of derivados) {
+          if (
+            d.comprobanteOrigenId != null &&
+            !convertidoMap.has(d.comprobanteOrigenId)
+          ) {
+            convertidoMap.set(
+              d.comprobanteOrigenId,
+              `${d.serie}-${String(d.correlativo).padStart(8, '0')}`,
+            );
+          }
+        }
+      }
+
       // Anulaciones aún no confirmadas por SUNAT.
       //
       // Una factura/boleta se marca ANULADO en cuanto se emite su nota de crédito
@@ -658,6 +685,7 @@ export class ComprobanteService {
             ...it,
             detalles,
             comprobante,
+            convertidoA: convertidoMap.get(it.id) ?? null,
             anulacionEnTramite: anulacionEnTramite.has(it.id),
             anulacionEstado: anulacionNoConfirmada.has(it.id)
               ? 'NO_CONFIRMADA'
@@ -2880,7 +2908,10 @@ export class ComprobanteService {
         select: {
           id: true,
           tipoDoc: true,
+          serie: true,
+          correlativo: true,
           estadoPago: true,
+          estadoEnvioSunat: true,
           mtoImpVenta: true,
         },
       });
@@ -2893,6 +2924,27 @@ export class ComprobanteService {
       if (!tiposInformales.includes(origen.tipoDoc)) {
         throw new BadRequestException(
           'El comprobante de origen no es de tipo informal',
+        );
+      }
+      // Un informal anulado ya no representa una venta: convertirlo emitiría a
+      // SUNAT un documento fiscal por una operación que se dio de baja.
+      if (origen.estadoEnvioSunat === 'ANULADO') {
+        throw new BadRequestException(
+          `${origen.serie}-${origen.correlativo} está anulado y no puede convertirse en un comprobante formal.`,
+        );
+      }
+      // Ya convertido: emitir un segundo formal duplicaría la venta en SUNAT, en
+      // los reportes y en las comisiones. `editarNotaVenta` ya bloqueaba por lo
+      // mismo; la conversión no lo hacía.
+      const yaConvertido = await this.prisma.comprobante.findFirst({
+        where: { comprobanteOrigenId: Number(comprobanteOrigenId) },
+        select: { serie: true, correlativo: true },
+      });
+      if (yaConvertido) {
+        throw new BadRequestException(
+          `${origen.serie}-${origen.correlativo} ya fue convertido a ` +
+            `${yaConvertido.serie}-${String(yaConvertido.correlativo).padStart(8, '0')}. ` +
+            'Emitir otro comprobante duplicaría la venta.',
         );
       }
       const salidasOrigen = await this.prisma.movimientoKardex.count({
