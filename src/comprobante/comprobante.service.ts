@@ -3619,8 +3619,15 @@ export class ComprobanteService {
         where: { id: comp.id },
         data: {
           estadoEnvioSunat: 'FALLIDO_ENVIO' as any,
-          // Elegible de inmediato para el Job 2 (filtra por sunatNextRetryAt <= now).
-          sunatNextRetryAt: new Date(),
+          // Media hora de margen antes de que el Job 2 lo vuelva a enviar.
+          //
+          // Con reintento inmediato el comprobante volvía a PENDIENTE en el
+          // siguiente ciclo del scheduler (5 min) y el usuario se quedaba sin
+          // poder descartarlo —descartar exige que NO esté PENDIENTE—, con lo
+          // que verificar y descartar se volvía una carrera imposible de ganar.
+          // Quien acaba de verificar a mano necesita margen para decidir si
+          // reemite o descarta; pasada la media hora el sistema sigue solo.
+          sunatNextRetryAt: new Date(Date.now() + 30 * 60 * 1000),
           sunatErrorMsg:
             causaPrevia && !yaVerificado
               ? `${veredicto} Último error del envío: ${causaPrevia}`
@@ -3820,8 +3827,10 @@ export class ComprobanteService {
       comp.estadoEnvioSunat === 'PENDIENTE'
     ) {
       throw new BadRequestException(
-        'Este comprobante ya fue enviado a SUNAT y podría estar aceptado. ' +
-          'Reenvíalo para confirmar su estado (Emitido o Rechazado) antes de intentar eliminarlo.',
+        'Este comprobante ya fue enviado a SUNAT y podría estar aceptado; borrarlo ahora ' +
+          'dejaría un documento registrado en SUNAT y sin rastro aquí. ' +
+          'Usa primero "Verificar en SUNAT" en este mismo menú: consulta el estado real y, ' +
+          'si SUNAT no lo tiene, lo deja como envío fallido y recién ahí se puede eliminar.',
       );
     }
 
