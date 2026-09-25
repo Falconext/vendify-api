@@ -1816,8 +1816,36 @@ export class ComprobanteService {
               where: { empresaId, tipoDoc, activo: true },
               orderBy: { id: 'asc' },
             });
-      if (configuredSerie?.serie) {
-        serie = configuredSerie.serie;
+
+      // Una serie configurada solo puede pisar la calculada si es COHERENTE con el
+      // documento afectado: las notas sobre boleta van en serie B* y las notas
+      // sobre factura en F*.
+      //
+      // La búsqueda de arriba, al no encontrar la serie específica ("07:03"),
+      // cae a la genérica del tipo ("07"). Si la empresa tenía configurada una
+      // sola serie de notas —típicamente FCA1, creada para las notas de
+      // factura—, esa genérica pisaba la BCA1 recién calculada y la nota sobre
+      // una boleta salía numerada como nota sobre factura. SUNAT rechaza esa
+      // contradicción con el error 2116 y la anulación nunca ocurre.
+      const prefijoRequerido =
+        (tipoDoc === '07' || tipoDoc === '08') && tipDocAfectado
+          ? tipDocAfectado === '03'
+            ? 'B'
+            : 'F'
+          : null;
+      const serieConfigCoherente =
+        !prefijoRequerido ||
+        String(configuredSerie?.serie || '').startsWith(prefijoRequerido);
+
+      const serieConfigAplicada = !!configuredSerie?.serie && serieConfigCoherente;
+      if (serieConfigAplicada) {
+        serie = configuredSerie!.serie;
+      } else if (configuredSerie?.serie) {
+        console.warn(
+          `[obtenerSerieYCorrelativo] Serie configurada ${configuredSerie.serie} ignorada: ` +
+            `el documento afectado es de tipo ${tipDocAfectado} y exige una serie ${prefijoRequerido}*. ` +
+            `Se usa la serie calculada ${serie}.`,
+        );
       }
 
       console.log('[obtenerSerieYCorrelativo] Querying for serie:', serie);
@@ -1828,8 +1856,12 @@ export class ComprobanteService {
       });
       let correlativo = ultimo ? Number(ultimo.correlativo) + 1 : 1;
 
+      // El correlativo inicial configurado solo vale si su serie fue la que se
+      // usó. Arrastrarlo desde una serie descartada numeraría la serie nueva
+      // desde donde iba otra.
       if (
         !ultimo &&
+        serieConfigAplicada &&
         configuredSerie?.correlativo &&
         correlativo < configuredSerie.correlativo
       ) {
