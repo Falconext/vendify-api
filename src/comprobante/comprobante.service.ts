@@ -3830,7 +3830,8 @@ export class ComprobanteService {
     //    la nota se descarta, esa anulación nunca llegó a existir y dejar la
     //    boleta anulada crearía una discrepancia silenciosa con SUNAT que ya
     //    nada señalaría (el aviso depende de que la nota exista).
-    const afectadoRevivido = await this.revertirAnulacionPorNotaDescartada(comp);
+    const afectadoRevivido =
+      await this.revertirAnulacionPorNotaDescartada(comp);
 
     // 0b) Deshacer la devolución de stock que hizo la nota de crédito.
     //     Al crearla se registró un INGRESO por cada ítem (la mercadería
