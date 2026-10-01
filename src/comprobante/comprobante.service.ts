@@ -34,6 +34,13 @@ import {
   type FormatoPdf,
 } from './pdf-generator.service';
 import { generarQrSunatDataUrl } from './qr-sunat.util';
+import {
+  baseRetencion,
+  esRetencion,
+  importeNetoACobrar,
+  montoRetenido,
+  porcentajeRetenido,
+} from './retencion';
 import { numeroALetras } from './utils/numero-a-letras';
 import { construirDescripcionVehiculo } from '../producto/ficha-tecnica-vehiculo';
 import { ProductoLoteService } from '../producto/producto-lote.service';
@@ -6160,13 +6167,14 @@ export class ComprobanteService {
       Number((full as any).mtoDescuentoGlobal || 0) + totalDescuentoItems
     ).toFixed(2);
 
-    // Retención
-    const obs = (full.observaciones || '').toUpperCase();
-    const hasRetentionText = obs.includes('RETENCIÓN') && obs.includes('3%');
-    const retencionMonto = hasRetentionText
-      ? Number((mtoImpVenta * 0.03).toFixed(2))
-      : 0;
-    const shouldShowRetention = hasRetentionText && retencionMonto > 0;
+    // Retención del 3% de IGV.
+    //
+    // Antes esto se decidía buscando las palabras "RETENCIÓN" y "3%" dentro de
+    // las observaciones, y el monto se recalculaba a mano. Resultado: una
+    // factura podía irse a SUNAT con su retención y salir impresa sin una sola
+    // línea, si las observaciones venían vacías. Ahora sale del dato guardado.
+    const shouldShowRetention = esRetencion(full as any);
+    const retencionMonto = montoRetenido(full as any);
 
     const ahora = new Date();
     const fechaImpresion =
@@ -6262,7 +6270,11 @@ export class ComprobanteService {
       ordenCompraCliente: (full as any).ordenCompraCliente || undefined,
       shouldShowRetention,
       retencionMonto: retencionMonto.toFixed(2),
-      importeNeto: (mtoImpVenta - retencionMonto).toFixed(2),
+      // Base imponible de la retención: el importe TOTAL de la operación, con
+      // IGV (S/3,100 de base → S/93 retenidos), no el subtotal gravado.
+      retencionBase: baseRetencion(full as any).toFixed(2),
+      retencionPorcentaje: porcentajeRetenido(full as any).toFixed(2),
+      importeNeto: importeNetoACobrar(full as any).toFixed(2),
       qrCode: qrSunat,
       tipoDetraccion: full.tipoDetraccion
         ? `${full.tipoDetraccion.codigo} - ${full.tipoDetraccion.descripcion} (${full.tipoDetraccion.porcentaje}%)`

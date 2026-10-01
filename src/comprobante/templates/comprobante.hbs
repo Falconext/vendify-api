@@ -326,6 +326,32 @@
   </div>
   {{/if}}{{/if}}
 
+  {{#if shouldShowRetention}}
+  <!-- RETENCIÓN 3% IGV. El TOTAL de la factura NO se reduce: la retención es
+       informativa y lo que cambia es cuánto entra en caja. -->
+  <div class="detraccion" style="font-size: {{fsz fc 'detraccion' 12}}px;">
+    <p class="detraccion-title">Información de la retención</p>
+    <div class="detraccion-grid">
+      <div class="det-row">
+        <span class="det-lbl">Base imponible de la retención:</span>
+        <span class="det-val">{{simboloMoneda}} {{retencionBase}}</span>
+      </div>
+      <div class="det-row">
+        <span class="det-lbl">Porcentaje de la retención:</span>
+        <span class="det-val">{{retencionPorcentaje}} %</span>
+      </div>
+      <div class="det-row">
+        <span class="det-lbl">Monto de la retención:</span>
+        <span class="det-val">{{simboloMoneda}} {{retencionMonto}}</span>
+      </div>
+      <div class="det-row">
+        <span class="det-lbl">Importe neto a pagar:</span>
+        <span class="det-val"><b>{{simboloMoneda}} {{importeNeto}}</b></span>
+      </div>
+    </div>
+  </div>
+  {{/if}}
+
   <!-- TABLA DE PRODUCTOS -->
   <div class="table-wrap">
     <div class="tbl-header" style="font-size: {{fsz fc 'productos' 11}}px;">
@@ -399,10 +425,6 @@
           <span>MONTO TOTAL:</span>
           <span>{{simboloMoneda}} {{mtoImpVenta}}</span>
         </div>
-        {{/if}}
-        {{#if shouldShowRetention}}
-        <div class="tot-row tot-retention"><span>RETENCIÓN (3%):</span><span>{{simboloMoneda}} {{retencionMonto}}</span></div>
-        <div class="tot-neto"><span>IMPORTE NETO:</span><span>{{simboloMoneda}} {{importeNeto}}</span></div>
         {{/if}}
       </div>
     </div>
