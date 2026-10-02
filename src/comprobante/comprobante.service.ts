@@ -4452,9 +4452,50 @@ export class ComprobanteService {
       totalIGV = this.round2(totalIgv);
     }
 
-    // 7) Calcular subtotales
-    const subTotal = this.round2(mtoOperGravadas + totalIGV);
-    const mtoImpVenta = this.round2(mtoOperGravadas + totalIGV);
+    // 7) Totales por balde de operación, recalculados desde las líneas de la nota.
+    //
+    // Antes la cabecera arrancaba de los totales del comprobante afectado y solo se
+    // persistían `mtoOperGravadas` y `mtoIGV`. Una nota sobre una factura con líneas
+    // exoneradas, inafectas o de exportación quedaba con esos importes en cero: el
+    // XML salía con la cabecera en 0 y las líneas con monto, y SUNAT no puede cuadrar
+    // el documento. Las líneas son la única fuente fiable de los baldes.
+    if (detalleFinal.length === 0) {
+      throw new BadRequestException(
+        `El motivo ${motivoNota.codigo} - ${motivoNota.descripcion} no generó líneas para la nota de crédito. No se emitió nada.`,
+      );
+    }
+
+    let baseGravada = 0;
+    let baseExonerada = 0;
+    let baseInafecta = 0;
+    let baseExportacion = 0;
+    let igvDeLineas = 0;
+    for (const d of detalleFinal) {
+      const afe = Number(d.tipAfeIgv ?? 10);
+      const base = Number(d.mtoBaseIgv ?? d.mtoValorVenta ?? 0);
+      // Gratuitas: quedan fuera del importe a pagar (no suman a ningún balde oneroso).
+      if (this.esGratuito(afe)) continue;
+      if (afe === 20) baseExonerada += base;
+      else if (afe === 30) baseInafecta += base;
+      else if (afe === 40) baseExportacion += base;
+      else {
+        baseGravada += base;
+        igvDeLineas += Number(d.igv || 0);
+      }
+    }
+    mtoOperGravadas = this.round2(baseGravada);
+    totalIGV = this.round2(igvDeLineas);
+    const mtoOperExoneradas = this.round2(baseExonerada);
+    const mtoOperInafectas = this.round2(baseInafecta);
+    const mtoOperExportacion = this.round2(baseExportacion);
+    const valorVenta = this.round2(
+      mtoOperGravadas +
+        mtoOperExoneradas +
+        mtoOperInafectas +
+        mtoOperExportacion,
+    );
+    const subTotal = this.round2(valorVenta + totalIGV);
+    const mtoImpVenta = subTotal;
 
     // 8) Validar tipoOperacion si se envía
     let tipoOperacionIdFinal: number | null = null;
@@ -4518,9 +4559,12 @@ export class ComprobanteService {
         sedeId,
         usuarioId: usuarioId ?? undefined,
         mtoOperGravadas,
+        mtoOperExoneradas,
+        mtoOperInafectas,
+        mtoOperExportacion,
         mtoIGV: totalIGV,
         medioPago,
-        valorVenta: mtoOperGravadas,
+        valorVenta,
         mtoDescuentoGlobal:
           motivoNota.codigo === '04' ? montoDescuentoGlobal : undefined,
         totalImpuestos: totalIGV,
