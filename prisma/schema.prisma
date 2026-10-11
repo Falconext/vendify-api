@@ -295,6 +295,17 @@ model Empresa {
   // Credenciales de API "Consulta de Validez de CPE" de SUNAT (portal SOL).
   sunatClientId           String?
   sunatClientSecret       String?
+  // Credenciales de API del SIRE (se generan aparte, en Menú SOL → Credenciales
+  // de API SUNAT → Gestión, marcando "MIGE RCE y RVIE - SIRE"). OJO: el SIRE no
+  // usa client_credentials como la Consulta de Validez, sino grant_type=password
+  // con el usuario y la clave SOL, por eso también se guardan esos dos.
+  sireClientId            String?
+  sireClientSecret        String?
+  sireUsuarioSol          String?
+  /**
+   * Clave SOL cifrada (AES-256-GCM). Nunca se devuelve al frontend.
+   */
+  sireClaveSol            String?
   qpseExternalId          String?
   usaDemo                 Boolean                        @default(false)
   // false = el cron de renovaciones NO cobra ni reactiva este cliente.
@@ -322,6 +333,7 @@ model Empresa {
   vehiculos               Vehiculo[]
   contratosVehiculares    ContratoVehicular[]
   listasPrecio            ListaPrecio[]
+  reglasComision          ReglaComision[]
 
   @@index([providerToken])
   @@index([slugTienda])
@@ -348,55 +360,57 @@ model EmpresaSerie {
 }
 
 model Usuario {
-  id                      Int                     @id @default(autoincrement())
-  nombre                  String
-  dni                     String
-  celular                 String
-  email                   String                  @unique
-  password                String
-  rol                     Rol
-  empresaId               Int?
-  estado                  EstadoType              @default(ACTIVO)
-  telefono                String?
-  permisos                String?
-  compras                 Compra[]
-  ordenesCompra           OrdenCompra[]
-  comprobantes            Comprobante[]
-  historialEstadosPedido  HistorialEstadoPedido[]
-  movimientosCaja         MovimientoCaja[]
-  depositosCajaRealizados MovimientoCaja[]        @relation("DepositoCajaRealizadoPor")
-  movimientosKardex       MovimientoKardex[]
-  Notificacion            Notificacion[]
-  pagos                   Pago[]
-  pagosCompra             PagoCompra[]
-  preferenciasTabla       PreferenciaTabla[]
-  refreshTokens           RefreshToken[]
-  empresa                 Empresa?                @relation(fields: [empresaId], references: [id])
-  whatsappEnvios          WhatsAppEnvio[]
-  guiasRemision           GuiaRemision[]
-  sedeId                  Int?
-  sede                    Sede?                   @relation(fields: [sedeId], references: [id])
-  resellerId              Int?
-  reseller                Reseller?               @relation(fields: [resellerId], references: [id])
-  sistemaNegocio          String?
-  sistemaProducto         String?
-  sedesAsignadas          UsuarioSede[]
-  subModulosAsignados     UsuarioSubModulo[]
-  passwordResetToken      String?
-  passwordResetExpires    DateTime?
-  ordenesProduccion       OrdenProduccion[]
-  movimientosProduccion   MovimientoProduccion[]
-  comisiones              ComisionVendedor[]
-  campanas                CampanaMarketing[]
-  comisionGlobal          Decimal?                @db.Decimal(12, 2)
-  comisionGlobalFija      Decimal?                @db.Decimal(12, 2)
-  comisionGlobalVenta     Decimal?                @db.Decimal(12, 2)
+  id                              Int                     @id @default(autoincrement())
+  nombre                          String
+  dni                             String
+  celular                         String
+  email                           String                  @unique
+  password                        String
+  rol                             Rol
+  empresaId                       Int?
+  estado                          EstadoType              @default(ACTIVO)
+  telefono                        String?
+  permisos                        String?
+  compras                         Compra[]
+  ordenesCompra                   OrdenCompra[]
+  comprobantes                    Comprobante[]
+  historialEstadosPedido          HistorialEstadoPedido[]
+  movimientosCaja                 MovimientoCaja[]
+  depositosCajaRealizados         MovimientoCaja[]        @relation("DepositoCajaRealizadoPor")
+  movimientosKardex               MovimientoKardex[]
+  Notificacion                    Notificacion[]
+  pagos                           Pago[]
+  pagosCompra                     PagoCompra[]
+  preferenciasTabla               PreferenciaTabla[]
+  refreshTokens                   RefreshToken[]
+  empresa                         Empresa?                @relation(fields: [empresaId], references: [id])
+  whatsappEnvios                  WhatsAppEnvio[]
+  guiasRemision                   GuiaRemision[]
+  sedeId                          Int?
+  sede                            Sede?                   @relation(fields: [sedeId], references: [id])
+  resellerId                      Int?
+  reseller                        Reseller?               @relation(fields: [resellerId], references: [id])
+  sistemaNegocio                  String?
+  sistemaProducto                 String?
+  sedesAsignadas                  UsuarioSede[]
+  subModulosAsignados             UsuarioSubModulo[]
+  passwordResetToken              String?
+  passwordResetExpires            DateTime?
+  ordenesProduccion               OrdenProduccion[]
+  movimientosProduccion           MovimientoProduccion[]
+  comisiones                      ComisionVendedor[]
+  campanas                        CampanaMarketing[]
+  comisionGlobal                  Decimal?                @db.Decimal(12, 2)
+  comisionGlobalFija              Decimal?                @db.Decimal(12, 2)
+  comisionGlobalVenta             Decimal?                @db.Decimal(12, 2)
   // Único permiso opt-in en el sentido contrario (default false = SIN el
   // permiso, igual que el comportamiento actual): anular/eliminar
   // comprobantes queda reservado a ADMIN_EMPRESA salvo que se active aquí.
-  puedeAnularComprobantes Boolean                 @default(false)
-  actasInspeccion         ActaInspeccion[]
-  listasPrecio            ListaPrecioUsuario[]
+  puedeAnularComprobantes         Boolean                 @default(false)
+  actasInspeccion                 ActaInspeccion[]
+  listasPrecio                    ListaPrecioUsuario[]
+  reglasComision                  ReglaComision[]
+  restringirTransferenciasASuSede Boolean                 @default(false)
 }
 
 model Categoria {
@@ -537,6 +551,7 @@ model Producto {
   reviews                  ProductoReview[]
   contratosVehiculares     ContratoVehicular[]
   listaPrecioItems         ListaPrecioItem[]
+  reglasComision           ReglaComision[]
 
   @@unique([empresaId, codigo])
   @@unique([empresaId, codigoDigemid])
@@ -1705,6 +1720,12 @@ model ProductoStock {
   vendibleEnSede         Boolean  @default(true)
   precioUnitarioOverride Decimal?
   precioOfertaOverride   Decimal?
+
+  /// Costo promedio ponderado de ESTA sede. NULL = la sede todavía no tiene
+  /// costo propio y se usa el de Producto.costoPromedio. Mantenerlo nullable
+  /// es lo que permite convivir con el costo global mientras dure la
+  /// migración: ninguna consulta cambia de resultado por agregar la columna.
+  costoPromedio Decimal?
 
   producto Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
   sede     Sede     @relation(fields: [sedeId], references: [id], onDelete: Cascade)
@@ -2902,4 +2923,31 @@ model ListaPrecioItem {
   @@unique([listaPrecioId, productoId, presentacionCodigo])
   @@index([listaPrecioId])
   @@index([productoId])
+}
+
+model ReglaComision {
+  id            Int      @id @default(autoincrement())
+  empresaId     Int
+  /// NULL = cualquier producto.
+  productoId    Int?
+  /// NULL = cualquier vendedor.
+  vendedorId    Int?
+  /// Días en que aplica, 0=domingo … 6=sábado, separados por coma ("0,6").
+  /// NULL = todos los días. Se evalúa en hora de Perú, no del servidor.
+  diasSemana    String?
+  /// Monto fijo por unidad. Tiene prioridad sobre el porcentaje.
+  montoFijo     Decimal?
+  /// Porcentaje del precio unitario.
+  porcentaje    Decimal?
+  activa        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  empresa  Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  producto Producto? @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  vendedor Usuario?  @relation(fields: [vendedorId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId, activa])
+  @@index([productoId])
+  @@index([vendedorId])
 }

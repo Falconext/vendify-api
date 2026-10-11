@@ -64,6 +64,7 @@
     "@react-email/render": "^2.0.7",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "adm-zip": "^0.6.1",
     "archiver": "^8.0.0",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
@@ -98,6 +99,7 @@
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
     "@prisma/client": "6.17.1",
+    "@types/adm-zip": "^0.5.8",
     "@types/archiver": "^6.0.3",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
@@ -129,7 +131,8 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "moduleNameMapper": {
-      "^src/(.*)$": "<rootDir>/$1"
+      "^src/(.*)$": "<rootDir>/$1",
+      "^archiver$": "<rootDir>/../test/stubs/archiver.js"
     },
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
