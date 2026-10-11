@@ -10,6 +10,11 @@ import type { MovimientoKardex, Prisma } from '@prisma/client';
 import { TipoCambioService } from '../tipo-cambio/tipo-cambio.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  alinearCostoGlobal,
+  costoDeSede,
+  promedioTrasIngreso,
+} from './costo-sede';
+import {
   FiltrosKardexDto,
   FiltrosReporteDto,
   TipoMovimiento,
@@ -265,7 +270,13 @@ export class KardexService {
     }
 
     const stockAnterior = num(productoStock.stock);
-    const costoPromedio = Number(productoStock.producto.costoPromedio) || 0;
+    // El movimiento ocurre en una sede concreta, así que se valoriza al costo
+    // de esa sede. Es lo que hace que la rentabilidad por local sea real: una
+    // venta en Centro ya no se cuesta con lo que pagó Norte.
+    const costoPromedio = costoDeSede(
+      productoStock.costoPromedio,
+      productoStock.producto.costoPromedio,
+    );
     let stockActual = stockAnterior;
     const cantidadNum = round3(num(data.cantidad));
 
@@ -753,6 +764,17 @@ export class KardexService {
     const whereProductos: any = {
       empresaId,
       ...(filtros?.incluirInactivos ? {} : { estado: 'ACTIVO' }),
+      // Un modelo con tallas NO es una unidad de inventario: su stock ya es la
+      // suma de sus variantes, y las variantes cuentan por su cuenta. Al contar
+      // ambos, el Dashboard de Inventario mostraba el doble que la pantalla de
+      // Productos (COMERCIAL LINNA MODA: S/ 11,285 contra S/ 5,642 reales, y
+      // 249 productos contra 55). Es el mismo criterio que usa el Excel de
+      // inventario; el producto sin variantes es su propia unidad y se queda.
+      // Solo cuentan las variantes ACTIVAS: el stock del padre es la suma de
+      // esas (sincronizarStockPadre). Si se mira "tiene alguna variante" sin
+      // más, un modelo cuyas tallas fueron todas desactivadas se excluye y su
+      // stock desaparece del valorizado.
+      NOT: { variantes: { some: { estado: 'ACTIVO' } } },
     };
 
     if (filtros?.categoriaId) {
@@ -797,8 +819,22 @@ export class KardexService {
           : 0
         : num(producto.stock);
 
-      const costoPromedio = Number(producto.costoPromedio) || 0;
-      const valorTotal = stockUsar * costoPromedio;
+      // Viendo una sola sede, el costo también es el de esa sede: antes se
+      // multiplicaba el stock del local por el costo global, y el inventario
+      // valorizado de una sede salía con el costo de compras de otra.
+      const costoPromedio =
+        sedeId && producto.stocks?.length
+          ? costoDeSede(producto.stocks[0].costoPromedio, producto.costoPromedio)
+          : Number(producto.costoPromedio) || 0;
+      // El costo se guarda NETO, pero el valorizado que ve el empresario es el
+      // "de bolsillo" (con IGV): es el mismo criterio de la pantalla de
+      // Productos, y sin esto el Dashboard mostraba el valor dividido entre
+      // 1.18 respecto de ella aunque el conteo ya coincidiera.
+      const esGravado = String(producto.tipoAfectacionIGV ?? '10') === '10';
+      const costoDeBolsillo = esGravado
+        ? Number((costoPromedio * 1.18).toFixed(2))
+        : costoPromedio;
+      const valorTotal = stockUsar * costoDeBolsillo;
 
       return {
         id: producto.id,
@@ -956,7 +992,18 @@ export class KardexService {
       select: { costoPromedio: true },
     });
 
-    const costoPromedio = Number(producto?.costoPromedio) || 0;
+    // Si el resumen es de una sede, el stock ya viene de esa sede: el costo
+    // tiene que venir de ahí también, o el valorizado mezcla dos locales.
+    const stockDeSede = sedeId
+      ? await this.prisma.productoStock.findUnique({
+          where: { productoId_sedeId: { productoId, sedeId } },
+          select: { costoPromedio: true },
+        })
+      : null;
+
+    const costoPromedio = sedeId
+      ? costoDeSede(stockDeSede?.costoPromedio, producto?.costoPromedio)
+      : Number(producto?.costoPromedio) || 0;
     const valorInventario = stockActual * costoPromedio;
 
     return {
@@ -1032,40 +1079,40 @@ export class KardexService {
     // costo 0 es válido (bonificación de proveedor): antes `&& costoUnitario`
     // lo trataba como "sin costo" y se saltaba el recálculo, así que las
     // unidades gratis nunca bajaban el costo promedio del producto.
+    const producto = await this.prisma.producto.findUnique({
+      where: { id: productoId },
+      select: { costoPromedio: true },
+    });
+
     if (tipoMovimiento === 'INGRESO' && costoUnitario != null && cantidad) {
-      // Recalcular costo promedio global
-      const producto = await this.prisma.producto.findUnique({
-        where: { id: productoId },
-        select: { costoPromedio: true },
+      // El costo de ESTA sede, ponderado contra SU stock y SU costo. El stock
+      // de la sede ya se actualizó arriba, así que es el de después.
+      const stockSede = await this.prisma.productoStock.findUnique({
+        where: { productoId_sedeId: { productoId, sedeId } },
+        select: { stock: true, costoPromedio: true },
       });
-      // Obtener stock TOTAL de todas las sedes para el ponderado
-      const totalStock = await this.prisma.productoStock.aggregate({
-        where: { productoId },
-        _sum: { stock: true },
-      });
-      const stockTotalGlobal = num(totalStock._sum.stock); // Este es el stock NUEVO total ya actualizado en la línea anterior?
-      // Espera, acabamos de actualizar el stock de la sede.
-      // El stockAnteriorGlobal seria stockTotalGlobal - cantidad.
-
-      if (producto) {
-        const stockActualGlobal = stockTotalGlobal;
-        const stockAnteriorGlobal = stockActualGlobal - cantidad;
-        const costoAnterior = Number(producto.costoPromedio) || 0;
-
-        // Calcular costo promedio ponderado
-        const valorAnterior = stockAnteriorGlobal * costoAnterior;
-        const valorNuevo = cantidad * costoUnitario;
-
-        if (stockActualGlobal > 0) {
-          const costoPromedio =
-            (valorAnterior + valorNuevo) / stockActualGlobal;
-          await this.prisma.producto.update({
-            where: { id: productoId },
-            data: { costoPromedio },
+      if (stockSede) {
+        const costoSede = promedioTrasIngreso(
+          num(stockSede.stock),
+          cantidad,
+          costoUnitario,
+          // De qué costo parte la sede: el suyo si ya lo tiene, y si no el
+          // global, que es lo que venía valiendo hasta este ingreso.
+          costoDeSede(stockSede.costoPromedio, producto?.costoPromedio),
+        );
+        if (costoSede != null) {
+          await this.prisma.productoStock.update({
+            where: { productoId_sedeId: { productoId, sedeId } },
+            data: { costoPromedio: costoSede },
           });
         }
       }
     }
+
+    // Después de CUALQUIER movimiento, no solo de un ingreso: una salida
+    // también cambia la mezcla, y vender en la sede barata deja el producto
+    // concentrado en la cara. Con una sola sede el resultado es el de siempre.
+    await alinearCostoGlobal(this.prisma, productoId, producto?.costoPromedio);
   }
 
   /**
@@ -1524,6 +1571,16 @@ export class KardexService {
           );
         }
 
+        // La mercadería sale valorizada al costo de LA SEDE QUE LA ENVÍA, que
+        // es lo que esa sede pagó por ella. Antes se usaba el costo global, así
+        // que un local podía despachar a un costo que nunca le correspondió.
+        // El costo de la sede origen no cambia por una salida: el promedio
+        // ponderado solo se mueve cuando entra mercadería.
+        const costoOrigen = costoDeSede(
+          stockOrigen.costoPromedio,
+          stockOrigen.producto.costoPromedio,
+        );
+
         // 2. Registrar SALIDA en sede origen
         const movSalida = await tx.movimientoKardex.create({
           data: {
@@ -1534,9 +1591,8 @@ export class KardexService {
             cantidad: item.cantidad,
             stockAnterior: num(stockOrigen.stock),
             stockActual: round3(num(stockOrigen.stock) - num(item.cantidad)),
-            costoUnitario: stockOrigen.producto.costoPromedio,
-            valorTotal:
-              Number(stockOrigen.producto.costoPromedio) * num(item.cantidad),
+            costoUnitario: costoOrigen,
+            valorTotal: costoOrigen * num(item.cantidad),
             sedeId: sedeOrigenId,
             usuarioId,
             observacion,
@@ -1584,9 +1640,8 @@ export class KardexService {
             cantidad: item.cantidad,
             stockAnterior: stockAnteriorDestino,
             stockActual: round3(stockAnteriorDestino + num(item.cantidad)),
-            costoUnitario: stockOrigen.producto.costoPromedio,
-            valorTotal:
-              Number(stockOrigen.producto.costoPromedio) * num(item.cantidad),
+            costoUnitario: costoOrigen,
+            valorTotal: costoOrigen * num(item.cantidad),
             sedeId: sedeDestinoId,
             usuarioId,
             observacion,
@@ -1601,6 +1656,20 @@ export class KardexService {
           data: { stock: { decrement: item.cantidad } },
         });
 
+        // La sede que recibe promedia lo que ya tenía con lo que le llega, al
+        // costo de la sede que lo envió. Un traslado no crea ni destruye valor:
+        // por eso el costo global del producto no se toca, solo se reparte
+        // distinto entre los locales.
+        const costoDestino = promedioTrasIngreso(
+          stockAnteriorDestino + num(item.cantidad),
+          num(item.cantidad),
+          costoOrigen,
+          costoDeSede(
+            stockDestinoActual?.costoPromedio,
+            stockOrigen.producto.costoPromedio,
+          ),
+        );
+
         await tx.productoStock.update({
           where: {
             productoId_sedeId: {
@@ -1609,7 +1678,11 @@ export class KardexService {
             },
           },
           // Recibir stock por traslado asigna el producto a la sede destino.
-          data: { stock: { increment: item.cantidad }, visibleEnSede: true },
+          data: {
+            stock: { increment: item.cantidad },
+            visibleEnSede: true,
+            ...(costoDestino != null ? { costoPromedio: costoDestino } : {}),
+          },
         });
 
         resultados.push({ productoId: item.productoId, movSalida, movIngreso });
@@ -1625,6 +1698,19 @@ export class KardexService {
           where: { id: item.productoId },
           data: { stock: totalStock._sum.stock ?? 0 },
         });
+
+        // El traslado no cambia cuánto vale el producto, pero sí le fija costo
+        // a la sede que recibe. Alinear el global mantiene la identidad con el
+        // valorizado por local.
+        const productoActual = await tx.producto.findUnique({
+          where: { id: item.productoId },
+          select: { costoPromedio: true },
+        });
+        await alinearCostoGlobal(
+          tx,
+          item.productoId,
+          productoActual?.costoPromedio,
+        );
 
         // Si el producto trasladado es una variante, recalcular el stock del
         // padre (global y por sede) para que su distribución por sede quede

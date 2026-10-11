@@ -31,6 +31,16 @@ import axios from 'axios';
 import { estadosAListar } from './vendibilidad';
 import { etiquetaDeMotivo } from './motivo-ajuste-stock';
 
+import { colorDe, tallaDe, varianteDe } from './atributos-variante';
+import { afectacionDeCelda } from './afectacion-igv';
+import {
+  ESTADO_EN_CAMINO,
+  agruparEnCamino,
+  agregarDeVariantes,
+  cantidadEnCamino,
+  saldoPrometible,
+  type EnCaminoDeProducto,
+} from '../compras/stock-en-camino';
 @Injectable()
 export class ProductoService {
   constructor(
@@ -899,6 +909,100 @@ export class ProductoService {
     }));
   }
 
+
+  /**
+   * Lo pedido al proveedor y todavía no recibido, por producto.
+   *
+   * Pedido de KREZKA: la vendedora necesita saber si la talla que no está en
+   * el almacén viene en camino. Sale de las órdenes de compra EMITIDAS (las
+   * RECIBIDAS ya movieron el kardex, las BORRADOR no se mandaron).
+   *
+   * Si se consulta por sede, entran las órdenes de esa sede y las que no
+   * tienen sede asignada: esas últimas llegan al negocio, no a un local.
+   */
+  private async cargarEnCamino(
+    empresaId: number,
+    productoIds: number[],
+    sedeId?: number,
+  ): Promise<Map<number, EnCaminoDeProducto>> {
+    if (!Array.isArray(productoIds) || productoIds.length === 0) {
+      return new Map<number, EnCaminoDeProducto>();
+    }
+    const detalles = await this.prisma.detalleOrdenCompra.findMany({
+      where: {
+        productoId: { in: productoIds },
+        ordenCompra: {
+          empresaId,
+          estado: ESTADO_EN_CAMINO as any,
+          ...(sedeId ? { OR: [{ sedeId }, { sedeId: null }] } : {}),
+        },
+      },
+      select: {
+        productoId: true,
+        cantidad: true,
+        ordenCompra: {
+          select: {
+            numero: true,
+            fechaEntrega: true,
+            proveedor: { select: { nombre: true } },
+          },
+        },
+      },
+    });
+    return agruparEnCamino(
+      detalles.map((d: any) => ({
+        productoId: d.productoId,
+        cantidad: d.cantidad,
+        fechaEntrega: d.ordenCompra?.fechaEntrega ?? null,
+        proveedor: d.ordenCompra?.proveedor?.nombre ?? null,
+        numero: d.ordenCompra?.numero ?? null,
+      })),
+    );
+  }
+
+
+  /**
+   * Lo ya prometido en Notas de Pedido que todavía no se entregaron.
+   *
+   * La NP es el documento con el que se aparta mercadería: no descuenta stock
+   * y el stock recién baja al convertirla en boleta/factura. Entonces lo que
+   * está en NP sin convertir es compromiso vivo con un cliente.
+   *
+   * Se excluyen: las anuladas, las que ya se convirtieron (su comprobante
+   * formal ya tomó el stock) y las que se emitieron marcando "descontar del
+   * stock ahora" —esas ya salieron del almacén y contarlas otra vez sería
+   * restar dos veces la misma unidad—.
+   */
+  private async cargarComprometidoEnPedidos(
+    empresaId: number,
+    productoIds: number[],
+    sedeId?: number,
+  ): Promise<Map<number, number>> {
+    if (!Array.isArray(productoIds) || productoIds.length === 0) {
+      return new Map<number, number>();
+    }
+    const detalles = await this.prisma.detalleComprobante.groupBy({
+      by: ['productoId'],
+      where: {
+        productoId: { in: productoIds },
+        comprobante: {
+          empresaId,
+          tipoDoc: 'NP',
+          estadoEnvioSunat: { not: 'ANULADO' as any },
+          comprobantesDerivados: { none: {} },
+          movimientosKardex: { none: { tipoMovimiento: 'SALIDA' as any } },
+          ...(sedeId ? { sedeId } : {}),
+        },
+      },
+      _sum: { cantidad: true },
+    });
+    return new Map<number, number>(
+      detalles
+        .filter((d) => d.productoId != null)
+        .map((d) => [Number(d.productoId), Number(d._sum.cantidad ?? 0)]),
+    );
+  }
+
   async listar(params: {
     empresaId: number;
     sedeId?: number;
@@ -1189,6 +1293,32 @@ export class ProductoService {
       }
     };
 
+    // Lo pedido al proveedor que todavía no llegó (órdenes de compra EMITIDAS).
+    // Las variantes son productos propios: cada talla tiene su propia orden de
+    // compra, así que sus ids también entran en la consulta.
+    const idsConVariantes = Array.from(
+      new Set([
+        ...productoIds,
+        ...productosRaw.flatMap((p: any) =>
+          Array.isArray(p?.variantes)
+            ? p.variantes.map((v: any) => Number(v?.id))
+            : [],
+        ),
+      ]),
+    ).filter((id) => Number.isFinite(id) && id > 0);
+    const enCaminoPorProducto = await this.cargarEnCamino(
+      empresaId,
+      idsConVariantes,
+      params.sedeId,
+    );
+    // Lo ya prometido en Notas de Pedido sin entregar: evita que dos
+    // vendedores comprometan las mismas unidades que vienen en camino.
+    const comprometidoPorProducto = await this.cargarComprometidoEnPedidos(
+      empresaId,
+      idsConVariantes,
+      params.sedeId,
+    );
+
     // Lista de precios que aplica al usuario/sede (solo en contexto de venta,
     // igual que el override por sede). Una sola query para todo el listado.
     const itemsLista = params.usarPrecioSede
@@ -1244,6 +1374,7 @@ export class ProductoService {
           p.precioOferta != null ? Number(p.precioOferta) : null,
         );
         const reservado = reservadoPorProducto.get(p.id) ?? 0;
+        const enCaminoProducto = enCaminoPorProducto.get(p.id) ?? null;
         const cupoProvision = Math.floor(
           (stockTotal * (p.porcentajeProvision ?? 0)) / 100,
         );
@@ -2373,6 +2504,36 @@ export class ProductoService {
     });
   }
 
+  /**
+   * Cuando el empresario escribe un costo a mano, las sedes vuelven a NULL.
+   *
+   * El costo por sede se calcula de las compras; un costo tipeado es una
+   * corrección que manda sobre todo lo calculado. Si las sedes se quedaran con
+   * el suyo, el valorizado global diría una cosa y la suma de los locales otra
+   * —S/1 009.73 de diferencia en el caso que destapó esto—, además de que el
+   * número que el empresario acaba de escribir no se vería en ningún reporte
+   * por sede.
+   *
+   * Volver a NULL las deja leyendo el costo nuevo y cada una vuelve a
+   * diferenciarse en su próxima compra, igual que al empezar la migración.
+   *
+   * Solo cuando el valor CAMBIA: guardar el formulario sin tocar el costo no
+   * puede borrar lo que las compras calcularon.
+   */
+  private async resetearCostoPorSede(
+    productoId: number,
+    costoAnterior: number,
+    costoNuevo: number,
+  ) {
+    if (!(costoNuevo >= 0) || Math.abs(costoNuevo - costoAnterior) < 0.00005) {
+      return;
+    }
+    await this.prisma.productoStock.updateMany({
+      where: { productoId, costoPromedio: { not: null } },
+      data: { costoPromedio: null },
+    });
+  }
+
   async actualizar(
     data: {
       id: number;
@@ -2930,6 +3091,11 @@ export class ProductoService {
       await this.propagarCostoAVariantes(
         actualizado.id,
         data.empresaId,
+        Number(producto.costoPromedio ?? 0),
+        Number(data.costoUnitario),
+      );
+      await this.resetearCostoPorSede(
+        actualizado.id,
         Number(producto.costoPromedio ?? 0),
         Number(data.costoUnitario),
       );
@@ -3567,7 +3733,7 @@ export class ProductoService {
     if (limpias.length > maxExtra) {
       const maxTotal = maxExtra + 1;
       throw new ForbiddenException(
-        `Máximo ${maxTotal} imágenes por producto (1 principal + ${maxExtra} adicionales) para tu rubro.`,
+        `Máximo ${maxTotal} imágenes por producto: 1 principal + ${maxExtra} adicionales.`,
       );
     }
     await this.prisma.producto.update({
@@ -3608,7 +3774,7 @@ export class ProductoService {
     const maxExtra = await this.getMaxImagenesExtraEmpresa(empresaId);
     if (actuales.length >= maxExtra) {
       throw new ForbiddenException(
-        `Máximo ${maxExtra + 1} imágenes por producto (1 principal + ${maxExtra} adicionales) para tu rubro.`,
+        `Máximo ${maxExtra + 1} imágenes por producto: 1 principal + ${maxExtra} adicionales.`,
       );
     }
 
@@ -4009,6 +4175,27 @@ export class ProductoService {
       empresaId,
       estado: { in: [EstadoType.ACTIVO, EstadoType.INACTIVO] },
       codigo: { notIn: productosDelSistema },
+      // El modelo con tallas no es una unidad de inventario: su stock es la
+      // suma de sus variantes, y las variantes salen como filas propias. Al
+      // listar ambos, el TOTAL del Excel contaba todo dos veces (en una
+      // empresa real: 4,355 unidades reportadas sobre 2,223 reales). Se deja
+      // fuera al padre que tiene variantes; el producto sin variantes es su
+      // propia unidad de inventario y se queda.
+      NOT: [
+        // El modelo con tallas no es unidad de inventario: cuentan sus variantes.
+        { variantes: { some: { estado: 'ACTIVO' } } },
+        // Una variante desactivada SIN stock es ruido: queda de cuando se cambia
+        // la matriz de colores/tallas de un modelo y la combinación vieja sale.
+        // Las que SÍ tienen stock se quedan a propósito: esconderlas dejaría
+        // pares invisibles en todo el sistema.
+        {
+          AND: [
+            { estado: EstadoType.INACTIVO },
+            { productoPadreId: { not: null } },
+            { stock: { lte: 0 } },
+          ],
+        },
+      ],
       OR: search
         ? [
             { descripcion: { contains: search, mode: 'insensitive' } },
@@ -4096,9 +4283,21 @@ export class ProductoService {
         .filter((v: any) => v != null && String(v).trim() !== '')
         .join(' | ');
 
+      // "Negro / S" a partir del dato estructurado de la variante, para que el
+      // Excel sirva de reporte de stock por talla sin leer el sufijo del nombre.
+      const atributos = (producto as any).valoresAtributos as Record<
+        string,
+        string
+      >;
+
       return {
         CÓDIGO: p?.codigoBarras || producto.codigo,
         PRODUCTO: producto.descripcion,
+        // Color y talla en columnas propias: el Excel se exporta justamente
+        // para filtrar por talla, y "Negro / 36" junto no se filtra.
+        COLOR: colorDe(atributos),
+        TALLA: tallaDe(atributos),
+        VARIANTE: varianteDe(atributos),
         'U.M': producto.unidadMedida?.nombre || '',
         AFECT: producto.tipoAfectacionIGV,
         'PRECIO UNITARIO CON IGV': Number(producto.precioUnitario),
@@ -4524,6 +4723,12 @@ export class ProductoService {
       actualizado?: boolean;
     }[] = [];
     const tiposValidos = ['10', '20', '30', '40'];
+    // Se lee una sola vez: decide con qué afectación nacen las filas cuya
+    // columna AFECT viene vacía (Ley de Amazonía → exonerado).
+    const empresaImport = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { leyAmazonia: true },
+    });
 
     for (const [index, row] of rows.entries()) {
       try {
@@ -4626,13 +4831,10 @@ export class ProductoService {
             `Unidad de medida no válida (${unidadNombre}) en la fila ${index + 1}`,
           );
 
-        let tipoAfectacionIGV = afectRaw ? afectRaw.toString().trim() : '10';
-        if (!tiposValidos.includes(tipoAfectacionIGV)) {
-          const n = parseInt(tipoAfectacionIGV, 10);
-          tipoAfectacionIGV = tiposValidos.includes(n.toString())
-            ? n.toString()
-            : '10';
-        }
+        // Celda vacia o ilegible: cae al default de la empresa, no a gravado
+        // fijo. En una empresa amazonica eso convertia cada import en una carga
+        // de productos con IGV.
+        const tipoAfectacionIGV = afectacionDeCelda(afectRaw, empresaImport);
 
         const precioUnitario = parseFloat(precioUnitarioRaw?.toString());
         const costoPromedio =
