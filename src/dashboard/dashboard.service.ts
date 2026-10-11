@@ -5,6 +5,12 @@ import { montoEnPen } from '../common/utils/moneda.util';
 import { egresosCajaWhere } from '../common/utils/egresos-caja.util';
 import { montoCompraEnSoles } from '../common/utils/moneda-compra';
 
+import { costoDeSede } from '../kardex/costo-sede';
+import {
+  ingresoLineaSinIgv,
+  normalizarCriterio,
+  type CriterioIgvVentas,
+} from '../finanzas/igv-ventas';
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
@@ -582,6 +588,101 @@ export class DashboardService {
     return { moneda: monedaNorm, categorias, grupos: resultado };
   }
 
+  private async utilidadBrutaPen(
+    comprobanteWhere: any,
+    criterio: CriterioIgvVentas,
+  ): Promise<{ venta: number; costo: number; utilidad: number }> {
+    const detalles = await this.prisma.detalleComprobante.findMany({
+      where: { comprobante: comprobanteWhere },
+      select: {
+        cantidad: true,
+        unidadesPorPaquete: true,
+        mtoValorVenta: true,
+        // Para decidir si a esta línea se le descuenta IGV hace falta el tipo
+        // de documento y el precio bruto; `mtoValorVenta` solo trae el neto.
+        mtoPrecioUnitario: true,
+        tipAfeIgv: true,
+        productoId: true,
+        producto: { select: { costoPromedio: true } },
+        comprobante: {
+          select: {
+            tipoMoneda: true,
+            tipoCambio: true,
+            sedeId: true,
+            tipoDoc: true,
+          },
+        },
+      },
+    });
+
+    // Cada venta se cuesta con lo que pagó LA SEDE que la hizo. Antes se usaba
+    // el costo global del producto, así que una compra cara en un local
+    // castigaba el margen de todos los demás.
+    //
+    // Se traen todos los costos de una vez —productos × sedes involucradas— en
+    // lugar de consultar línea por línea: un P&L del mes son miles de líneas.
+    const costoSedePorClave = new Map<string, unknown>();
+    const productoIds = [
+      ...new Set(detalles.map((d) => d.productoId).filter(Boolean)),
+    ] as number[];
+    const sedeIds = [
+      ...new Set(detalles.map((d) => d.comprobante.sedeId).filter(Boolean)),
+    ] as number[];
+    if (productoIds.length && sedeIds.length) {
+      const filas = await this.prisma.productoStock.findMany({
+        where: { productoId: { in: productoIds }, sedeId: { in: sedeIds } },
+        select: { productoId: true, sedeId: true, costoPromedio: true },
+      });
+      for (const f of filas) {
+        costoSedePorClave.set(`${f.productoId}:${f.sedeId}`, f.costoPromedio);
+      }
+    }
+
+    let venta = 0;
+    let costo = 0;
+    for (const d of detalles) {
+      // El IGV se descuenta según el criterio de la empresa, igual que en el
+      // P&L: con ELECTRONICOS una nota de venta cuenta íntegra, porque ese IGV
+      // nunca se declara y se queda en el negocio. Antes el dashboard restaba
+      // IGV a todo por igual y daba una utilidad distinta a la de Rentabilidad
+      // sobre las mismas ventas.
+      venta += montoEnPen(
+        ingresoLineaSinIgv(
+          String(d.comprobante.tipoDoc ?? ''),
+          {
+            cantidad: Number(d.cantidad ?? 0),
+            mtoPrecioUnitario: Number(d.mtoPrecioUnitario ?? 0),
+            mtoValorVenta: d.mtoValorVenta as any,
+            tipAfeIgv: d.tipAfeIgv as any,
+          },
+          criterio,
+        ),
+        d.comprobante.tipoMoneda,
+        d.comprobante.tipoCambio,
+      );
+      // Paquete vendido como UNA línea (Empresa.paquetesComoUnaLinea): el
+      // costo real son las unidades físicas = cantidad × unidadesPorPaquete,
+      // no la cantidad facturada (p.ej. 1 caja).
+      const uPaquete = Number(d.unidadesPorPaquete) || 1;
+      const costoUnitario = costoDeSede(
+        costoSedePorClave.get(`${d.productoId}:${d.comprobante.sedeId}`),
+        d.producto?.costoPromedio,
+      );
+      costo += costoUnitario * Number(d.cantidad ?? 0) * uPaquete;
+    }
+    venta = Number(venta.toFixed(2));
+    costo = Number(costo.toFixed(2));
+    return { venta, costo, utilidad: Number((venta - costo).toFixed(2)) };
+  }
+
+  /**
+   * Distribuye las ventas agrupadas por `medioPago` en los baldes del
+   * gráfico "Ventas por Canal". Los comprobantes "MIXTO" (pagados con más
+   * de un medio, ej. parte efectivo + parte Yape) no tienen un medio único:
+   * el monto real por medio vive en `Pago`, así que se consulta y reparte
+   * ahí en vez de amontonar todo el comprobante en "Otros".
+   */
+
   async overview(
     empresaId: number,
     fechaInicio: string,
@@ -731,6 +832,46 @@ export class DashboardService {
       pedidosPrev === 0
         ? 100
         : ((pedidosCurr - pedidosPrev) / pedidosPrev) * 100;
+
+    // Utilidad bruta de las ventas (KPI "Utilidad" del dashboard).
+    // Un solo lugar del que sale el criterio, para que el KPI y el ranking de
+    // productos no puedan quedar con criterios distintos.
+    const criterioIgv = normalizarCriterio(
+      (
+        await this.prisma.empresa.findUnique({
+          where: { id: empresaId },
+          select: { criterioIgvVentas: true },
+        })
+      )?.criterioIgvVentas,
+    );
+    const [utilidadCurr, utilidadPrev] = await Promise.all([
+      this.utilidadBrutaPen(
+        {
+          ...baseComprobanteWhere,
+          fechaEmision: currentRange,
+          tipoDoc: { notIn: ['07'] },
+        },
+        criterioIgv,
+      ),
+      this.utilidadBrutaPen(
+        {
+          ...baseComprobanteWhere,
+          fechaEmision: prevRange,
+          tipoDoc: { notIn: ['07'] },
+        },
+        criterioIgv,
+      ),
+    ]);
+    const utilidadTrend =
+      utilidadPrev.utilidad === 0
+        ? 100
+        : ((utilidadCurr.utilidad - utilidadPrev.utilidad) /
+            Math.abs(utilidadPrev.utilidad)) *
+          100;
+    const utilidadMargen =
+      utilidadCurr.venta > 0
+        ? (utilidadCurr.utilidad / utilidadCurr.venta) * 100
+        : 0;
 
     const clientesNuevosCurrRows = await this.clientesNuevos(
       empresaId,
@@ -1134,6 +1275,14 @@ export class DashboardService {
         pedidos: { value: pedidosCurr, trend: pedidosTrend },
         clientes: { value: clientesNuevosCurr, trend: clientesTrend },
         conversion: { value: conversionCurr, trend: conversionTrend },
+        // Utilidad bruta del periodo: venta neta (sin IGV) − costo de lo vendido.
+        utilidad: {
+          value: utilidadCurr.utilidad,
+          trend: utilidadTrend,
+          ventaNeta: utilidadCurr.venta,
+          costo: utilidadCurr.costo,
+          margen: utilidadMargen,
+        },
       },
       chartVentas,
       chartCanales,
