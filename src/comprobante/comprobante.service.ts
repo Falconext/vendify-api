@@ -60,6 +60,8 @@ import * as XLSX from 'xlsx';
 import * as XLSXStyle from 'xlsx-js-style';
 import { XMLParser } from 'fast-xml-parser';
 
+import { diaDeEnvio } from './dia-de-envio';
+import { aplicarDescuentoGlobal } from './descuento-global';
 @Injectable()
 export class ComprobanteService {
   private readonly logger = new Logger(ComprobanteService.name);
@@ -2634,8 +2636,17 @@ export class ComprobanteService {
       if (item.productoId) {
         const producto = await this.prisma.producto.findUnique({
           where: { id: item.productoId },
-          select: { stock: true, costoPromedio: true },
+          select: { stock: true, costoPromedio: true, atributosTecnicos: true },
         });
+
+        // Un servicio nunca tuvo SALIDA (ajustarStock lo saltea), así que
+        // devolverle stock lo inventa: una venta de polo + delivery, al
+        // anularse, dejaba el delivery en stock 1. El guard va acá y no en el
+        // `return` de arriba porque en una venta mixta sí hay movimientos
+        // originales —los del producto físico— y el corte no se activa.
+        if (producto && this.esProductoServicio(producto.atributosTecnicos as any)) {
+          continue;
+        }
 
         if (producto) {
           // Registrar movimiento de kardex GLOBAL (siempre se hace para subir el stock del producto)
@@ -3029,26 +3040,10 @@ export class ComprobanteService {
     const descuentoGlobalFormal = this.round2(
       Math.max(0, Number(montoDescuentoGlobal ?? 0)),
     );
-    let detallesEfectivos = detalles;
-    if (
-      descuentoGlobalFormal > 0 &&
-      Array.isArray(detalles) &&
-      detalles.length
-    ) {
-      const totalBruto = this.round2(
-        detalles.reduce(
-          (s: number, d: any) =>
-            s + Number(d.nuevoValorUnitario || 0) * Number(d.cantidad || 0),
-          0,
-        ),
-      );
-      const desc = Math.min(descuentoGlobalFormal, totalBruto);
-      const factor = totalBruto > 0 ? (totalBruto - desc) / totalBruto : 1;
-      detallesEfectivos = detalles.map((d: any) => ({
-        ...d,
-        nuevoValorUnitario: Number(d.nuevoValorUnitario || 0) * factor,
-      }));
-    }
+    const detallesEfectivos = aplicarDescuentoGlobal(
+      detalles,
+      descuentoGlobalFormal,
+    );
 
     const {
       detalleFinal,
@@ -4714,7 +4709,14 @@ export class ComprobanteService {
       mtoOpInafectas,
       mtoOperExportacion,
       totalIGV,
-    } = await this.cargarProductosYDetalles(detalles, empresaId, tipoOperacionId);
+    } = await this.cargarProductosYDetalles(
+      // El descuento global se reparte entre las líneas ANTES de calcular el
+      // IGV: si se resta recién al final, la base imponible queda en el monto
+      // sin descontar y el desglose del ticket no cuadra con lo que se cobra.
+      aplicarDescuentoGlobal(detalles, montoDescuentoGlobal),
+      empresaId,
+      tipoOperacionId,
+    );
     await this.validarSeriesComprobante(
       detalleFinal,
       empresaId,
@@ -4727,7 +4729,8 @@ export class ComprobanteService {
     const descuentoGlobal = this.round2(
       Math.max(0, Number(montoDescuentoGlobal ?? 0)),
     );
-    const mtoImpVenta = this.round2(Math.max(0, subTotal - descuentoGlobal));
+    // El total ya sale de las líneas rebajadas; restarlo otra vez lo duplicaría.
+    const mtoImpVenta = subTotal;
     const fecha = new Date(fechaEmision);
 
     // Validar tipoOperacionId si existe para evitar error de FK
@@ -5065,7 +5068,13 @@ export class ComprobanteService {
       mtoOpInafectas,
       mtoOperExportacion,
       totalIGV,
-    } = await this.cargarProductosYDetalles(detalles, empresaId, tipoOperacionId);
+    } = await this.cargarProductosYDetalles(
+      // Igual que en la venta: el descuento entra antes del IGV, para que el
+      // PDF que ve el cliente declare el impuesto sobre lo que va a pagar.
+      aplicarDescuentoGlobal(detalles, montoDescuentoGlobal),
+      empresaId,
+      tipoOperacionId,
+    );
     const valorVenta = this.round2(
       mtoOperGravadas + mtoOpExoneradas + mtoOpInafectas + mtoOperExportacion,
     );
@@ -5075,7 +5084,7 @@ export class ComprobanteService {
     const descuentoGlobal = this.round2(
       Math.max(0, Number(montoDescuentoGlobal ?? 0)),
     );
-    const mtoImpVenta = this.round2(Math.max(0, subTotal - descuentoGlobal));
+    const mtoImpVenta = subTotal;
     const fecha = new Date(fechaEmision);
 
     return this.prisma.$transaction(async (tx) => {
@@ -5621,7 +5630,7 @@ export class ComprobanteService {
       mtoOperExportacion,
       totalIGV,
     } = await this.cargarProductosYDetalles(
-      detalles,
+      aplicarDescuentoGlobal(detalles, montoDescuentoGlobal),
       empresaId,
       tipoOperacionId,
     );
@@ -5632,7 +5641,7 @@ export class ComprobanteService {
     const descuentoGlobal = this.round2(
       Math.max(0, Number(montoDescuentoGlobal ?? 0)),
     );
-    const mtoImpVenta = this.round2(Math.max(0, subTotal - descuentoGlobal));
+    const mtoImpVenta = subTotal;
 
     // 3) Estado de pago / saldo a partir de LO INGRESADO en esta edición (reemplaza).
     //    El pago que se registra es exactamente lo que puso el usuario en el paso de
@@ -5965,6 +5974,38 @@ export class ComprobanteService {
    * Obtiene las estadísticas de uso de comprobantes SUNAT para una empresa
    * Solo cuenta Facturas (01) y Boletas (03) con estado EMITIDO o ANULADO
    */
+  /**
+   * Comprobantes de la empresa esperando a que SUNAT responda.
+   *
+   * Solo cuenta los que fallaron por RED: esos se reenvían solos y el
+   * empresario no tiene nada que hacer. Los de datos o configuración quedan
+   * fuera a propósito — ahí sí tiene que actuar, y mezclarlos bajo un cartel
+   * de "tranquilo, es SUNAT" dejaría comprobantes sin emitir.
+   */
+  async incidenciaSunat(empresaId: number) {
+    const atascados = await this.prisma.comprobante.findMany({
+      where: {
+        empresaId,
+        estadoEnvioSunat: { in: ['FALLIDO_ENVIO', 'PENDIENTE'] },
+        sunatErrorMsg: { startsWith: '[RED]' },
+      },
+      select: { serie: true, correlativo: true, creadoEn: true },
+      orderBy: { creadoEn: 'asc' },
+      take: 50,
+    });
+
+    return {
+      // `activa` es lo único que mira la tienda para pintar el aviso: así el
+      // cartel desaparece solo en cuanto el reintento los saca de la cola.
+      activa: atascados.length > 0,
+      cantidad: atascados.length,
+      desde: atascados[0]?.creadoEn ?? null,
+      comprobantes: atascados
+        .slice(0, 10)
+        .map((c) => `${c.serie ?? ''}-${c.correlativo ?? ''}`),
+    };
+  }
+
   async getUsageStats(empresaId: number, sedeId?: number) {
     // Obtener el plan de la empresa
     const empresa = await this.prisma.empresa.findUnique({
@@ -6098,6 +6139,10 @@ export class ComprobanteService {
           },
         },
         detalles: { include: { producto: { select: { imagenUrl: true } } } },
+        // La fecha de entrega programada se imprime en el ticket: el cliente se
+        // lleva el papel y quiere saber cuándo le llega (pedido de COMERCIAL
+        // LINNA MODA, que despacha por día).
+        envioDespacho: { select: { fechaEstimada: true, turnoEnvio: true } },
         // Necesarias para imprimir la leyenda de Ley de Amazonía (código 2000).
         leyendas: { select: { code: true, value: true } },
         tipoDetraccion: true,
