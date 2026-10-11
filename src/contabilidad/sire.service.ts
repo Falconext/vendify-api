@@ -1,4 +1,9 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  SireClient,
+  type SireCredenciales,
+} from '../common/utils/sire.client';
+import { descifrarSecreto } from '../common/utils/secreto.util';
 import { PrismaService } from '../prisma/prisma.service';
 import * as XLSX from 'xlsx';
 import * as nodemailer from 'nodemailer';
@@ -32,6 +37,44 @@ export class SireService {
 
   private getPeriodo(mes: number, anio: number): string {
     return `${anio}${String(mes).padStart(2, '0')}00`;
+  }
+
+  /**
+   * Periodo del SIRE: AAAAMM (6 dígitos), campo 3 del RVIE y del RCE.
+   * OJO: el PLE antiguo usaba AAAAMM00 (8 dígitos con el día en '00'); el
+   * SIRE NO lleva ese sufijo. Ver RS 000112-2021/SUNAT anexo 2/3 campo 3.
+   */
+  private periodoSire(mes: number, anio: number): string {
+    return `${anio}${String(mes).padStart(2, '0')}`;
+  }
+
+  /** Fecha en formato AAAA-MM-DD (RVIE campo 29: doc. modificado). */
+  private formatFechaIso(date: Date | null | undefined): string {
+    if (!date) return '';
+    const d = new Date(date.getTime() - 5 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 10);
+  }
+
+  /**
+   * Texto libre entre palotes. La norma prohíbe los caracteres | / \ dentro
+   * de los campos de texto (RS 112-2021, reglas generales del archivo).
+   */
+  private texto(val: string | null | undefined): string {
+    return (val ?? '').replace(/[|/\\]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * Los comprobantes guardan el documento afectado como "SERIE-NUMERO"
+   * (p. ej. "F0A1-316"), pero el SIRE exige serie y número en campos
+   * separados. Se parte por el último guion para no romper series que lo
+   * contengan.
+   */
+  private splitSerieNumero(ref: string | null | undefined): [string, string] {
+    const val = (ref ?? '').trim();
+    if (!val) return ['', ''];
+    const i = val.lastIndexOf('-');
+    if (i <= 0) return [val, ''];
+    return [val.slice(0, i), val.slice(i + 1)];
   }
 
   private inferTipoDocIdentidad(
@@ -71,6 +114,57 @@ export class SireService {
     return `SIRE_${tipo === 'ventas' ? 'RVIE' : 'RCE'}_${periodo}.${ext}`;
   }
 
+  /**
+   * Nombre del TXT según la tabla 6 del anexo 1 (RS 112-2021 para el RVIE y
+   * RS 040-2022 para el RCE). SUNAT valida el nombre, no solo el contenido:
+   *
+   *   LE + RUC(11) + AAAAMM + DD + LLLLLL + CC + O + I + M + G + .TXT
+   *
+   *   DD     '00' (el RVIE/RCE no es de periodicidad diaria)
+   *   LLLLLL identificador del libro: 140400 ventas, 080400 compras
+   *   CC     oportunidad: 01 acepta propuesta, 02 reemplaza, 03 ajustes
+   *   O      indicador de operaciones: 1 = empresa operativa
+   *   I      indicador de contenido: 1 = con información, 0 = sin
+   *   M      moneda: 1 = soles, 2 = dólares
+   *   G      '2' fijo = generado por el nuevo sistema (MIGE IGV)
+   */
+  async nombreArchivoTxtSire(
+    empresaId: number,
+    tipo: 'ventas' | 'compras',
+    mes: number,
+    anio: number,
+    conInformacion: boolean,
+  ): Promise<string> {
+    const { ruc } = await this.fetchGenerador(empresaId);
+    const periodo = this.periodoSire(mes, anio);
+    const libro = tipo === 'ventas' ? '140400' : '080400';
+    const oportunidad = '02'; // reemplaza la propuesta
+    const indOperaciones = '1';
+    const indContenido = conInformacion ? '1' : '0';
+    const indMoneda = '1'; // contabilidad en soles
+    return `LE${ruc}${periodo}00${libro}${oportunidad}${indOperaciones}${indContenido}${indMoneda}2.TXT`;
+  }
+
+  /**
+   * RUC y razón social del generador: campos 1 y 2 de ambos registros.
+   * Son obligatorios en el SIRE y no existían en el formato PLE anterior.
+   */
+  private async fetchGenerador(empresaId: number) {
+    const empresa = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { ruc: true, razonSocial: true },
+    });
+    if (!empresa?.ruc) {
+      throw new BadRequestException(
+        'La empresa no tiene RUC configurado: el SIRE lo exige en el campo 1 del archivo.',
+      );
+    }
+    return {
+      ruc: empresa.ruc,
+      razonSocial: this.texto(empresa.razonSocial),
+    };
+  }
+
   // ──────────────── VENTAS (RVIE) ────────────────
 
   private async fetchVentas(
@@ -87,7 +181,11 @@ export class SireService {
         ...(empresarial || !sedeId ? {} : { sedeId }),
         tipoDoc: { in: ['01', '03', '07', '08'] },
         fechaEmision,
-        estadoEnvioSunat: { not: 'PENDIENTE' as any },
+        // Excluir no válidos para el Libro de Ventas: PENDIENTE (sin enviar),
+        // RECHAZADO y FALLIDO_ENVIO (no aceptados por SUNAT). Antes se colaban como estado '1'.
+        estadoEnvioSunat: {
+          notIn: ['PENDIENTE', 'RECHAZADO', 'FALLIDO_ENVIO'] as any,
+        },
       },
       orderBy: { fechaEmision: 'asc' },
       select: {
@@ -97,6 +195,7 @@ export class SireService {
         correlativo: true,
         fechaEmision: true,
         tipoMoneda: true,
+        tipoCambio: true,
         mtoOperGravadas: true,
         mtoIGV: true,
         mtoOperInafectas: true,
@@ -122,190 +221,234 @@ export class SireService {
     empresaId: number,
     mes: number,
     anio: number,
-    simple: boolean,
     empresarial: boolean,
     sedeId?: number,
   ): Promise<Buffer> {
-    const comprobantes = await this.fetchVentas(
+    const [generador, comprobantes] = await Promise.all([
+      this.fetchGenerador(empresaId),
+      this.fetchVentas(empresaId, mes, anio, empresarial, sedeId),
+    ]);
+    const periodo = this.periodoSire(mes, anio);
+    // El texto de la RS 112-2021 dice "Formato YYYY-MM-DD" para el campo 29,
+    // pero el validador oficial (PVSIRE 1.9.0) lo rechaza con el error 206
+    // "Fecha de emisión no contiene el formato establecido" y sí acepta
+    // DD/MM/AAAA, igual que el campo 5. Se sigue al validador.
+    const fechasDocModificado = await this.fetchFechasDocModificado(
       empresaId,
-      mes,
-      anio,
-      empresarial,
-      sedeId,
+      comprobantes,
+      'ddmmyyyy',
     );
-    const periodo = this.getPeriodo(mes, anio);
     const lines: string[] = [];
 
     for (const c of comprobantes) {
-      const cuo = String(c.id).padStart(10, '0');
-      const fecEmision = this.formatFecha(c.fechaEmision);
-      const tipoDocCliente = this.inferTipoDocIdentidad(
-        c.cliente?.nroDoc ?? '',
-        c.cliente?.tipoDocumento?.codigo,
-      );
-      const nroDocCliente = c.cliente?.nroDoc ?? '';
-      const razonSocial = (c.cliente?.nombre ?? '').replace(/\|/g, ' ');
-      const baseGravadas = this.fmt(c.mtoOperGravadas);
-      const igv = this.fmt(c.mtoIGV);
-      const inafectas = this.fmt(c.mtoOperInafectas);
-      const exoneradas = this.fmt(c.mtoOperExoneradas);
-      const exportacion = this.fmt(c.mtoOperExportacion);
-      // mtoOperGravadas ya viene NETO del descuento global (el descuento se
-      // pliega en el precio unitario al emitir); este campo es solo
-      // informativo para SUNAT, no se resta de nuevo.
-      const dctoBaseImp = this.fmt(c.mtoDescuentoGlobal);
-      const total = this.fmt(c.mtoImpVenta);
-      const tipoCambio = c.tipoMoneda === 'USD' ? '' : '1.000';
-      const tipRef = c.tipDocAfectado ?? '';
-      const nroRef = c.numDocAfectado ?? '';
-      const estado = (c.estadoEnvioSunat as any) === 'ANULADO' ? '6' : '1';
+      const esNota = c.tipoDoc === '07' || c.tipoDoc === '08';
+      // Las notas de crédito (07) reducen el registro: sus montos van en
+      // NEGATIVO ("- #.##" según la norma, campos 14 a 26).
+      const signo = c.tipoDoc === '07' ? -1 : 1;
+      // La norma manda 0.00 para un comprobante "anulado", pero eso aplica a
+      // los dados de BAJA ante SUNAT (tabla 9: baja comunicada por el
+      // contribuyente). Acá `ANULADO` significa otra cosa: o se anuló
+      // internamente, o una nota de crédito de anulación afectó al original
+      // (ver comprobante.service.ts:1078 y :4067). En ambos casos el CDR fue
+      // aceptado y SUNAT lo sigue contando a valor completo — la reducción la
+      // hace la nota de crédito. Ponerlos en 0.00 restaría dos veces: se
+      // verificó contra la propuesta RVIE real de SUNAT (07/2026), que cuadra
+      // al céntimo informando los montos tal cual. No hay flujo de
+      // comunicación de baja en el sistema.
+      const monto = (val: number | null | undefined) =>
+        this.fmt(Number(val ?? 0) * signo);
 
-      if (simple) {
-        lines.push(
-          [
-            periodo,
-            cuo,
-            '',
-            fecEmision,
-            '',
-            c.tipoDoc,
-            c.serie,
-            String(c.correlativo),
-            tipoDocCliente,
-            nroDocCliente,
-            razonSocial,
-            exportacion,
-            baseGravadas,
-            dctoBaseImp,
-            igv,
-            '0.00',
-            exoneradas,
-            inafectas,
-            total,
-            estado,
-          ].join('|'),
-        );
-      } else {
-        // Formato RVIE 14.1 — 33 campos
-        lines.push(
-          [
-            periodo, // 1  Período
-            cuo, // 2  CUO
-            '', // 3  Correlativo asiento
-            fecEmision, // 4  Fecha emisión
-            '', // 5  Fecha vencimiento
-            c.tipoDoc, // 6  Tipo CDP
-            c.serie, // 7  Serie
-            String(c.correlativo), // 8  Número
-            tipoDocCliente, // 9  Tipo doc identidad cliente
-            nroDocCliente, // 10 Nro doc cliente
-            razonSocial, // 11 Razón social
-            exportacion, // 12 Exportación
-            baseGravadas, // 13 Base imp. gravadas
-            dctoBaseImp, // 14 Dcto. base imp.
-            igv, // 15 IGV / IPM
-            '0.00', // 16 Dcto. IGV
-            exoneradas, // 17 Exoneradas
-            inafectas, // 18 Inafectas
-            '0.00', // 19 ISC
-            '0.00', // 20 Base IVAP
-            '0.00', // 21 IVAP
-            '0.00', // 22 ICBPER
-            '0.00', // 23 Otros tributos
-            total, // 24 Importe total
-            tipoCambio, // 25 Tipo de cambio
-            '', // 26 Fecha CDP referencia
-            tipRef, // 27 Tipo CDP referencia
-            nroRef, // 28 Nro CDP referencia
-            '', // 29 ID contrato
-            '0', // 30 Indicador pago beneficio
-            estado, // 31 Estado
-            '', // 32 Código error
-            '1', // 33 Indicador medio pago
-          ].join('|'),
-        );
-      }
+      const [serieRef, nroRef] = this.splitSerieNumero(c.numDocAfectado);
+      const moneda = c.tipoMoneda || 'PEN';
+
+      // Formato RVIE — 33 campos (RS 000112-2021/SUNAT, anexo 2/3).
+      lines.push(
+        [
+          generador.ruc, //                              1  RUC del generador
+          generador.razonSocial, //                      2  Razón social del generador
+          periodo, //                                    3  Periodo AAAAMM
+          '', //                                         4  CAR (lo completa SUNAT)
+          this.formatFecha(c.fechaEmision), //           5  Fecha emisión DD/MM/AAAA
+          '', //                                         6  Fecha vencimiento/pago (solo tipo 14)
+          c.tipoDoc, //                                  7  Tipo CP
+          c.serie, //                                    8  Serie del CDP
+          String(c.correlativo), //                      9  Número del CP
+          '', //                                        10  Nro final (rango)
+          this.inferTipoDocIdentidad(
+            c.cliente?.nroDoc ?? '',
+            c.cliente?.tipoDocumento?.codigo,
+          ), //                                         11  Tipo doc identidad cliente
+          c.cliente?.nroDoc ?? '', //                   12  Nro doc identidad cliente
+          this.texto(c.cliente?.nombre), //             13  Razón social del cliente
+          monto(c.mtoOperExportacion), //               14  Valor facturado exportación
+          monto(c.mtoOperGravadas), //                  15  Base imponible gravada
+          // 16 Dscto BI: solo aplica en notas que modifican periodos
+          // anteriores. mtoOperGravadas ya viene neto del descuento global,
+          // así que no se vuelve a restar acá.
+          '0.00', //                                    16  Descuento de la base imponible
+          monto(c.mtoIGV), //                           17  IGV / IPM
+          '0.00', //                                    18  Descuento del IGV
+          monto(c.mtoOperExoneradas), //                19  Exonerado
+          monto(c.mtoOperInafectas), //                 20  Inafecto
+          '0.00', //                                    21  ISC
+          '0.00', //                                    22  Base imponible IVAP
+          '0.00', //                                    23  IVAP
+          '0.00', //                                    24  ICBPER
+          '0.00', //                                    25  Otros tributos y cargos
+          monto(c.mtoImpVenta), //                      26  Importe total del CP
+          moneda, //                                    27  Moneda ISO 4217
+          // 28 Tipo de cambio: obligatorio solo si la moneda no es PEN.
+          moneda === 'PEN' ? '' : this.fmt(Number(c.tipoCambio ?? 0)),
+          esNota ? fechasDocModificado.get(c.id) ?? '' : '', // 29 Fecha doc. modificado AAAA-MM-DD
+          esNota ? c.tipDocAfectado ?? '' : '', //      30  Tipo CP modificado
+          esNota ? serieRef : '', //                    31  Serie CP modificado
+          esNota ? nroRef : '', //                      32  Número CP modificado
+          '', //                                        33  ID contrato / proyecto
+        ].join('|'),
+      );
     }
 
     // SUNAT exige el TXT en ANSI (Windows-1252/ISO-8859-1), no UTF-8: con
     // UTF-8, cualquier nombre con tilde o Ñ sale corrupto o es rechazado por
     // el validador. 'latin1' cubre correctamente los caracteres del español.
-    return Buffer.from(lines.join('\r\n'), 'latin1');
+    // Cada línea termina en CRLF, incluida la última.
+    return Buffer.from(
+      lines.map((l) => `${l}\r\n`).join(''),
+      'latin1',
+    );
+  }
+
+  /**
+   * El campo 29 del RVIE (y el 28 del RCE) pide la fecha de emisión del
+   * comprobante ORIGINAL que la nota modifica, dato que no se guarda en el
+   * comprobante. Se resuelve buscando el documento referenciado en una sola
+   * consulta por lote.
+   */
+  private async fetchFechasDocModificado(
+    empresaId: number,
+    comprobantes: Array<{
+      id: number;
+      tipoDoc: string;
+      tipDocAfectado?: string | null;
+      numDocAfectado?: string | null;
+    }>,
+    formato: 'iso' | 'ddmmyyyy' = 'iso',
+  ): Promise<Map<number, string>> {
+    const notas = comprobantes.filter(
+      (c) =>
+        (c.tipoDoc === '07' || c.tipoDoc === '08') &&
+        c.tipDocAfectado &&
+        c.numDocAfectado,
+    );
+    const salida = new Map<number, string>();
+    if (!notas.length) return salida;
+
+    const refs = notas.map((n) => {
+      const [serie, numero] = this.splitSerieNumero(n.numDocAfectado);
+      return { id: n.id, tipoDoc: n.tipDocAfectado as string, serie, numero };
+    });
+
+    const originales = await this.prisma.comprobante.findMany({
+      where: {
+        empresaId,
+        OR: refs
+          .filter((r) => r.serie && /^\d+$/.test(r.numero))
+          .map((r) => ({
+            tipoDoc: r.tipoDoc,
+            serie: r.serie,
+            correlativo: Number(r.numero),
+          })),
+      },
+      select: { tipoDoc: true, serie: true, correlativo: true, fechaEmision: true },
+    });
+
+    const porClave = new Map(
+      originales.map((o) => [
+        `${o.tipoDoc}|${o.serie}|${o.correlativo}`,
+        o.fechaEmision,
+      ]),
+    );
+    for (const r of refs) {
+      const fecha = porClave.get(`${r.tipoDoc}|${r.serie}|${Number(r.numero)}`);
+      if (fecha) {
+        salida.set(
+          r.id,
+          formato === 'iso'
+            ? this.formatFechaIso(fecha)
+            : this.formatFecha(fecha),
+        );
+      }
+    }
+    return salida;
   }
 
   async generarExcelVentas(
     empresaId: number,
     mes: number,
     anio: number,
-    simple: boolean,
     empresarial: boolean,
     sedeId?: number,
   ): Promise<Buffer> {
-    const comprobantes = await this.fetchVentas(
+    const [generador, comprobantes] = await Promise.all([
+      this.fetchGenerador(empresaId),
+      this.fetchVentas(empresaId, mes, anio, empresarial, sedeId),
+    ]);
+    const periodo = this.periodoSire(mes, anio);
+    const fechasDocModificado = await this.fetchFechasDocModificado(
       empresaId,
-      mes,
-      anio,
-      empresarial,
-      sedeId,
+      comprobantes,
+      'ddmmyyyy',
     );
-    const periodo = this.getPeriodo(mes, anio);
 
+    // El Excel espeja campo por campo el TXT oficial (mismos nombres que la
+    // plantilla de SUNAT), para que el contador pueda cuadrar una cosa con la
+    // otra sin traducir cabeceras.
     const rows = comprobantes.map((c) => {
-      const tipoDocCliente = this.inferTipoDocIdentidad(
-        c.cliente?.nroDoc ?? '',
-        c.cliente?.tipoDocumento?.codigo,
-      );
-      const estado = (c.estadoEnvioSunat as any) === 'ANULADO' ? '6' : '1';
-
-      if (simple) {
-        return {
-          PERIODO: periodo,
-          CUO: String(c.id).padStart(10, '0'),
-          'FECHA EMISIÓN': this.formatFecha(c.fechaEmision),
-          'TIPO CDP': c.tipoDoc,
-          SERIE: c.serie,
-          NÚMERO: c.correlativo,
-          'TIPO DOC CLIENTE': tipoDocCliente,
-          'NRO DOC CLIENTE': c.cliente?.nroDoc ?? '',
-          'RAZÓN SOCIAL': c.cliente?.nombre ?? '',
-          'BASE GRAVADA': +(c.mtoOperGravadas ?? 0).toFixed(2),
-          IGV: +(c.mtoIGV ?? 0).toFixed(2),
-          INAFECTAS: +(c.mtoOperInafectas ?? 0).toFixed(2),
-          'IMPORTE TOTAL': +(c.mtoImpVenta ?? 0).toFixed(2),
-          ESTADO: estado,
-        };
-      }
+      const esNota = c.tipoDoc === '07' || c.tipoDoc === '08';
+      const signo = c.tipoDoc === '07' ? -1 : 1;
+      const n = (val: any) => +(Number(val ?? 0) * signo).toFixed(2);
+      const [serieRef, nroRef] = this.splitSerieNumero(c.numDocAfectado);
+      const moneda = c.tipoMoneda || 'PEN';
 
       return {
-        PERÍODO: periodo,
-        CUO: String(c.id).padStart(10, '0'),
-        'CORR. ASIENTO': '',
-        'FECHA EMISIÓN': this.formatFecha(c.fechaEmision),
-        'FECHA VENCIM.': '',
-        'TIPO CDP': c.tipoDoc,
-        SERIE: c.serie,
-        NÚMERO: c.correlativo,
-        'TIPO DOC CLIENTE': tipoDocCliente,
-        'NRO DOC CLIENTE': c.cliente?.nroDoc ?? '',
-        'RAZÓN SOCIAL': c.cliente?.nombre ?? '',
-        EXPORTACIÓN: +(c.mtoOperExportacion ?? 0).toFixed(2),
-        'BASE GRAVADA': +(c.mtoOperGravadas ?? 0).toFixed(2),
-        'DCTO. BASE IMP.': +(c.mtoDescuentoGlobal ?? 0).toFixed(2),
-        IGV: +(c.mtoIGV ?? 0).toFixed(2),
-        'DCTO. IGV': 0,
-        EXONERADAS: +(c.mtoOperExoneradas ?? 0).toFixed(2),
-        INAFECTAS: +(c.mtoOperInafectas ?? 0).toFixed(2),
+        RUC: generador.ruc,
+        ID: generador.razonSocial,
+        PERIODO: periodo,
+        'CAR SUNAT': '',
+        'FECHA DE EMISIÓN': this.formatFecha(c.fechaEmision),
+        'FECHA VCTO/PAGO': '',
+        'TIPO CP/DOC.': c.tipoDoc,
+        'SERIE DEL CDP': c.serie,
+        'NRO CP O DOC.': c.correlativo,
+        'NRO FINAL (RANGO)': '',
+        'TIPO DOC IDENTIDAD': this.inferTipoDocIdentidad(
+          c.cliente?.nroDoc ?? '',
+          c.cliente?.tipoDocumento?.codigo,
+        ),
+        'NRO DOC IDENTIDAD': c.cliente?.nroDoc ?? '',
+        'APELLIDOS NOMBRES/ RAZÓN SOCIAL': this.texto(c.cliente?.nombre),
+        'VALOR FACTURADO EXPORTACIÓN': n(c.mtoOperExportacion),
+        'BI GRAVADA': n(c.mtoOperGravadas),
+        'DSCTO BI': 0,
+        'IGV / IPM DG': n(c.mtoIGV),
+        'DSCTO IGV / IPM': 0,
+        'MTO EXONERADO': n(c.mtoOperExoneradas),
+        'MTO INAFECTO': n(c.mtoOperInafectas),
         ISC: 0,
-        'BASE IVAP': 0,
+        'BI GRAV IVAP': 0,
         IVAP: 0,
         ICBPER: 0,
         'OTROS TRIBUTOS': 0,
-        'IMPORTE TOTAL': +(c.mtoImpVenta ?? 0).toFixed(2),
-        'TIPO CAMBIO': c.tipoMoneda === 'USD' ? '' : 1,
-        'FECHA CDP REF.': '',
-        'TIPO CDP REF.': c.tipDocAfectado ?? '',
-        'NRO CDP REF.': c.numDocAfectado ?? '',
-        ESTADO: estado,
+        'TOTAL CP': n(c.mtoImpVenta),
+        MONEDA: moneda,
+        'TIPO DE CAMBIO': moneda === 'PEN' ? '' : Number(c.tipoCambio ?? 0),
+        'FECHA EMISIÓN DOC MODIFICADO': esNota
+          ? fechasDocModificado.get(c.id) ?? ''
+          : '',
+        'TIPO CP MODIFICADO': esNota ? c.tipDocAfectado ?? '' : '',
+        'SERIE CP MODIFICADO': esNota ? serieRef : '',
+        'NRO CP MODIFICADO': esNota ? nroRef : '',
+        'ID PROYECTO OPERADORES ATRIBUCIÓN': '',
       };
     });
 
@@ -314,7 +457,7 @@ export class SireService {
       wch: Math.max(k.length, 12),
     }));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Libro Ventas');
+    XLSX.utils.book_append_sheet(wb, ws, 'RVIE');
     return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
   }
 
@@ -332,29 +475,30 @@ export class SireService {
         empresaId,
         ...(sedeId ? { sedeId } : {}),
         fechaEmision,
-        // Solo compras vigentes: las anuladas, rechazadas o pendientes de
-        // aprobación nunca aplicaron efectos (ni stock ni crédito fiscal).
+        // Excluir compras que nunca aplicaron efectos reales: ANULADA,
+        // RECHAZADA (el admin la rechazó) y PENDIENTE_APROBACION (aún sin
+        // visto bueno, sin stock ni pago). Solo REGISTRADO va al RCE.
         estado: 'REGISTRADO' as any,
+        // El contador puede denegar una compra (p.ej. no corresponde al giro):
+        // esa no se declara, así que queda fuera del RCE y de los totales.
+        estadoContador: { not: 'DENEGADA' } as any,
       },
       orderBy: { fechaEmision: 'asc' },
       include: {
         proveedor: { include: { tipoDocumento: true } },
-        // Para separar la base gravada de las adquisiciones no gravadas:
-        // líneas de productos exonerados/inafectos van sin IGV.
+        usuario: { select: { nombre: true } },
+        // Para separar la base gravada (campo 15) de las adquisiciones no
+        // gravadas (campo 21): líneas de exonerados/inafectos van sin IGV.
         detalles: { select: { subtotal: true, igv: true } },
       },
     });
   }
 
-  private r2(n: number): number {
-    return Number((n || 0).toFixed(2));
-  }
-
   /**
    * Base gravada vs. no gravada de una compra según sus líneas: las que
-   * llevan IGV suman a la base imponible; las de productos exonerados/inafectos
-   * (IGV 0) van como adquisiciones no gravadas. Sin detalle (compras antiguas)
-   * todo se toma como gravado.
+   * llevan IGV suman a la base imponible (campo 15 del RCE); las de productos
+   * exonerados/inafectos (IGV 0) van como adquisiciones no gravadas (campo 21).
+   * Sin detalle (compras antiguas/importadas) todo se toma como gravado.
    */
   private desgloseBaseCompra(c: {
     subtotal: any;
@@ -371,6 +515,8 @@ export class SireService {
       if (Number(d.igv ?? 0) > 0) gravada += Number(d.subtotal ?? 0);
       else noGravada += Number(d.subtotal ?? 0);
     }
+    // Si toda la compra es gravada se respeta el subtotal de cabecera (puede
+    // absorber centavos de redondeo del total tecleado).
     if (noGravada === 0) return { gravada: Number(c.subtotal ?? 0), noGravada: 0 };
     if (gravada === 0) return { gravada: 0, noGravada: Number(c.subtotal ?? 0) };
     return { gravada: this.r2(gravada), noGravada: this.r2(noGravada) };
@@ -380,194 +526,155 @@ export class SireService {
     empresaId: number,
     mes: number,
     anio: number,
-    simple: boolean,
     sedeId?: number,
   ): Promise<Buffer> {
-    const compras = await this.fetchCompras(empresaId, mes, anio, sedeId);
-    const periodo = this.getPeriodo(mes, anio);
+    const [generador, compras] = await Promise.all([
+      this.fetchGenerador(empresaId),
+      this.fetchCompras(empresaId, mes, anio, sedeId),
+    ]);
+    const periodo = this.periodoSire(mes, anio);
     const lines: string[] = [];
 
     for (const c of compras) {
-      const cuo = String(c.id).padStart(10, '0');
-      const fecEmision = this.formatFecha(c.fechaEmision);
-      const fecVcto = this.formatFecha(c.fechaVencimiento ?? null);
       const tipoDocSunat = TIPO_DOC_COMPRA_MAP[c.tipoDoc] ?? '01';
-      const tipoDocProveedor = this.inferTipoDocIdentidad(
-        c.proveedor?.nroDoc ?? '',
-        c.proveedor?.tipoDocumento?.codigo,
-      );
-      const nroDocProveedor = c.proveedor?.nroDoc ?? '';
-      const razonSocial = (c.proveedor?.nombre ?? '').replace(/\|/g, ' ');
-      // Importes en soles (factura en US$ × TC de la compra); las notas de
-      // crédito de compra restan crédito fiscal (negativo). Los exonerados/
-      // inafectos van como adquisiciones no gravadas (campo 19).
+      // Las notas de crédito de compra restan crédito fiscal: montos en
+      // negativo, igual criterio que en el RVIE.
       const signo = tipoDocSunat === '07' ? -1 : 1;
-      const factor = factorCompraASoles(c) * signo;
+      // Los importes del RCE van en moneda nacional: una factura en dólares se
+      // convierte con el TC de la compra (columnas 26/27 llevan moneda y TC).
+      const factor = factorCompraASoles(c);
+      const monto = (val: any) => this.fmt(Number(val ?? 0) * factor * signo);
+      const moneda = c.moneda || 'PEN';
       const base = this.desgloseBaseCompra(c);
-      const igvN = Number(c.igv ?? 0) * factor;
-      const totalN = Number(c.total ?? 0) * factor;
-      const baseGravada = this.fmt(base.gravada * factor);
-      const noGravadas = this.fmt(base.noGravada * factor);
-      const igvStr = this.fmt(igvN);
-      const totalStr = this.fmt(totalN);
-      const tipoCambio =
-        (c.moneda ?? 'PEN') === 'USD'
-          ? Number(c.tipoCambio ?? 1).toFixed(3)
-          : '1.000';
 
-      if (simple) {
-        lines.push(
-          [
-            periodo,
-            cuo,
-            '',
-            fecEmision,
-            fecVcto,
-            tipoDocSunat,
-            c.serie,
-            '',
-            c.numero,
-            tipoDocProveedor,
-            nroDocProveedor,
-            razonSocial,
-            baseGravada,
-            igvStr,
-            '0.00',
-            '0.00',
-            '0.00',
-            '0.00',
-            noGravadas,
-            '0.00',
-            '0.00',
-            '0.00',
-            totalStr,
-            '1',
-          ].join('|'),
-        );
-      } else {
-        // Formato RCE 8.1 — 33 campos
-        lines.push(
-          [
-            periodo, // 1  Período
-            cuo, // 2  CUO
-            '', // 3  Correlativo asiento
-            fecEmision, // 4  Fecha emisión
-            fecVcto, // 5  Fecha vencimiento
-            tipoDocSunat, // 6  Tipo CDP
-            c.serie, // 7  Serie
-            '', // 8  Año DUA/DSI
-            c.numero, // 9  Número
-            tipoDocProveedor, // 10 Tipo doc proveedor
-            nroDocProveedor, // 11 Nro doc proveedor
-            razonSocial, // 12 Razón social
-            baseGravada, // 13 Base adq. gravadas (op. gravadas)
-            igvStr, // 14 IGV adq. gravadas (op. gravadas)
-            '0.00', // 15 Base adq. gravadas (op. gravadas y no gravadas)
-            '0.00', // 16 IGV adq. gravadas (op. gravadas y no gravadas)
-            '0.00', // 17 Base adq. gravadas (op. no gravadas)
-            '0.00', // 18 IGV adq. gravadas (op. no gravadas)
-            noGravadas, // 19 Valor adq. no gravadas (exonerados/inafectos)
-            '0.00', // 20 ISC
-            '0.00', // 21 ICBPER
-            '0.00', // 22 Otros tributos
-            totalStr, // 23 Total
-            tipoCambio, // 24 Tipo de cambio
-            '', // 25 Fecha CDP referencia
-            '', // 26 Tipo CDP referencia
-            '', // 27 Nro CDP referencia
-            '', // 28 Nro constancia detracción
-            '', // 29 Fecha constancia detracción
-            '', // 30 Indicador anticipo
-            '', // 31 Período crédito fiscal
-            '1', // 32 Estado
-            '', // 33 Código error
-          ].join('|'),
-        );
-      }
+      // Formato RCE — 37 campos (RS 000040-2022/SUNAT).
+      lines.push(
+        [
+          generador.ruc, //                             1  RUC del generador
+          generador.razonSocial, //                     2  Razón social del generador
+          periodo, //                                   3  Periodo AAAAMM
+          '', //                                        4  CAR (lo completa SUNAT)
+          this.formatFecha(c.fechaEmision), //          5  Fecha emisión DD/MM/AAAA
+          this.formatFecha(c.fechaVencimiento ?? null), // 6 Fecha vencimiento/pago
+          tipoDocSunat, //                              7  Tipo CP
+          c.serie, //                                   8  Serie del CDP
+          '', //                                        9  Año emisión DAM/DSI (solo importaciones)
+          c.numero, //                                 10  Número del CP
+          '', //                                       11  Nro final (rango)
+          this.inferTipoDocIdentidad(
+            c.proveedor?.nroDoc ?? '',
+            c.proveedor?.tipoDocumento?.codigo,
+          ), //                                        12  Tipo doc identidad proveedor
+          c.proveedor?.nroDoc ?? '', //                13  Nro doc identidad proveedor
+          this.texto(c.proveedor?.nombre), //          14  Razón social del proveedor
+          // Campos 15/16: adquisiciones gravadas destinadas a operaciones
+          // gravadas y/o de exportación (el caso normal). Los pares 17/18 y
+          // 19/20 son para uso mixto y para compras sin derecho a crédito,
+          // que el sistema no discrimina hoy.
+          monto(base.gravada), //                      15  Base imponible gravada (con derecho a crédito)
+          monto(c.igv), //                             16  IGV / IPM de la base 15
+          '0.00', //                                   17  Base gravada uso mixto
+          '0.00', //                                   18  IGV uso mixto
+          '0.00', //                                   19  Base gravada sin derecho a crédito
+          '0.00', //                                   20  IGV sin derecho a crédito
+          monto(base.noGravada), //                    21  Valor de adquisiciones no gravadas (exonerados/inafectos)
+          '0.00', //                                   22  ISC
+          '0.00', //                                   23  ICBPER
+          '0.00', //                                   24  Otros conceptos, tributos y cargos
+          monto(c.total), //                           25  Importe total de la adquisición
+          moneda, //                                   26  Moneda ISO 4217
+          // 27 Tipo de cambio: obligatorio solo si la moneda no es PEN.
+          moneda === 'PEN' ? '' : this.fmt(Number(c.tipoCambio ?? 0)),
+          // Campos 28 a 32: SUNAT los exige cuando el tipo de CP es nota de
+          // crédito o débito (07/08/87/88), pero el modelo Compra no guarda
+          // referencia al documento que la nota modifica. Hoy no se dispara
+          // (todas las compras registradas son facturas); si algún día se
+          // registran notas de compra, hay que agregar esos campos al modelo
+          // antes de que el archivo pase la validación de SUNAT.
+          '', //                                       28  Fecha emisión doc. modificado DD/MM/AAAA
+          '', //                                       29  Tipo CP modificado
+          '', //                                       30  Serie CP modificado
+          '', //                                       31  Código dependencia aduanera
+          '', //                                       32  Número CP modificado
+          '', //                                       33  Clasificación de bienes y servicios
+          '', //                                       34  ID contrato / proyecto
+          '', //                                       35  Porcentaje de participación
+          '0.00', //                                   36  Impuesto materia de beneficio (Ley 31053)
+          '', //                                       37  CAR original / indicador exclusión-inclusión
+        ].join('|'),
+      );
     }
 
     // SUNAT exige el TXT en ANSI (Windows-1252/ISO-8859-1), no UTF-8: con
     // UTF-8, cualquier nombre con tilde o Ñ sale corrupto o es rechazado por
-    // el validador. 'latin1' cubre correctamente los caracteres del español.
-    return Buffer.from(lines.join('\r\n'), 'latin1');
+    // el validador. Cada línea termina en CRLF, incluida la última.
+    return Buffer.from(lines.map((l) => `${l}\r\n`).join(''), 'latin1');
   }
 
   async generarExcelCompras(
     empresaId: number,
     mes: number,
     anio: number,
-    simple: boolean,
     sedeId?: number,
   ): Promise<Buffer> {
-    const compras = await this.fetchCompras(empresaId, mes, anio, sedeId);
-    const periodo = this.getPeriodo(mes, anio);
+    const [generador, compras] = await Promise.all([
+      this.fetchGenerador(empresaId),
+      this.fetchCompras(empresaId, mes, anio, sedeId),
+    ]);
+    const periodo = this.periodoSire(mes, anio);
 
+    // Espeja campo por campo el TXT oficial del RCE (mismos nombres que la
+    // plantilla de SUNAT) para poder cuadrar Excel contra TXT.
     const rows = compras.map((c) => {
       const tipoDocSunat = TIPO_DOC_COMPRA_MAP[c.tipoDoc] ?? '01';
-      const tipoDocProveedor = this.inferTipoDocIdentidad(
-        c.proveedor?.nroDoc ?? '',
-        c.proveedor?.tipoDocumento?.codigo,
-      );
-      // Mismo criterio que el TXT: soles, NC en negativo, no gravadas aparte.
       const signo = tipoDocSunat === '07' ? -1 : 1;
-      const factor = factorCompraASoles(c) * signo;
+      // Importes en soles (ver RCE TXT): factura en US$ × TC de la compra.
+      const factor = factorCompraASoles(c);
+      const n = (val: any) => +(Number(val ?? 0) * factor * signo).toFixed(2);
+      const moneda = c.moneda || 'PEN';
       const base = this.desgloseBaseCompra(c);
-      const subtotalN = base.gravada * factor;
-      const noGravadasN = base.noGravada * factor;
-      const igvN = Number(c.igv ?? 0) * factor;
-      const totalN = Number(c.total ?? 0) * factor;
-
-      if (simple) {
-        return {
-          PERIODO: periodo,
-          CUO: String(c.id).padStart(10, '0'),
-          'FECHA EMISIÓN': this.formatFecha(c.fechaEmision),
-          'FECHA VENCIM.': this.formatFecha(c.fechaVencimiento ?? null),
-          'TIPO CDP': tipoDocSunat,
-          SERIE: c.serie,
-          NÚMERO: c.numero,
-          'TIPO DOC PROVEEDOR': tipoDocProveedor,
-          'NRO DOC PROVEEDOR': c.proveedor?.nroDoc ?? '',
-          'RAZÓN SOCIAL PROVEEDOR': c.proveedor?.nombre ?? '',
-          'BASE GRAVADA': +subtotalN.toFixed(2),
-          IGV: +igvN.toFixed(2),
-          'IMPORTE TOTAL': +totalN.toFixed(2),
-          ESTADO: '1',
-        };
-      }
 
       return {
-        PERÍODO: periodo,
-        CUO: String(c.id).padStart(10, '0'),
-        'CORR. ASIENTO': '',
-        'FECHA EMISIÓN': this.formatFecha(c.fechaEmision),
-        'FECHA VENCIM.': this.formatFecha(c.fechaVencimiento ?? null),
-        'TIPO CDP': tipoDocSunat,
-        SERIE: c.serie,
-        'AÑO DUA/DSI': '',
-        NÚMERO: c.numero,
-        'TIPO DOC PROVEEDOR': tipoDocProveedor,
-        'NRO DOC PROVEEDOR': c.proveedor?.nroDoc ?? '',
-        'RAZÓN SOCIAL': c.proveedor?.nombre ?? '',
-        'BASE ADQ. GRAVADAS': +subtotalN.toFixed(2),
-        'IGV ADQ. GRAVADAS': +igvN.toFixed(2),
-        'BASE ADQ. GRAV. (MX)': 0,
-        'IGV ADQ. GRAV. (MX)': 0,
-        'BASE ADQ. GRAV. (NG)': 0,
-        'IGV ADQ. GRAV. (NG)': 0,
-        'ADQ. NO GRAVADAS': +noGravadasN.toFixed(2),
+        RUC: generador.ruc,
+        'APELLIDOS Y NOMBRES O RAZON SOCIAL': generador.razonSocial,
+        PERIODO: periodo,
+        'CAR SUNAT': '',
+        'FECHA DE EMISION': this.formatFecha(c.fechaEmision),
+        'FECHA VCTO/PAGO': this.formatFecha(c.fechaVencimiento ?? null),
+        'TIPO CP/DOC.': tipoDocSunat,
+        'SERIE DEL CDP': c.serie,
+        'ANIO': '',
+        'NRO CP O DOC.': c.numero,
+        'NRO FINAL (RANGO)': '',
+        'TIPO DOC IDENTIDAD': this.inferTipoDocIdentidad(
+          c.proveedor?.nroDoc ?? '',
+          c.proveedor?.tipoDocumento?.codigo,
+        ),
+        'NRO DOC IDENTIDAD': c.proveedor?.nroDoc ?? '',
+        'APELLIDOS NOMBRES/ RAZON SOCIAL': this.texto(c.proveedor?.nombre),
+        'BI GRAVADO DG': n(base.gravada),
+        'IGV / IPM DG': n(c.igv),
+        'BI GRAVADO DGNG': 0,
+        'IGV / IPM DGNG': 0,
+        'BI GRAVADO DNG': 0,
+        'IGV / IPM DNG': 0,
+        'VALOR ADQ. NG': n(base.noGravada),
         ISC: 0,
         ICBPER: 0,
-        'OTROS TRIBUTOS': 0,
-        'IMPORTE TOTAL': +totalN.toFixed(2),
-        'TIPO CAMBIO': (c.moneda ?? 'PEN') === 'USD' ? +(c.tipoCambio ?? 1) : 1,
-        'FECHA CDP REF.': '',
-        'TIPO CDP REF.': '',
-        'NRO CDP REF.': '',
-        'NRO CONSTANCIA DET.': '',
-        'FECHA CONSTANCIA DET.': '',
-        'PERÍODO CRÉDITO': '',
-        ESTADO: '1',
+        'OTROS TRIB/ CARGOS': 0,
+        'TOTAL CP': n(c.total),
+        MONEDA: moneda,
+        'TIPO DE CAMBIO': moneda === 'PEN' ? '' : Number(c.tipoCambio ?? 0),
+        'FECHA EMISION DOC MODIFICADO': '',
+        'TIPO CP MODIFICADO': '',
+        'SERIE CP MODIFICADO': '',
+        'COD. DAM O DSI': '',
+        'NRO CP MODIFICADO': '',
+        'CLASIF DE BSS Y SSS': '',
+        'ID PROYECTO OPERADORES/PARTICIPES': '',
+        PORCPART: '',
+        IMB: 0,
+        'CAR ORIG': '',
       };
     });
 
@@ -576,8 +683,484 @@ export class SireService {
       wch: Math.max(k.length, 12),
     }));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Registro Compras');
+    XLSX.utils.book_append_sheet(wb, ws, 'RCE');
     return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+  }
+
+  // ──────────────── RESÚMENES (previsualización) ────────────────
+
+  private r2(n: number): number {
+    return Number((n || 0).toFixed(2));
+  }
+
+  /**
+   * Revisión previa del período: lo que un contador necesita mirar ANTES de
+   * generar el archivo. Detecta lo que SUNAT observaría después.
+   */
+  async obtenerRevisionVentas(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    empresarial: boolean,
+    sedeId?: number,
+  ) {
+    const rango = this.getDateRange(mes, anio);
+    const [incluidos, excluidos] = await Promise.all([
+      this.fetchVentas(empresaId, mes, anio, empresarial, sedeId),
+      // Comprobantes del período que NO entran al libro por su estado: son
+      // ventas emitidas que quedarían sin declarar.
+      this.prisma.comprobante.findMany({
+        where: {
+          empresaId,
+          ...(empresarial || !sedeId ? {} : { sedeId }),
+          tipoDoc: { in: ['01', '03', '07', '08'] },
+          fechaEmision: rango,
+          estadoEnvioSunat: {
+            in: ['PENDIENTE', 'RECHAZADO', 'FALLIDO_ENVIO'] as any,
+          },
+        },
+        orderBy: { fechaEmision: 'asc' },
+        select: {
+          tipoDoc: true,
+          serie: true,
+          correlativo: true,
+          estadoEnvioSunat: true,
+          mtoImpVenta: true,
+        },
+      }),
+    ]);
+
+    // ── Huecos de numeración ────────────────────────────────────────────
+    // Por cada serie del período se revisa el rango [min, max] y se marcan
+    // los correlativos que no existen en la empresa. Un correlativo emitido
+    // en otro mes no es hueco, por eso se busca en toda la empresa.
+    const porSerie = new Map<string, number[]>();
+    for (const c of incluidos) {
+      if (!porSerie.has(c.serie)) porSerie.set(c.serie, []);
+      porSerie.get(c.serie)!.push(c.correlativo);
+    }
+    const huecos: Array<{ serie: string; faltantes: number[] }> = [];
+    for (const [serie, nums] of porSerie) {
+      const min = Math.min(...nums);
+      const max = Math.max(...nums);
+      if (max - min > 5000) continue; // rango absurdo: no vale la pena revisar
+      const existentes = new Set(
+        (
+          await this.prisma.comprobante.findMany({
+            where: {
+              empresaId,
+              serie,
+              correlativo: { gte: min, lte: max },
+            },
+            select: { correlativo: true },
+          })
+        ).map((x) => x.correlativo),
+      );
+      const faltantes: number[] = [];
+      for (let n = min; n <= max; n++) if (!existentes.has(n)) faltantes.push(n);
+      if (faltantes.length) huecos.push({ serie, faltantes: faltantes.slice(0, 25) });
+    }
+
+    // ── Documentos de identidad inválidos ───────────────────────────────
+    const docsInvalidos: Array<{
+      comprobante: string;
+      cliente: string;
+      motivo: string;
+    }> = [];
+    for (const c of incluidos) {
+      const nro = (c.cliente?.nroDoc ?? '').trim();
+      const tipo = this.inferTipoDocIdentidad(
+        nro,
+        c.cliente?.tipoDocumento?.codigo,
+      );
+      const etiqueta = `${c.serie}-${c.correlativo}`;
+      const nombre = c.cliente?.nombre ?? '(sin cliente)';
+      // La factura (01) siempre exige RUC del adquirente.
+      if (c.tipoDoc === '01' && !/^\d{11}$/.test(nro)) {
+        docsInvalidos.push({
+          comprobante: etiqueta,
+          cliente: nombre,
+          motivo: nro
+            ? `Factura con RUC inválido: "${nro}"`
+            : 'Factura sin RUC del cliente',
+        });
+      } else if (tipo === '6' && nro && !/^\d{11}$/.test(nro)) {
+        docsInvalidos.push({
+          comprobante: etiqueta,
+          cliente: nombre,
+          motivo: `RUC con ${nro.length} dígitos (debe tener 11)`,
+        });
+      } else if (tipo === '1' && nro && !/^\d{8}$/.test(nro)) {
+        docsInvalidos.push({
+          comprobante: etiqueta,
+          cliente: nombre,
+          motivo: `DNI con ${nro.length} dígitos (debe tener 8)`,
+        });
+      }
+    }
+
+    // ── Notas de crédito sin documento afectado localizable ─────────────
+    const fechas = await this.fetchFechasDocModificado(
+      empresaId,
+      incluidos,
+      'ddmmyyyy',
+    );
+    const notasHuerfanas = incluidos
+      .filter(
+        (c) =>
+          (c.tipoDoc === '07' || c.tipoDoc === '08') && !fechas.get(c.id),
+      )
+      .map((c) => ({
+        comprobante: `${c.serie}-${c.correlativo}`,
+        referencia: c.numDocAfectado ?? '(vacío)',
+      }));
+
+    return {
+      excluidos: excluidos.map((c) => ({
+        comprobante: `${c.serie}-${c.correlativo}`,
+        tipoDoc: c.tipoDoc,
+        estado: c.estadoEnvioSunat,
+        total: this.r2(Number(c.mtoImpVenta ?? 0)),
+      })),
+      huecos,
+      docsInvalidos: docsInvalidos.slice(0, 25),
+      notasHuerfanas,
+      detalle: incluidos.map((c) => {
+        const signo = c.tipoDoc === '07' ? -1 : 1;
+        return {
+          tipoDoc: c.tipoDoc,
+          comprobante: `${c.serie}-${c.correlativo}`,
+          fecha: this.formatFecha(c.fechaEmision),
+          docCliente: c.cliente?.nroDoc ?? '',
+          cliente: c.cliente?.nombre ?? '',
+          base: this.r2(Number(c.mtoOperGravadas ?? 0) * signo),
+          igv: this.r2(Number(c.mtoIGV ?? 0) * signo),
+          total: this.r2(Number(c.mtoImpVenta ?? 0) * signo),
+          anulado: (c.estadoEnvioSunat as any) === 'ANULADO',
+        };
+      }),
+    };
+  }
+
+  /**
+   * Totales del Libro de Ventas del período. Se calcula con la MISMA consulta
+   * (fetchVentas) y los mismos criterios de signo que el TXT/Excel, para que
+   * el usuario pueda cuadrar en pantalla antes de exportar a SUNAT.
+   */
+  async obtenerResumenVentas(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    empresarial: boolean,
+    sedeId?: number,
+  ) {
+    const comprobantes = await this.fetchVentas(
+      empresaId,
+      mes,
+      anio,
+      empresarial,
+      sedeId,
+    );
+
+    let gravadas = 0;
+    let igv = 0;
+    let exoneradas = 0;
+    let inafectas = 0;
+    let exportacion = 0;
+    let total = 0;
+    let anulados = 0;
+    let notasCredito = 0;
+    const porTipoDoc: Record<string, { cantidad: number; total: number }> = {};
+
+    for (const c of comprobantes) {
+      // Mismo criterio que el TXT: las notas de crédito (07) restan.
+      const signo = c.tipoDoc === '07' ? -1 : 1;
+      if (signo === -1) notasCredito++;
+      if ((c.estadoEnvioSunat as any) === 'ANULADO') anulados++;
+
+      gravadas += Number(c.mtoOperGravadas ?? 0) * signo;
+      igv += Number(c.mtoIGV ?? 0) * signo;
+      exoneradas += Number(c.mtoOperExoneradas ?? 0) * signo;
+      inafectas += Number(c.mtoOperInafectas ?? 0) * signo;
+      exportacion += Number(c.mtoOperExportacion ?? 0) * signo;
+      const importe = Number(c.mtoImpVenta ?? 0) * signo;
+      total += importe;
+
+      const tipo = c.tipoDoc ?? '';
+      if (!porTipoDoc[tipo]) porTipoDoc[tipo] = { cantidad: 0, total: 0 };
+      porTipoDoc[tipo].cantidad++;
+      porTipoDoc[tipo].total = this.r2(porTipoDoc[tipo].total + importe);
+    }
+
+    return {
+      periodo: `${anio}${String(mes).padStart(2, '0')}`,
+      cantidad: comprobantes.length,
+      gravadas: this.r2(gravadas),
+      igv: this.r2(igv),
+      exoneradas: this.r2(exoneradas),
+      inafectas: this.r2(inafectas),
+      exportacion: this.r2(exportacion),
+      total: this.r2(total),
+      anulados,
+      notasCredito,
+      porTipoDoc,
+    };
+  }
+
+  /**
+   * Totales del Registro de Compras del período, con la misma consulta
+   * (fetchCompras) que alimenta el TXT/Excel — solo compras REGISTRADO.
+   */
+  async obtenerResumenCompras(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    sedeId?: number,
+  ) {
+    const compras = await this.fetchCompras(empresaId, mes, anio, sedeId);
+
+    let base = 0;
+    let noGravadas = 0;
+    let igv = 0;
+    let total = 0;
+    const porTipoDoc: Record<string, { cantidad: number; total: number }> = {};
+
+    for (const c of compras) {
+      // Mismo criterio que el TXT: soles (US$ × TC de la compra), las notas
+      // de crédito (07) restan y los exonerados/inafectos no son base gravada.
+      const tipoDocSunat = TIPO_DOC_COMPRA_MAP[c.tipoDoc] ?? '01';
+      const signo = tipoDocSunat === '07' ? -1 : 1;
+      const factor = factorCompraASoles(c) * signo;
+      const desglose = this.desgloseBaseCompra(c);
+      base += desglose.gravada * factor;
+      noGravadas += desglose.noGravada * factor;
+      igv += Number(c.igv ?? 0) * factor;
+      const importe = Number(c.total ?? 0) * factor;
+      total += importe;
+
+      const tipo = TIPO_DOC_COMPRA_MAP[c.tipoDoc] ?? '01';
+      if (!porTipoDoc[tipo]) porTipoDoc[tipo] = { cantidad: 0, total: 0 };
+      porTipoDoc[tipo].cantidad++;
+      porTipoDoc[tipo].total = this.r2(porTipoDoc[tipo].total + importe);
+    }
+
+    return {
+      periodo: `${anio}${String(mes).padStart(2, '0')}`,
+      cantidad: compras.length,
+      base: this.r2(base),
+      noGravadas: this.r2(noGravadas),
+      igv: this.r2(igv),
+      total: this.r2(total),
+      porTipoDoc,
+    };
+  }
+
+  /**
+   * IGV resultante del período: débito fiscal (ventas) menos crédito fiscal
+   * (compras). Es el número que el empresario realmente quiere ver y que hoy
+   * tiene que sacar a mano cruzando los dos libros.
+   *
+   * Usa los mismos resúmenes que alimentan los archivos, así que lo que se ve
+   * acá es exactamente lo que se declararía.
+   */
+  async obtenerIgvPeriodo(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    empresarial: boolean,
+    sedeId?: number,
+  ) {
+    const anterior =
+      mes === 1 ? { mes: 12, anio: anio - 1 } : { mes: mes - 1, anio };
+
+    const [ventas, compras, ventasPrev, comprasPrev] = await Promise.all([
+      this.obtenerResumenVentas(empresaId, mes, anio, empresarial, sedeId),
+      this.obtenerResumenCompras(empresaId, mes, anio, sedeId),
+      this.obtenerResumenVentas(
+        empresaId,
+        anterior.mes,
+        anterior.anio,
+        empresarial,
+        sedeId,
+      ),
+      this.obtenerResumenCompras(empresaId, anterior.mes, anterior.anio, sedeId),
+    ]);
+
+    const resultado = this.r2(ventas.igv - compras.igv);
+    const resultadoPrev = this.r2(ventasPrev.igv - comprasPrev.igv);
+    // Solo tiene sentido comparar si el mes anterior tuvo movimiento.
+    const variacion =
+      resultadoPrev !== 0
+        ? this.r2(((resultado - resultadoPrev) / Math.abs(resultadoPrev)) * 100)
+        : null;
+
+    return {
+      periodo: `${anio}${String(mes).padStart(2, '0')}`,
+      debito: ventas.igv,
+      credito: compras.igv,
+      resultado,
+      // Negativo = saldo a favor que se arrastra al mes siguiente.
+      esSaldoAFavor: resultado < 0,
+      comprobantesVentas: ventas.cantidad,
+      comprobantesCompras: compras.cantidad,
+      periodoAnterior: {
+        periodo: `${anterior.anio}${String(anterior.mes).padStart(2, '0')}`,
+        resultado: resultadoPrev,
+      },
+      variacion,
+    };
+  }
+
+  /**
+   * Compara la propuesta que publica SUNAT contra lo que tiene el sistema.
+   *
+   * La propuesta (anexo 2) trae los mismos campos que el archivo de reemplazo
+   * en las primeras 33 posiciones y agrega columnas referenciales despues, asi
+   * que se lee por POSICION y se tolera cualquier cantidad de campos >= 26.
+   * Tambien se tolera una fila de cabecera y el separador ; por si el archivo
+   * viene exportado desde Excel.
+   */
+  async compararConPropuesta(params: {
+    empresaId: number;
+    mes: number;
+    anio: number;
+    contenido: string;
+    empresarial: boolean;
+    sedeId?: number;
+  }) {
+    const { empresaId, mes, anio, contenido, empresarial, sedeId } = params;
+
+    const lineas = contenido
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (!lineas.length) {
+      throw new BadRequestException('El archivo está vacío.');
+    }
+
+    const sep = lineas[0].includes('|') ? '|' : ';';
+    const filas = lineas
+      .map((l) => l.split(sep))
+      .filter((f) => f.length >= 26)
+      // Descarta una posible fila de cabecera: la posición 7 (tipo CP) debe
+      // ser numérica en las filas de datos.
+      .filter((f) => /^\d{1,2}$/.test((f[6] ?? '').trim()));
+
+    if (!filas.length) {
+      throw new BadRequestException(
+        'No se reconocieron filas válidas. Se esperaba el archivo de la propuesta de SUNAT ' +
+          '(campos separados por "|", con el tipo de comprobante en la posición 7).',
+      );
+    }
+
+    const num = (v: string | undefined) => {
+      const n = Number(String(v ?? '').replace(/,/g, '').trim());
+      return Number.isFinite(n) ? this.r2(n) : 0;
+    };
+    // Serie y numero se normalizan (sin ceros a la izquierda) para que
+    // "F0A1"/"0310" y "F0A1"/"310" se reconozcan como el mismo comprobante.
+    const clave = (tipo: string, serie: string, numero: string) =>
+      `${tipo.trim().padStart(2, '0')}|${serie.trim().toUpperCase()}|${String(
+        numero,
+      )
+        .trim()
+        .replace(/^0+/, '')}`;
+
+    const sunat = new Map<
+      string,
+      { comprobante: string; base: number; igv: number; total: number }
+    >();
+    for (const f of filas) {
+      const tipo = (f[6] ?? '').trim().padStart(2, '0');
+      const serie = (f[7] ?? '').trim();
+      // La 8 es el año de la DUA y viene vacía en las facturas normales: el
+      // número del CP está en la 9. Misma regla por fila que en la sincronización.
+      const numero = ((f[9] ?? '').trim() || (f[8] ?? '').trim());
+      sunat.set(clave(tipo, serie, numero), {
+        comprobante: `${serie}-${numero.replace(/^0+/, '')}`,
+        // Mismos índices que la sincronización; ver la nota de allá.
+        base: num(f[14]) + num(f[16]) + num(f[18]),
+        igv: num(f[15]) + num(f[17]) + num(f[19]),
+        total: num(f[24]),
+      });
+    }
+
+    const propios = await this.fetchVentas(
+      empresaId,
+      mes,
+      anio,
+      empresarial,
+      sedeId,
+    );
+    const sistema = new Map<
+      string,
+      { comprobante: string; base: number; igv: number; total: number }
+    >();
+    for (const c of propios) {
+      const signo = c.tipoDoc === '07' ? -1 : 1;
+      sistema.set(clave(c.tipoDoc, c.serie, String(c.correlativo)), {
+        comprobante: `${c.serie}-${c.correlativo}`,
+        base: this.r2(Number(c.mtoOperGravadas ?? 0) * signo),
+        igv: this.r2(Number(c.mtoIGV ?? 0) * signo),
+        total: this.r2(Number(c.mtoImpVenta ?? 0) * signo),
+      });
+    }
+
+    const soloEnSunat: any[] = [];
+    const soloEnSistema: any[] = [];
+    const diferencias: any[] = [];
+    const tolerancia = 0.01;
+
+    for (const [k, v] of sunat) {
+      const mio = sistema.get(k);
+      if (!mio) {
+        soloEnSunat.push({ ...v, tipoDoc: k.split('|')[0] });
+        continue;
+      }
+      if (
+        Math.abs(mio.base - v.base) > tolerancia ||
+        Math.abs(mio.igv - v.igv) > tolerancia ||
+        Math.abs(mio.total - v.total) > tolerancia
+      ) {
+        diferencias.push({
+          comprobante: mio.comprobante,
+          tipoDoc: k.split('|')[0],
+          sunat: v,
+          sistema: mio,
+        });
+      }
+    }
+    for (const [k, v] of sistema) {
+      if (!sunat.has(k)) {
+        soloEnSistema.push({ ...v, tipoDoc: k.split('|')[0] });
+      }
+    }
+
+    const suma = (m: Map<string, { igv: number; total: number }>) => {
+      let igv = 0;
+      let total = 0;
+      for (const v of m.values()) {
+        igv += v.igv;
+        total += v.total;
+      }
+      return { igv: this.r2(igv), total: this.r2(total) };
+    };
+
+    return {
+      periodo: this.periodoSire(mes, anio),
+      totales: {
+        sunat: { cantidad: sunat.size, ...suma(sunat) },
+        sistema: { cantidad: sistema.size, ...suma(sistema) },
+      },
+      cuadra:
+        !soloEnSunat.length && !soloEnSistema.length && !diferencias.length,
+      soloEnSunat: soloEnSunat.slice(0, 100),
+      soloEnSistema: soloEnSistema.slice(0, 100),
+      diferencias: diferencias.slice(0, 100),
+      totalSoloEnSunat: soloEnSunat.length,
+      totalSoloEnSistema: soloEnSistema.length,
+      totalDiferencias: diferencias.length,
+    };
   }
 
   // ──────────────── EMAIL ────────────────
@@ -586,7 +1169,6 @@ export class SireService {
     tipo: 'ventas' | 'compras';
     mes: number;
     anio: number;
-    simple: boolean;
     empresarial?: boolean;
     empresaId: number;
     destinatario: string;
@@ -608,7 +1190,6 @@ export class SireService {
       tipo,
       mes,
       anio,
-      simple,
       empresarial,
       empresaId,
       destinatario,
@@ -623,7 +1204,6 @@ export class SireService {
         empresaId,
         mes,
         anio,
-        simple,
         empresarial ?? false,
         sedeId,
       );
@@ -631,7 +1211,6 @@ export class SireService {
         empresaId,
         mes,
         anio,
-        simple,
         empresarial ?? false,
         sedeId,
       );
@@ -640,14 +1219,12 @@ export class SireService {
         empresaId,
         mes,
         anio,
-        simple,
         sedeId,
       );
       xlsxBuffer = await this.generarExcelCompras(
         empresaId,
         mes,
         anio,
-        simple,
         sedeId,
       );
     }
@@ -668,7 +1245,7 @@ export class SireService {
     });
 
     await transporter.sendMail({
-      from: `"Vendify SIRE" <${smtpFrom}>`,
+      from: `"Falconext SIRE" <${smtpFrom}>`,
       to: destinatario,
       subject: `SIRE - ${label} | Período ${periodo}`,
       html: `
@@ -679,7 +1256,7 @@ export class SireService {
           <li><strong>${nombreTxt}</strong> — Formato TXT para importar en el sistema SIRE de SUNAT.</li>
           <li><strong>${nombreXlsx}</strong> — Versión Excel para revisión.</li>
         </ul>
-        <p>Generado por <strong>Vendify</strong>.</p>
+        <p>Generado por <strong>Falconext MyPE</strong>.</p>
       `,
       attachments: [
         { filename: nombreTxt, content: txtBuffer, contentType: 'text/plain' },
@@ -692,4 +1269,600 @@ export class SireService {
       ],
     });
   }
+
+  // ───────────────────────── Revisión del contador (RCE) ─────────────────────
+  /**
+   * Compras del período con su estado de revisión, para que el contador las
+   * apruebe o deniegue una por una. A diferencia del resumen/TXT, aquí SÍ se
+   * listan las denegadas: el negocio tiene que ver qué le rechazaron y por qué.
+   */
+  async obtenerRevisionCompras(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    sedeId?: number,
+  ) {
+    const fechaEmision = this.getDateRange(mes, anio);
+    const compras = await this.prisma.compra.findMany({
+      where: {
+        empresaId,
+        ...(sedeId ? { sedeId } : {}),
+        fechaEmision,
+        estado: 'REGISTRADO' as any,
+      },
+      orderBy: [{ fechaEmision: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        tipoDoc: true,
+        serie: true,
+        numero: true,
+        fechaEmision: true,
+        moneda: true,
+        tipoCambio: true,
+        subtotal: true,
+        igv: true,
+        total: true,
+        esGasto: true,
+        estadoContador: true,
+        motivoContador: true,
+        revisadoContadorEn: true,
+        proveedor: { select: { nombre: true, nroDoc: true } },
+      },
+    });
+
+    const items = compras.map((c) => {
+      const factor = factorCompraASoles(c as any);
+      return {
+        id: c.id,
+        tipoDoc: c.tipoDoc,
+        tipoDocSunat: TIPO_DOC_COMPRA_MAP[c.tipoDoc] ?? '01',
+        documento: `${c.serie}-${c.numero}`,
+        fechaEmision: c.fechaEmision,
+        proveedor: c.proveedor?.nombre ?? '',
+        proveedorDoc: c.proveedor?.nroDoc ?? '',
+        moneda: c.moneda,
+        // Importes en soles, igual que el TXT y el resumen.
+        base: this.r2(Number(c.subtotal ?? 0) * factor),
+        igv: this.r2(Number(c.igv ?? 0) * factor),
+        total: this.r2(Number(c.total ?? 0) * factor),
+        esGasto: c.esGasto,
+        estadoContador: c.estadoContador,
+        motivoContador: c.motivoContador,
+        revisadoContadorEn: c.revisadoContadorEn,
+      };
+    });
+
+    const suma = (f: (i: (typeof items)[number]) => number, estado?: string) =>
+      this.r2(
+        items
+          .filter((i) => !estado || i.estadoContador === estado)
+          .reduce((a, i) => a + f(i), 0),
+      );
+
+    return {
+      periodo: `${anio}${String(mes).padStart(2, '0')}`,
+      items,
+      resumen: {
+        total: items.length,
+        pendientes: items.filter((i) => i.estadoContador === 'PENDIENTE').length,
+        aprobadas: items.filter((i) => i.estadoContador === 'APROBADA').length,
+        denegadas: items.filter((i) => i.estadoContador === 'DENEGADA').length,
+        // Crédito fiscal en juego: el que se declara y el que se pierde al denegar.
+        igvDeclarable: this.r2(suma((i) => i.igv) - suma((i) => i.igv, 'DENEGADA')),
+        igvDenegado: suma((i) => i.igv, 'DENEGADA'),
+      },
+    };
+  }
+
+  /**
+   * Aprueba o deniega compras (una o varias). Denegar exige motivo: es lo que
+   * el negocio va a leer para entender por qué no se declaró esa factura.
+   */
+  async revisarCompras(
+    empresaId: number,
+    usuarioId: number | undefined,
+    dto: { ids: number[]; estado: 'PENDIENTE' | 'APROBADA' | 'DENEGADA'; motivo?: string },
+  ) {
+    const ids = Array.from(new Set((dto.ids || []).map(Number).filter(Boolean)));
+    if (!ids.length) {
+      throw new BadRequestException('Elige al menos una compra para revisar.');
+    }
+    const motivo = String(dto.motivo ?? '').trim();
+    if (dto.estado === 'DENEGADA' && !motivo) {
+      throw new BadRequestException(
+        'Indica el motivo del rechazo: el negocio necesita saber por qué no se declara esa compra.',
+      );
+    }
+    // Solo compras de la empresa (el id viaja desde el cliente).
+    const propias = await this.prisma.compra.findMany({
+      where: { id: { in: ids }, empresaId },
+      select: { id: true },
+    });
+    if (!propias.length) {
+      throw new BadRequestException('No se encontraron esas compras.');
+    }
+    const pendiente = dto.estado === 'PENDIENTE';
+    await this.prisma.compra.updateMany({
+      where: { id: { in: propias.map((c) => c.id) }, empresaId },
+      data: {
+        estadoContador: dto.estado as any,
+        // Volver a "pendiente" limpia la revisión anterior.
+        motivoContador: pendiente ? null : motivo || null,
+        revisadoContadorEn: pendiente ? null : new Date(),
+        revisadoContadorPor: pendiente ? null : (usuarioId ?? null),
+      },
+    });
+    return { actualizadas: propias.length, estado: dto.estado };
+  }
+
+
+  /**
+   * Cruza las COMPRAS del período con la propuesta del RCE que SUNAT publica
+   * (Menú SOL → SIRE → RCE → Propuesta → Exportar). Es lo que un contador
+   * revisa a mano: qué facturas tiene SUNAT que el negocio nunca registró (ahí
+   * se pierde crédito fiscal), cuáles registró el negocio y SUNAT no tiene, y
+   * cuáles no cuadran en importes.
+   *
+   * El archivo del RCE es "campo|campo|..." por posición. Ojo: NO es el mismo
+   * layout que el de ventas — entre la serie y el número va el "año de emisión
+   * de la DUA", así que el número está una posición más a la derecha. Se valida
+   * y, si no calza, se cae a la posición anterior para tolerar variantes.
+   */
+  async compararComprasConPropuesta(params: {
+    empresaId: number;
+    mes: number;
+    anio: number;
+    contenido: string;
+    sedeId?: number;
+  }) {
+    const { empresaId, mes, anio, contenido, sedeId } = params;
+
+    const lineas = contenido
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (!lineas.length) {
+      throw new BadRequestException('El archivo está vacío.');
+    }
+
+    const sep = lineas[0].includes('|') ? '|' : ';';
+    const filas = lineas
+      .map((l) => l.split(sep))
+      .filter((f) => f.length >= 20)
+      // Descarta la cabecera: en las filas de datos el tipo de CP es numérico.
+      .filter((f) => /^\d{1,2}$/.test((f[6] ?? '').trim()));
+
+    if (!filas.length) {
+      throw new BadRequestException(
+        'No se reconocieron filas válidas. Se esperaba el archivo de la propuesta del RCE ' +
+          '(SIRE → Compras → Propuesta → Exportar), con los campos separados por "|".',
+      );
+    }
+
+    const num = (v: string | undefined) => {
+      const n = Number(String(v ?? '').replace(/,/g, '').trim());
+      return Number.isFinite(n) ? this.r2(n) : 0;
+    };
+    const clave = (tipo: string, serie: string, numero: string) =>
+      `${tipo.trim().padStart(2, '0')}|${serie.trim().toUpperCase()}|${String(numero)
+        .trim()
+        .replace(/^0+/, '')}`;
+
+    // El número del CP va en la posición 10 del RCE (la 9 es el año de emisión
+    // de la DUA, casi siempre vacío). Se resuelve POR FILA: si la 10 trae algo
+    // se usa esa; si viene vacía, el archivo no tiene la columna DUA y el
+    // número está en la 9. Mirar solo la primera fila fallaba con archivos
+    // mixtos (una importación con DUA entre facturas normales).
+    const numeroDeFila = (f: string[]) => {
+      const conDua = (f[9] ?? '').trim();
+      return conDua || (f[8] ?? '').trim();
+    };
+
+    const sunat = new Map<
+      string,
+      {
+        comprobante: string;
+        proveedor: string;
+        proveedorDoc: string;
+        fechaEmision: string;
+        base: number;
+        igv: number;
+        total: number;
+      }
+    >();
+    for (const f of filas) {
+      const tipo = (f[6] ?? '').trim().padStart(2, '0');
+      const serie = (f[7] ?? '').trim();
+      const numero = numeroDeFila(f);
+      if (!serie && !numero) continue;
+      // La base gravada del RCE viene partida en tres pares (gravada, gravada
+      // y no gravada, no gravada); para cuadrar con nuestra compra se suman.
+      //
+      // Los índices son 0-based sobre las columnas del TXT de la propuesta:
+      //   14 BI Gravado DG   15 IGV/IPM DG
+      //   16 BI Gravado DGNG 17 IGV/IPM DGNG
+      //   18 BI Gravado DNG  19 IGV/IPM DNG
+      //   24 Total CP
+      // Estaban corridos un campo: lo que se mostraba como IGV eran las bases.
+      // Con setiembre 2026 de KREZKA el panel anunciaba S/ 4,728.47 de IGV
+      // cuando SUNAT dice 832.19 — el crédito fiscal salía 5.7 veces inflado.
+      const base = num(f[14]) + num(f[16]) + num(f[18]);
+      const igv = num(f[15]) + num(f[17]) + num(f[19]);
+      sunat.set(clave(tipo, serie, numero), {
+        comprobante: `${serie}-${numero.replace(/^0+/, '')}`,
+        // 11 es el TIPO de documento ("6" = RUC) y 12 el número; el nombre
+        // está en la 13. Con el corrimiento salía el RUC donde va el proveedor,
+        // y la pantalla listaba números en vez de nombres.
+        proveedorDoc: (f[12] ?? '').trim(),
+        proveedor: (f[13] ?? '').trim(),
+        fechaEmision: (f[4] ?? '').trim(),
+        base: this.r2(base),
+        igv: this.r2(igv),
+        // 23 es "Otros Trib/Cargos" y venía casi siempre en 0.00: por eso TODOS
+        // los comprobantes que sí cruzaban salían como "diferencia de importe".
+        total: num(f[24]),
+      });
+    }
+
+    // Las denegadas por el contador no entran al RCE (fetchCompras las excluye),
+    // pero SÍ hay que reconocerlas en el cruce: si no, aparecerían como "SUNAT
+    // las tiene y tú no" cuando en realidad se excluyeron a propósito.
+    const propias = await this.fetchCompras(empresaId, mes, anio, sedeId);
+    const denegadas = await this.prisma.compra.findMany({
+      where: {
+        empresaId,
+        ...(sedeId ? { sedeId } : {}),
+        fechaEmision: this.getDateRange(mes, anio),
+        estado: 'REGISTRADO' as any,
+        estadoContador: 'DENEGADA' as any,
+      },
+      select: {
+        id: true,
+        tipoDoc: true,
+        serie: true,
+        numero: true,
+        motivoContador: true,
+      },
+    });
+    const denegadasPorClave = new Map(
+      denegadas.map((c) => [
+        clave(TIPO_DOC_COMPRA_MAP[c.tipoDoc] ?? '01', c.serie, String(c.numero)),
+        c,
+      ]),
+    );
+    const sistema = new Map<
+      string,
+      {
+        id: number;
+        comprobante: string;
+        proveedor: string;
+        base: number;
+        igv: number;
+        total: number;
+      }
+    >();
+    for (const c of propias) {
+      const tipoSunat = TIPO_DOC_COMPRA_MAP[c.tipoDoc] ?? '01';
+      const signo = tipoSunat === '07' ? -1 : 1;
+      const factor = factorCompraASoles(c as any) * signo;
+      sistema.set(clave(tipoSunat, c.serie, String(c.numero)), {
+        id: c.id,
+        comprobante: `${c.serie}-${c.numero}`,
+        proveedor: (c as any).proveedor?.nombre ?? '',
+        base: this.r2(Number(c.subtotal ?? 0) * factor),
+        igv: this.r2(Number(c.igv ?? 0) * factor),
+        total: this.r2(Number(c.total ?? 0) * factor),
+      });
+    }
+
+    const soloEnSunat: any[] = [];
+    const soloEnSistema: any[] = [];
+    const diferencias: any[] = [];
+    const denegadasEnSunat: any[] = [];
+    const tolerancia = 0.01;
+
+    for (const [k, v] of sunat) {
+      const mio = sistema.get(k);
+      if (!mio) {
+        const deneg = denegadasPorClave.get(k);
+        if (deneg) {
+          // SUNAT la tiene y el negocio la registró, pero el contador la excluyó.
+          denegadasEnSunat.push({
+            ...v,
+            tipoDoc: k.split('|')[0],
+            compraId: deneg.id,
+            motivo: deneg.motivoContador,
+          });
+          continue;
+        }
+        soloEnSunat.push({ ...v, tipoDoc: k.split('|')[0] });
+        continue;
+      }
+      if (
+        Math.abs(mio.base - v.base) > tolerancia ||
+        Math.abs(mio.igv - v.igv) > tolerancia ||
+        Math.abs(mio.total - v.total) > tolerancia
+      ) {
+        diferencias.push({
+          comprobante: mio.comprobante,
+          tipoDoc: k.split('|')[0],
+          compraId: mio.id,
+          sunat: v,
+          sistema: mio,
+        });
+      }
+    }
+    for (const [k, v] of sistema) {
+      if (!sunat.has(k)) {
+        soloEnSistema.push({ ...v, tipoDoc: k.split('|')[0] });
+      }
+    }
+
+    const suma = (arr: Array<{ igv: number; total: number }>) => ({
+      igv: this.r2(arr.reduce((a, v) => a + v.igv, 0)),
+      total: this.r2(arr.reduce((a, v) => a + v.total, 0)),
+    });
+
+    return {
+      periodo: this.periodoSire(mes, anio),
+      totales: {
+        sunat: { cantidad: sunat.size, ...suma([...sunat.values()]) },
+        sistema: { cantidad: sistema.size, ...suma([...sistema.values()]) },
+      },
+      cuadra:
+        !soloEnSunat.length && !soloEnSistema.length && !diferencias.length,
+      // Crédito fiscal que el negocio está dejando de usar por no haber
+      // registrado esas compras: el número que justifica todo el cruce.
+      igvNoAprovechado: suma(soloEnSunat).igv,
+      // Las que SUNAT tiene y el contador excluyó a propósito: ni error ni
+      // crédito perdido por descuido, pero hay que verlas.
+      denegadas: denegadasEnSunat.slice(0, 200),
+      totalDenegadas: denegadasEnSunat.length,
+      igvDenegado: suma(denegadasEnSunat).igv,
+      soloEnSunat: soloEnSunat.slice(0, 200),
+      soloEnSistema: soloEnSistema.slice(0, 200),
+      diferencias: diferencias.slice(0, 200),
+      totalSoloEnSunat: soloEnSunat.length,
+      totalSoloEnSistema: soloEnSistema.length,
+      totalDiferencias: diferencias.length,
+    };
+  }
+
+
+  // ───────────── Sincronización con la API del SIRE de SUNAT ─────────────
+  /**
+   * Estado de la configuración del SIRE de una empresa, para que la UI sepa si
+   * puede ofrecer el botón de sincronizar (sin exponer secretos).
+   */
+  async estadoSire(empresaId: number) {
+    const e = (await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: {
+        ruc: true,
+        sireClientId: true,
+        sireClientSecret: true,
+        sireUsuarioSol: true,
+        sireClaveSol: true,
+      },
+    })) as any;
+    const falta: string[] = [];
+    if (!e?.sireClientId) falta.push('Client ID');
+    if (!e?.sireClientSecret) falta.push('Client Secret');
+    if (!e?.sireUsuarioSol) falta.push('Usuario SOL');
+    if (!e?.sireClaveSol) falta.push('Clave SOL');
+    return {
+      configurado: falta.length === 0,
+      falta,
+      usuarioSol: e?.sireUsuarioSol ?? null,
+      clientId: e?.sireClientId ?? null,
+    };
+  }
+
+  /** Credenciales listas para el cliente, o un error explicando qué falta. */
+  private async credencialesSire(empresaId: number): Promise<SireCredenciales> {
+    const e = (await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: {
+        ruc: true,
+        sireClientId: true,
+        sireClientSecret: true,
+        sireUsuarioSol: true,
+        sireClaveSol: true,
+      },
+    })) as any;
+    const clave = descifrarSecreto(e?.sireClaveSol);
+    if (!e?.sireClientId || !e?.sireClientSecret || !e?.sireUsuarioSol || !clave) {
+      throw new BadRequestException(
+        'Faltan las credenciales del SIRE. Complétalas en Perfil → Configuración → SIRE (API de SUNAT).',
+      );
+    }
+    return {
+      ruc: String(e.ruc ?? ''),
+      clientId: e.sireClientId,
+      clientSecret: e.sireClientSecret,
+      usuarioSol: e.sireUsuarioSol,
+      claveSol: clave,
+    };
+  }
+
+  /**
+   * Prueba de conexión: pide el token al SIRE y reporta el resultado. Sirve
+   * para que el usuario sepa si sus credenciales quedaron bien SIN tener que
+   * esperar a una sincronización completa.
+   */
+  /** AAAAMM del mes pasado: el período que con más seguridad ya está cerrado. */
+  private periodoAnteriorSire(): string {
+    const partes = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Lima',
+      year: 'numeric',
+      month: '2-digit',
+    }).formatToParts(new Date());
+    const valor = (t: string) => Number(partes.find((p) => p.type === t)?.value);
+    let mes = valor('month') - 1;
+    let anio = valor('year');
+    if (mes === 0) {
+      mes = 12;
+      anio -= 1;
+    }
+    return `${anio}${String(mes).padStart(2, '0')}`;
+  }
+
+  async probarConexionSire(empresaId: number) {
+    const cred = await this.credencialesSire(empresaId);
+    const cliente = new SireClient(cred);
+    try {
+      const token = await cliente.obtenerToken();
+      // El token solo prueba que el usuario y la credencial son válidos. Antes
+      // la prueba terminaba acá y pintaba verde, pero el acceso al SIRE puede
+      // fallar igual —RUC que no corresponde, servicio no habilitado— y el
+      // empresario se enteraba recién al pedir sus compras. Se hace una lectura
+      // real para que el verde signifique "esto funciona".
+      const periodo = this.periodoAnteriorSire();
+      try {
+        await cliente.solicitarPropuestaRce(periodo);
+      } catch (e: any) {
+        return {
+          ok: false,
+          mensaje: 'Las credenciales son válidas, pero SUNAT no devolvió tus compras.',
+          detalle: e?.detalle ?? e?.message ?? null,
+        };
+      }
+      return {
+        ok: true,
+        mensaje: 'Conexión con el SIRE establecida.',
+        tokenLargo: token.length,
+      };
+    } catch (e: any) {
+      return {
+        ok: false,
+        mensaje: e?.message ?? 'No se pudo conectar con el SIRE.',
+        detalle: e?.detalle ?? null,
+      };
+    }
+  }
+
+  /**
+   * Trae del SIRE la propuesta de compras del período y la cruza con lo
+   * registrado, reusando exactamente el mismo análisis que el cruce manual
+   * (`compararComprasConPropuesta`): la API solo reemplaza el "subir archivo".
+   *
+   * OJO: la descarga depende de rutas de SUNAT que al 2026-09-22 devuelven 401
+   * (credenciales recién creadas, aún no habilitadas). El flujo queda escrito y
+   * los errores traducidos; al habilitarse puede hacer falta ajustar las rutas
+   * (son configurables por variables de entorno en sire.client.ts).
+   */
+  /**
+   * Convierte un fallo del SIRE en una respuesta que el empresario pueda leer.
+   *
+   * El `SireError` lleva un `detalle` con lo que contestó SUNAT, pero si sube
+   * sin traducir Nest lo vuelve un 500 genérico y ese detalle se pierde: en
+   * pantalla quedaba "El SIRE de SUNAT respondió con un error." y nada más, que
+   * no alcanza ni para saber si reintentar.
+   */
+  private comoErrorLegible(e: any): never {
+    const mensaje = e?.message ?? 'No se pudo consultar el SIRE de SUNAT.';
+    const detalle = e?.detalle ? ` ${e.detalle}` : '';
+    throw new BadRequestException(`${mensaje}${detalle}`.trim());
+  }
+
+  async sincronizarComprasDesdeSire(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    sedeId?: number,
+  ) {
+    try {
+      return await this.sincronizarComprasDesdeSireInterno(
+        empresaId, mes, anio, sedeId,
+      );
+    } catch (e: any) {
+      if (e?.name === 'SireError') this.comoErrorLegible(e);
+      throw e;
+    }
+  }
+
+  private async sincronizarComprasDesdeSireInterno(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    sedeId?: number,
+  ) {
+    const cred = await this.credencialesSire(empresaId);
+    const cliente = new SireClient(cred);
+    const periodo = `${anio}${String(mes).padStart(2, '0')}`;
+
+    const solicitud = await cliente.solicitarPropuestaRce(periodo);
+    // SUNAT responde con un ticket cuando la exportación es asíncrona, o
+    // directamente con el contenido cuando es pequeña.
+    const numTicket =
+      solicitud?.numTicket ?? solicitud?.numticket ?? solicitud?.ticket ?? null;
+
+    let contenido = '';
+    if (!numTicket) {
+      contenido = typeof solicitud === 'string' ? solicitud : '';
+    } else {
+      // SUNAT tarda unos segundos en generar el archivo. Antes se consultaba el
+      // ticket una sola vez, al instante, y casi siempre salía "aún no está
+      // listo" aunque a los pocos segundos ya lo estuviera. Se espera un poco.
+      let reporte: any = null;
+      let registro: any = null;
+      for (let intento = 1; intento <= 6; intento++) {
+        const estado = await cliente.consultarTicket(periodo, String(numTicket));
+        registro = estado?.registros?.[0] ?? null;
+        reporte = registro?.archivoReporte?.[0] ?? null;
+        if (reporte?.nomArchivoReporte || estado?.nomArchivoReporte) break;
+        if (intento < 6) await new Promise((s) => setTimeout(s, 5000));
+      }
+      const archivo = reporte?.nomArchivoReporte ?? null;
+      if (!archivo) {
+        // Un ticket "Terminado" sin archivo NO es un archivo que todavía se
+        // está generando: es que SUNAT no tiene comprobantes para el período.
+        // Decir "vuelve a intentar en unos minutos" manda al empresario a
+        // reintentar para siempre por algo que nunca va a cambiar solo.
+        const detalle = registro?.detalleTicket ?? {};
+        const terminado =
+          String(registro?.desEstadoProceso ?? '').toLowerCase() === 'terminado';
+        const informados = Number(detalle?.cntCPInformados ?? 0);
+        if (terminado && !(informados > 0)) {
+          return {
+            vacio: true,
+            numTicket: String(numTicket),
+            mensaje:
+              'SUNAT no tiene comprobantes para este período. Si esperabas ver compras acá, revisa en el SIRE de SUNAT que la propuesta del período siga disponible: una vez que la registras, deja de estar.',
+          };
+        }
+        return {
+          pendiente: true,
+          numTicket: String(numTicket),
+          mensaje:
+            'SUNAT está preparando el archivo. Vuelve a intentar en unos minutos.',
+        };
+      }
+      // Todo sale del ticket. `codProceso` y `numTicket` no son opcionales:
+      // sin ellos SUNAT responde 422 "El archivo solicitado no existe".
+      contenido = await cliente.descargarArchivo({
+        nombreArchivo: String(archivo),
+        codTipoArchivo: String(reporte?.codTipoAchivoReporte ?? '00'),
+        numTicket: String(numTicket),
+        codProceso: String(registro?.codProceso ?? '10'),
+        perTributario: String(registro?.perTributario ?? periodo),
+      });
+    }
+
+    if (!contenido.trim()) {
+      throw new BadRequestException(
+        'SUNAT no devolvió comprobantes para ese período.',
+      );
+    }
+
+    const cruce = await this.compararComprasConPropuesta({
+      empresaId,
+      mes,
+      anio,
+      contenido,
+      sedeId,
+    });
+    return { ...cruce, origen: 'SUNAT' as const };
+  }
+
 }
