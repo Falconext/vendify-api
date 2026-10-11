@@ -80,6 +80,8 @@ export class CreateEnvioDespachoDto {
   @IsOptional() @IsString() contenidoPaquete?: string;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) montoCOD?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) costoEnvio?: number;
+  /** Lo que se le paga al courier por este despacho (no lo que se cobra al cliente). */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) costoCourier?: number;
   @IsOptional() @IsIn(['CLIENTE', 'NEGOCIO']) pagarFlete?:
     | 'CLIENTE'
     | 'NEGOCIO';
@@ -110,4 +112,12 @@ export class ExportarRepartoQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() repartidorId?: number;
   /** Estado del despacho a incluir (por defecto todos menos DEVUELTO). */
   @IsOptional() @IsString() estado?: string;
+  /**
+   * Courier del que se reporta. `PROPIOS` (por defecto) conserva el
+   * comportamiento histórico: la plantilla de carga masiva del motorizado.
+   * `SHALOM`/`OLVA` reportan los envíos por agencia y `TODOS` los compara.
+   */
+  @IsOptional()
+  @IsIn(['PROPIOS', 'SHALOM', 'OLVA', 'TODOS'])
+  courier?: 'PROPIOS' | 'SHALOM' | 'OLVA' | 'TODOS';
 }
