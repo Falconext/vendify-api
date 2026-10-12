@@ -1838,6 +1838,15 @@ model Compra {
   sedeId Int?
   sede   Sede? @relation(fields: [sedeId], references: [id])
 
+  // Revisión del CONTADOR sobre esta compra para el SIRE (distinto de `estado`,
+  // que es el visto bueno interno del dueño a sus vendedores): PENDIENTE al
+  // registrarse, APROBADA entra al RCE, DENEGADA se excluye con su motivo
+  // (p.ej. "no corresponde al giro del negocio").
+  estadoContador      EstadoContador @default(PENDIENTE)
+  motivoContador      String?
+  revisadoContadorEn  DateTime?
+  revisadoContadorPor Int?
+
   @@index([empresaId])
   @@index([proveedorId])
   @@index([fechaEmision])
@@ -3128,4 +3137,15 @@ model OperacionSync {
 
   @@index([empresaId, dispositivoId, recibidoEn])
   @@index([empresaId, estado])
+}
+
+// =============================================
+// REVISIÓN DEL CONTADOR (SIRE / RCE)
+// Lo que el contador decide de cada compra antes de que entre al registro.
+// =============================================
+
+enum EstadoContador {
+  PENDIENTE
+  APROBADA
+  DENEGADA
 }
