@@ -61,7 +61,7 @@ function armar(opts: { sinStock?: boolean; producto?: any; presentacion?: any } 
     },
   };
   const noop: any = new Proxy({}, { get: () => jest.fn() });
-  return { service: new TiendaService(prisma, noop, noop, noop, noop, noop, noop), creado };
+  return { service: new TiendaService(prisma, noop, noop, noop, noop), creado };
 }
 
 const pedido = (item: any) => ({

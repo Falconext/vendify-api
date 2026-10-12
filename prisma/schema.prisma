@@ -1779,6 +1779,11 @@ model Compra {
   // del mes (neto, sin IGV: ese IGV es crédito fiscal). Por defecto se marca
   // sola cuando ninguna línea está enlazada a un producto del catálogo.
   esGasto              Boolean            @default(false)
+  // Revisión del contador antes de que la compra entre al SIRE.
+  estadoContador       EstadoContador     @default(PENDIENTE)
+  motivoContador       String?
+  revisadoContadorEn   DateTime?
+  revisadoContadorPor  Int?
   creadoEn             DateTime           @default(now())
   actualizadoEn        DateTime           @updatedAt
   cuotas               Json?
@@ -2082,6 +2087,13 @@ enum EstadoOrdenCompra {
   EMITIDA
   RECIBIDA
   ANULADA
+}
+
+// Revisión del contador sobre una compra antes de llevarla al SIRE.
+enum EstadoContador {
+  PENDIENTE
+  APROBADA
+  DENEGADA
 }
 
 enum EstadoCompra {

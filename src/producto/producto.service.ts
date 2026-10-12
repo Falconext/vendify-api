@@ -349,6 +349,7 @@ export class ProductoService {
             unidadesPorPaquete?: number;
             precioPaquete?: number;
             alias?: string;
+            codigoInterno?: string;
             imagenUrl?: string;
           }
       >;
@@ -1970,6 +1971,7 @@ export class ProductoService {
           unidadesPorPaquete?: number;
           precioPaquete?: number;
           alias?: string;
+          codigoInterno?: string;
           imagenUrl?: string;
         }
     >,
@@ -2087,6 +2089,7 @@ export class ProductoService {
               unidadesPorPaquete?: number;
               precioPaquete?: number;
               alias?: string;
+              codigoInterno?: string;
               imagenUrl?: string;
             }
         >
@@ -2603,6 +2606,7 @@ export class ProductoService {
             unidadesPorPaquete?: number;
             precioPaquete?: number;
             alias?: string;
+            codigoInterno?: string;
             imagenUrl?: string;
           }
       >;

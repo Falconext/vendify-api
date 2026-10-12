@@ -2272,6 +2272,9 @@ export class TiendaService {
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
+        // Si el negocio trabaja por encargo, el pedido entra aunque no haya
+        // stock. Sin este campo el guard de abajo lo rechaza por su cuenta.
+        tiendaVentaSinStock: true,
       },
     });
 

@@ -932,6 +932,8 @@ export class ComprasService {
       sedeId: number | null;
       moneda?: string | null;
       tipoCambio?: any;
+      /** Consumo propio: no sumó stock, así que revertirla no debe restarlo. */
+      esGasto?: boolean | null;
       detalles: {
         productoId: number | null;
         cantidad: any;

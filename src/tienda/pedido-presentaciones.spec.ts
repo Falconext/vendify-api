@@ -91,7 +91,7 @@ function armar(opts: { producto?: any; presentacion?: any; variante?: any } = {}
     },
   };
   const noop: any = new Proxy({}, { get: () => jest.fn() });
-  const service = new TiendaService(prisma, noop, noop, noop, noop, noop, noop);
+  const service = new TiendaService(prisma, noop, noop, noop, noop);
   return { service, prisma, creado };
 }
 
