@@ -1,11 +1,14 @@
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
+  Max,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
@@ -298,4 +301,23 @@ export class CreateProductoDto {
     codigoBarras?: string | null;
     estado?: 'ACTIVO' | 'INACTIVO';
   }[];
+  /**
+   * Qué se le puede prometer al cliente: INMEDIATA, BAJO_PEDIDO,
+   * NO_DISPONIBLE (agotado, puede volver) o NO_COMERCIAL (descontinuado).
+   * Omitirlo deja que se deduzca del stock.
+   */
+  @IsOptional()
+  @IsIn(['INMEDIATA', 'BAJO_PEDIDO', 'NO_DISPONIBLE', 'NO_COMERCIAL'])
+  disponibilidad?:
+    | 'INMEDIATA'
+    | 'BAJO_PEDIDO'
+    | 'NO_DISPONIBLE'
+    | 'NO_COMERCIAL';
+
+  /** Empuje frente a productos equivalentes: 4 muy alta, 3 alta, 2 media, 1 baja. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(4)
+  prioridadVenta?: number;
 }

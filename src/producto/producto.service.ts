@@ -7,7 +7,17 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { Prisma, EstadoReserva, EstadoType } from '@prisma/client';
+import {
+  DisponibilidadProducto,
+  Prisma,
+  EstadoReserva,
+  EstadoType,
+} from '@prisma/client';
+import {
+  escribirPrioridadVenta,
+  leerDisponibilidad,
+  leerPrioridadVenta,
+} from './disponibilidad.util';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
@@ -366,6 +376,10 @@ export class ProductoService {
       ubicacionSede?: string | null;
       /** Sedes donde queda disponible (ids). Si no viene, aplica el modo de la empresa. */
       sedesDisponibles?: number[] | null;
+      /** Qué prometerle al cliente. Sin valor, se deduce del stock. */
+      disponibilidad?: DisponibilidadProducto;
+      /** Empuje frente a equivalentes: 4 muy alta, 3 alta, 2 media, 1 baja. */
+      prioridadVenta?: number;
     },
     empresaId: number,
     sedeId?: number,
@@ -418,6 +432,8 @@ export class ProductoService {
       precioUnitarioSede,
       precioOfertaSede,
       ubicacionSede,
+      disponibilidad,
+      prioridadVenta,
     } = data;
 
     const porcentajes = this.normalizarPorcentajes(
@@ -526,6 +542,8 @@ export class ProductoService {
           stock,
           stockMinimo: stockMinimo != null ? stockMinimo : undefined,
           stockMaximo: stockMaximo != null ? stockMaximo : undefined,
+          disponibilidad: disponibilidad ?? undefined,
+          prioridadVenta: prioridadVenta ?? undefined,
           categoriaId:
             categoriaId && Number(categoriaId) > 0
               ? Number(categoriaId)
@@ -630,6 +648,8 @@ export class ProductoService {
           stock,
           stockMinimo: stockMinimo != null ? stockMinimo : undefined,
           stockMaximo: stockMaximo != null ? stockMaximo : undefined,
+          disponibilidad: disponibilidad ?? undefined,
+          prioridadVenta: prioridadVenta ?? undefined,
           categoriaId:
             categoriaId && Number(categoriaId) > 0
               ? Number(categoriaId)
@@ -2442,6 +2462,10 @@ export class ProductoService {
       ubicacionSede?: string | null;
       /** Sedes donde queda disponible (ids). Reemplaza la disponibilidad actual. */
       sedesDisponibles?: number[] | null;
+      /** Qué prometerle al cliente. null lo devuelve a deducirse del stock. */
+      disponibilidad?: DisponibilidadProducto | null;
+      /** Empuje frente a equivalentes: 4 muy alta, 3 alta, 2 media, 1 baja. */
+      prioridadVenta?: number | null;
 
       sedeId?: number; // Nueva propiedad opcional para identificar dónde se ajusta el stock
     },
@@ -4107,6 +4131,8 @@ export class ProductoService {
         STOCK: stockTotal,
         'VALOR INVENTARIO': valorInventario,
         'STOCK MINIMO': stockMinimo,
+        DISPONIBILIDAD: producto.disponibilidad ?? '',
+        PRIORIDAD: escribirPrioridadVenta(producto.prioridadVenta ?? null),
         CATEGORIA: producto.categoria?.nombre || '',
         MARCA: p?.marca?.nombre || '',
         LOCALIZACION: localizacion || '',
@@ -4570,6 +4596,18 @@ export class ProductoService {
           row['CATEGORIA'] ?? row['Categoría'] ?? row['categoria'] ?? null;
         const marcaRaw =
           row['MARCA'] ?? row['Marca'] ?? row['marca'] ?? null;
+        // Qué se le puede prometer al cliente y cuánto empujar el producto. Si
+        // vienen vacías o ilegibles se ignoran, y la disponibilidad se sigue
+        // deduciendo del stock.
+        const disponibilidadImport = leerDisponibilidad(
+          row['DISPONIBILIDAD'] ?? row['Disponibilidad'] ?? row['disponibilidad'],
+        );
+        const prioridadImport = leerPrioridadVenta(
+          row['PRIORIDAD'] ??
+            row['PRIORIDAD DE VENTA'] ??
+            row['Prioridad'] ??
+            row['prioridad'],
+        );
         // Fila sin CÓDIGO: es un producto nuevo que el empresario agregó al final
         // del Excel exportado (caso DEMENVER). Se le genera el siguiente PRxxx en
         // vez de rechazar la fila; si trae código de barras (columna opcional) o
@@ -4785,6 +4823,12 @@ export class ProductoService {
               ...(categoriaId != null ? { categoriaId } : {}),
               ...(marcaId != null ? { marcaId } : {}),
               ...(codigoBarras != null ? { codigoBarras } : {}),
+              ...(disponibilidadImport != null
+                ? { disponibilidad: disponibilidadImport }
+                : {}),
+              ...(prioridadImport != null
+                ? { prioridadVenta: prioridadImport }
+                : {}),
             },
           });
 
