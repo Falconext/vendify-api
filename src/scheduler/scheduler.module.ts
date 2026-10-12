@@ -9,7 +9,9 @@ import { ResellerModule } from '../reseller/reseller.module';
 import { S3Module } from '../s3/s3.module';
 import { GuiaRemisionModule } from '../guia-remision/guia-remision.module';
 import { WhatsAppModule } from '../whatsapp/whatsapp.module';
+import { VerificarEnviosShalomService } from './services/verificar-envios-shalom.service';
 import { VerificarEnviosOlvaService } from './services/verificar-envios-olva.service';
+import { ShalomModule } from '../shalom/shalom.module';
 import { OlvaModule } from '../olva/olva.module';
 import { EnvioDespachoModule } from '../envio-despacho/envio-despacho.module';
 
@@ -22,15 +24,21 @@ import { EnvioDespachoModule } from '../envio-despacho/envio-despacho.module';
     ResellerModule,
     S3Module,
     WhatsAppModule,
+    ShalomModule,
     OlvaModule,
     EnvioDespachoModule,
   ],
   providers: [
     SchedulerService,
     VerificarPendientesSunatService,
+    VerificarEnviosShalomService,
     VerificarEnviosOlvaService,
     PrismaService,
   ],
-  exports: [VerificarPendientesSunatService, VerificarEnviosOlvaService],
+  exports: [
+    VerificarPendientesSunatService,
+    VerificarEnviosShalomService,
+    VerificarEnviosOlvaService,
+  ],
 })
 export class SchedulerModule {}
