@@ -1003,6 +1003,9 @@ export class EmpresaService {
           slugTienda: true,
           brand: true,
           producto: true,
+          // El panel de sistema prende el modo offline empresa por empresa:
+          // el rollout es gradual, no un interruptor global.
+          offlineHabilitado: true,
           usaDemo: true,
           estadoGestion: true,
           billingProvider: true,
@@ -1323,6 +1326,8 @@ export class EmpresaService {
         updateData.usarPrecioLoteFefo = dto.usarPrecioLoteFefo;
       if (dto.permitirVentaSinStock !== undefined)
         updateData.permitirVentaSinStock = dto.permitirVentaSinStock;
+      if (dto.offlineHabilitado !== undefined)
+        updateData.offlineHabilitado = dto.offlineHabilitado;
       if (dto.cobranzaCampo !== undefined)
         updateData.cobranzaCampo = dto.cobranzaCampo;
       if (dto.requiereAprobacionGastos !== undefined)

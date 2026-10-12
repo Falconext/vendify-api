@@ -184,6 +184,11 @@ export class UpdateEmpresaDto {
   @IsBoolean()
   permitirVentaSinStock?: boolean;
 
+  // Modo offline-first de la app móvil (se activa por empresa desde el panel de sistema).
+  @IsOptional()
+  @IsBoolean()
+  offlineHabilitado?: boolean;
+
   @IsOptional()
   @IsBoolean()
   cobranzaCampo?: boolean;
