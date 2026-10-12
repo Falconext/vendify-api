@@ -12,13 +12,24 @@ export type PlanFeatureKey =
   | 'tieneAnalisisFinancieroAvanzado'
   | 'tieneMultiplesSedes'
   | 'tieneAutoGenerarImagen'
-  | 'tieneLocalizacion';
+  | 'tieneLocalizacion'
+  // ── Envíos y couriers ──────────────────────────────────────────────────────
+  // Separados por courier y por capacidad: el rastreo se cubre con la API key
+  // global, mientras que crear guías consume el cupo del proveedor.
+  | 'tieneShalom'
+  | 'tieneShalomGuias'
+  | 'tieneOlva'
+  | 'tieneOlvaGuias'
+  // ── Contabilidad ───────────────────────────────────────────────────────────
+  // El SIRE es lo que distingue al plan Corporativo: que SUNAT le traiga las
+  // compras al negocio en vez de digitarlas a mano.
+  | 'tieneSire';
 
 export interface PlanFeatureCatalogItem {
   key: PlanFeatureKey;
   label: string;
   description: string;
-  group: 'general' | 'tienda' | 'ventas' | 'operaciones' | 'inventario';
+  group: 'general' | 'tienda' | 'ventas' | 'operaciones' | 'inventario' | 'envios';
   icon: string;
   dependsOn?: PlanFeatureKey;
   limits?: Array<{
@@ -152,6 +163,49 @@ export const PLAN_FEATURE_CATALOG: PlanFeatureCatalogItem[] = [
       'Permite registrar pasillos, estantes u otras referencias físicas por producto.',
     group: 'inventario',
     icon: 'solar:map-point-bold-duotone',
+  },
+  // ── Envíos y couriers ──────────────────────────────────────────────────────
+  {
+    key: 'tieneShalom',
+    label: 'Shalom · rastreo de envíos',
+    description:
+      'Catálogo de agencias, rastreo del envío y cotización desde el panel, sin cuenta del negocio.',
+    group: 'envios',
+    icon: 'solar:delivery-bold-duotone',
+  },
+  {
+    key: 'tieneShalomGuias',
+    label: 'Shalom · crear guías (Pro)',
+    description:
+      'Conectar la cuenta Shalom Pro del negocio y emitir las guías desde el panel. Consume el cupo del proveedor.',
+    group: 'envios',
+    icon: 'solar:box-bold-duotone',
+    dependsOn: 'tieneShalom',
+  },
+  {
+    key: 'tieneOlva',
+    label: 'Olva · rastreo de envíos',
+    description:
+      'Catálogo de agencias Olva, rastreo del envío y cotización desde el panel.',
+    group: 'envios',
+    icon: 'solar:delivery-bold-duotone',
+  },
+  {
+    key: 'tieneOlvaGuias',
+    label: 'Olva · crear guías y pedidos',
+    description:
+      'Registrar la guía del envío en Olva desde el despacho. Consume el cupo de la cuenta Olva.',
+    group: 'envios',
+    icon: 'solar:box-bold-duotone',
+    dependsOn: 'tieneOlva',
+  },
+  {
+    key: 'tieneSire',
+    label: 'SIRE · traer mis compras de SUNAT',
+    description:
+      'Descarga del SIRE las compras y ventas que SUNAT tiene a nombre del RUC, sin digitarlas. Requiere que la empresa sea FORMAL y cargue sus credenciales del SIRE en su perfil.',
+    group: 'operaciones',
+    icon: 'solar:cloud-download-bold-duotone',
   },
 ];
 

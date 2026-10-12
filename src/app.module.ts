@@ -51,6 +51,7 @@ import { ComisionesModule } from './comisiones/comisiones.module';
 import { CampanasModule } from './campanas/campanas.module';
 import { VentasModule } from './ventas/ventas.module';
 import { ShalomModule } from './shalom/shalom.module';
+import { OlvaModule } from './olva/olva.module';
 import { VehiculoModule } from './vehiculo/vehiculo.module';
 import { ContratoVehicularModule } from './contrato-vehicular/contrato-vehicular.module';
 import { TipoCambioModule } from './tipo-cambio/tipo-cambio.module';
@@ -107,6 +108,7 @@ import { TipoCambioModule } from './tipo-cambio/tipo-cambio.module';
     CampanasModule,
     VentasModule,
     ShalomModule,
+    OlvaModule,
     VehiculoModule,
     ContratoVehicularModule,
     TipoCambioModule,

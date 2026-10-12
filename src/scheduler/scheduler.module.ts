@@ -9,6 +9,9 @@ import { ResellerModule } from '../reseller/reseller.module';
 import { S3Module } from '../s3/s3.module';
 import { GuiaRemisionModule } from '../guia-remision/guia-remision.module';
 import { WhatsAppModule } from '../whatsapp/whatsapp.module';
+import { VerificarEnviosOlvaService } from './services/verificar-envios-olva.service';
+import { OlvaModule } from '../olva/olva.module';
+import { EnvioDespachoModule } from '../envio-despacho/envio-despacho.module';
 
 @Module({
   imports: [
@@ -19,8 +22,15 @@ import { WhatsAppModule } from '../whatsapp/whatsapp.module';
     ResellerModule,
     S3Module,
     WhatsAppModule,
+    OlvaModule,
+    EnvioDespachoModule,
   ],
-  providers: [SchedulerService, VerificarPendientesSunatService, PrismaService],
-  exports: [VerificarPendientesSunatService],
+  providers: [
+    SchedulerService,
+    VerificarPendientesSunatService,
+    VerificarEnviosOlvaService,
+    PrismaService,
+  ],
+  exports: [VerificarPendientesSunatService, VerificarEnviosOlvaService],
 })
 export class SchedulerModule {}
