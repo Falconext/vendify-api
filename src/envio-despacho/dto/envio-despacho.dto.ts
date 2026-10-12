@@ -77,9 +77,23 @@ export class CreateEnvioDespachoDto {
   // Datos destinatario Shalom
   @IsOptional() @IsString() nombreDestinatario?: string;
   @IsOptional() @IsString() dniDestinatario?: string;
+  /**
+   * Clientes dados de alta solo con WhatsApp ("WSP 9…", sin documento): al
+   * completar DNI + nombre del destinatario para la guía, también se corrige
+   * la ficha del cliente para que la próxima venta ya salga completa.
+   */
+  @IsOptional() @IsBoolean() actualizarFichaCliente?: boolean;
   @IsOptional() @IsString() contenidoPaquete?: string;
+  /** type_product de Shalom elegido en la coordinación de envío. */
+  @IsOptional() @Type(() => Number) @IsInt() shalomTipoProducto?: number;
+  /** ter_id de la agencia Shalom de destino elegida en el selector (para cotizar y crear la guía). */
+  @IsOptional() @IsString() shalomAgenciaDestinoId?: string;
+  // Peso del paquete en kg: Olva lo exige para registrar la guía y cotizar.
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0.1) pesoKg?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) montoCOD?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) costoEnvio?: number;
+  /** Lo que se le paga al courier por este despacho (no lo que se cobra al cliente). */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) costoCourier?: number;
   @IsOptional() @IsIn(['CLIENTE', 'NEGOCIO']) pagarFlete?:
     | 'CLIENTE'
     | 'NEGOCIO';
@@ -110,4 +124,12 @@ export class ExportarRepartoQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() repartidorId?: number;
   /** Estado del despacho a incluir (por defecto todos menos DEVUELTO). */
   @IsOptional() @IsString() estado?: string;
+  /**
+   * Courier del que se reporta. `PROPIOS` (por defecto) conserva el
+   * comportamiento histórico: la plantilla de carga masiva del motorizado.
+   * `SHALOM`/`OLVA` reportan los envíos por agencia y `TODOS` los compara.
+   */
+  @IsOptional()
+  @IsIn(['PROPIOS', 'SHALOM', 'OLVA', 'TODOS'])
+  courier?: 'PROPIOS' | 'SHALOM' | 'OLVA' | 'TODOS';
 }

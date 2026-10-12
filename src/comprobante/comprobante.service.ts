@@ -34,6 +34,7 @@ import {
   type FormatoPdf,
 } from './pdf-generator.service';
 import { generarQrSunatDataUrl } from './qr-sunat.util';
+import { diaDeEnvio } from './dia-de-envio';
 import {
   baseRetencion,
   esRetencion,
@@ -6098,6 +6099,10 @@ export class ComprobanteService {
           },
         },
         detalles: { include: { producto: { select: { imagenUrl: true } } } },
+        // La fecha de entrega programada se imprime en el ticket: el cliente se
+        // lleva el papel y quiere saber cuándo le llega (negocio que despacha
+        // por día de entrega).
+        envioDespacho: { select: { fechaEstimada: true, turnoEnvio: true } },
         // Necesarias para imprimir la leyenda de Ley de Amazonía (código 2000).
         leyendas: { select: { code: true, value: true } },
         tipoDetraccion: true,
@@ -6276,6 +6281,13 @@ export class ComprobanteService {
         full.cliente?.tipoDocumento?.codigo === '6' ? 'RUC' : 'DNI',
       clienteNumDoc: full.cliente?.nroDoc || '',
       clienteDireccion: (full.cliente?.direccion || '-').toUpperCase(),
+      // Celular del cliente y día de entrega: el ticket solo mostraba la fecha
+      // de emisión, y el celular que salía arriba es el del negocio.
+      clienteCelular: (full.cliente as any)?.telefono || '',
+      fechaEnvioProgramado: diaDeEnvio(
+        (full as any)?.envioDespacho?.fechaEstimada,
+      ),
+      turnoEnvioProgramado: (full as any)?.envioDespacho?.turnoEnvio || '',
       clienteEmail: (full.cliente as any)?.email || undefined,
       clienteTelefono: (full.cliente as any)?.telefono || undefined,
       productos,

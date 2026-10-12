@@ -294,6 +294,13 @@ export class VentasService {
     fecha: string;
     // Fin del rango (inclusive). Si se omite, el panel es de un solo día.
     fechaFin?: string;
+    /**
+     * Día de ENTREGA programado ("Sale el"). Cuando llega, el panel deja de
+     * mirar la fecha de emisión y lista lo que sale ese día: es la relación de
+     * despachos del negocio que despacha por día. Una venta emitida el lunes
+     * para entregar el jueves tiene que aparecer el jueves.
+     */
+    fechaEnvio?: string;
     sedeId?: number;
     usuarioId?: number;
   }) {
@@ -301,6 +308,15 @@ export class VentasService {
 
     const inicioLima = new Date(`${fecha}T00:00:00-05:00`);
     const finLima = new Date(`${params.fechaFin || fecha}T23:59:59-05:00`);
+
+    // `fechaEstimada` se guarda a mediodía UTC para sobrevivir al UTC-5, así
+    // que el rango del día se arma en UTC y no en hora de Lima.
+    const envioWhere = params.fechaEnvio
+      ? {
+          gte: new Date(`${params.fechaEnvio}T00:00:00.000Z`),
+          lte: new Date(`${params.fechaEnvio}T23:59:59.999Z`),
+        }
+      : undefined;
 
     const sedeFilter = sedeId ? { sedeId } : {};
     // Filtro por VENDEDOR efectivo: el vendedor de campo (vendedorCampoId) si existe,
@@ -322,7 +338,10 @@ export class VentasService {
           empresaId,
           ...sedeFilter,
           ...comprobanteUsuarioFilter,
-          fechaEmision: { gte: inicioLima, lte: finLima },
+          // Con "Sale el" manda el día de entrega; si no, la fecha de emisión.
+          ...(envioWhere
+            ? { envioDespacho: { fechaEstimada: envioWhere } }
+            : { fechaEmision: { gte: inicioLima, lte: finLima } }),
           tipoDoc: { in: [...TIPOS_SUNAT, ...TIPOS_INFORMALES] },
           estadoEnvioSunat: { not: 'ANULADO' },
         },
@@ -362,6 +381,11 @@ export class VentasService {
               celularDest: true,
               nroPaquetes: true,
               turnoEnvio: true,
+              // Día de entrega programado: la columna "Fecha de envío" del
+              // panel lo lee de acá. Se había agregado al panel de despachos
+              // pero no a este select, así que la columna salía siempre en
+              // guion aunque el usuario hubiera cargado la fecha.
+              fechaEstimada: true,
               transportista: true,
               nroOrden: true,
               claveOrden: true,
@@ -502,6 +526,8 @@ export class VentasService {
         celularDest: c.envioDespacho?.celularDest ?? '—',
         nroPaquetes: c.envioDespacho?.nroPaquetes ?? null,
         turnoEnvio: c.envioDespacho?.turnoEnvio ?? '—',
+        // Día de entrega programado (columna "Fecha de envío" y filtro "Sale el").
+        fechaEstimada: c.envioDespacho?.fechaEstimada ?? null,
         courier: c.envioDespacho?.transportista ?? '',
         nroOrden: c.envioDespacho?.nroOrden ?? '',
         claveOrden: c.envioDespacho?.claveOrden ?? '',
