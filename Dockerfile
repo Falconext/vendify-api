@@ -85,4 +85,7 @@ EXPOSE 4000
 # Sincroniza el esquema (sin --accept-data-loss: aplica cambios seguros y
 # FALLA en vez de borrar datos ante un cambio destructivo) e inicia la app.
 # El seed de catálogos/ubigeo/admin lo hace initializeDatabase() al arrancar.
-CMD ["sh", "-c", "npx prisma db push && node dist/src/main.js"]
+# migrate deploy y no db push: db push hace que la base calce con el esquema del
+# commit desplegado, y en mype borró columnas en un reinicio. Todo cambio de
+# esquema necesita su migración; si una falla, el servicio no arranca (a propósito).
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
