@@ -936,6 +936,9 @@ export class ProductoController {
       usarPrecioSede: query.usarPrecioSede,
       usuarioId: user.id,
       soloStockBajo: query.soloStockBajo,
+      stockFiltro: query.stockFiltro,
+      stockDesde: query.stockDesde,
+      stockHasta: query.stockHasta,
       priorizarStock: query.priorizarStock,
       incluirOcultos: query.incluirOcultos,
     });
@@ -1308,6 +1311,7 @@ export class ProductoController {
       empresaId: user.empresaId,
       fechaVencimiento: parseFechaSoloDia(dto.fechaVencimiento),
       usuarioId: user.id,
+      sedeId: user.sedeId ?? undefined,
     });
     res.locals.message = 'Lote creado correctamente';
     return lote;
@@ -1369,7 +1373,12 @@ export class ProductoController {
     @User() user: any,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.loteService.desactivarLote(id, user.empresaId, user.id);
+    await this.loteService.desactivarLote(
+      id,
+      user.empresaId,
+      user.id,
+      user.sedeId ?? undefined,
+    );
     res.locals.message = 'Lote desactivado correctamente';
     return { success: true };
   }

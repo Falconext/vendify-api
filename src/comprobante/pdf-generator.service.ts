@@ -497,6 +497,14 @@ export class PdfGeneratorService {
   /**
    * Genera PDF de comprobante personalizado del sistema
    */
+  /** Montos del pago MIXTO ya formateados para la plantilla (`pagosMixtosFmt`). */
+  private formatearPagosMixtos(data: any) {
+    const lineas: Array<{ medio: string; monto: number }> = data?.pagosMixtos || [];
+    data.pagosMixtosFmt = lineas.length
+      ? lineas.map((l) => ({ medio: l.medio, monto: Number(l.monto).toFixed(2) }))
+      : undefined;
+  }
+
   async generarPDFComprobante(data: {
     // Empresa
     nombreComercial: string;
@@ -560,6 +568,8 @@ export class PdfGeneratorService {
     // Otros
     formaPago: string;
     medioPago?: string;
+    /** Desglose de un pago MIXTO (ver common/utils/pago-mixto.ts). */
+    pagosMixtos?: Array<{ medio: string; monto: number }>;
     vuelto?: string;
     pagado?: string;
     vendedor?: string;
@@ -591,6 +601,8 @@ export class PdfGeneratorService {
         (data as any).simboloMoneda = esUSD ? 'US$' : 'S/';
         (data as any).monedaNombre = esUSD ? 'DÓLARES' : 'SOLES';
       }
+
+      this.formatearPagosMixtos(data);
 
       // Sub total = suma de operaciones (gravadas + exoneradas + inafectas).
       // Se calcula aquí si el caller no lo envía, para que todos los flujos

@@ -297,8 +297,8 @@ export class VentasService {
     /**
      * Día de ENTREGA programado ("Sale el"). Cuando llega, el panel deja de
      * mirar la fecha de emisión y lista lo que sale ese día: es la relación de
-     * despachos que pidió LINNA MODA. Una venta emitida el lunes para entregar
-     * el jueves tiene que aparecer el jueves.
+     * despachos del negocio que despacha por día. Una venta emitida el lunes
+     * para entregar el jueves tiene que aparecer el jueves.
      */
     fechaEnvio?: string;
     sedeId?: number;
@@ -383,10 +383,9 @@ export class VentasService {
               nroPaquetes: true,
               turnoEnvio: true,
               // Día de entrega programado: la columna "Fecha de envío" del
-              // panel lo lee de acá. Se agregó al panel de despachos pero no
-              // a este select, así que la columna salía siempre en guion
-              // aunque el usuario hubiera cargado la fecha (reportado por
-              // KREZKA).
+              // panel lo lee de acá. Se había agregado al panel de despachos
+              // pero no a este select, así que la columna salía siempre en
+              // guion aunque el usuario hubiera cargado la fecha.
               fechaEstimada: true,
               transportista: true,
               nroOrden: true,

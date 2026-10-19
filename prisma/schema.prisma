@@ -171,6 +171,46 @@ model Empresa {
   whatsappActivo            Boolean                       @default(true)
   shalomEmail               String?
   shalomPassword            String?
+  // Rastreo automático Shalom (cron 30 min): opt-in por empresa. Con `false`
+  // (default) el cron NO actualiza estados ni envía WhatsApp a los clientes de
+  // esta empresa — se activa recién cuando el empresario está avisado.
+  shalomAutoTrackingActivo  Boolean                       @default(false)
+  // ── Cuenta Shalom Pro conectada (solo planes Corporativo) ────────────────
+  // El rastreo funciona con la API key global y NO necesita cuenta. Para CREAR
+  // guías, el proveedor exige registrar la cuenta Shalom Pro del negocio como
+  // "instancia" (POST /instances) y luego enviar las órdenes con ese instanceId.
+  shalomInstanceId          String?
+  shalomInstanceNombre      String?
+  // CONECTADA | ERROR (null = nunca se conectó)
+  shalomInstanceEstado      String?
+  shalomInstanceError       String?
+  shalomInstanceSyncAt      DateTime?
+  // Código de seguridad de la cuenta Shalom Pro (lo pide el registro masivo).
+  shalomSecurityCode        String?
+  // Agencia de origen por defecto desde donde el negocio despacha (ter_id).
+  shalomAgenciaOrigenId     String?
+  shalomAgenciaOrigenNombre String?
+  // Generar la guía sola al cerrar una venta con courier Shalom. Opt-in por
+  // empresa (default false): crea envíos REALES en la cuenta Shalom Pro, así que
+  // nadie debe descubrirlo sin haberlo pedido.
+  shalomAutoGuiaActivo      Boolean                       @default(false)
+  // Claves de retiro propias del negocio, separadas por coma (ej. "1010,1011").
+  // Shalom no permite repetir la clave del día anterior: al generar la guía se
+  // toma la primera que no se usó ayer. Vacío = clave aleatoria por envío.
+  shalomClavesRetiro        String?
+  // Tamaño de paquete Shalom por defecto (SOBRE|XXS|XS|S|M|L) cuando el
+  // despacho no elige uno. Null = XS (comportamiento histórico).
+  shalomTamanoDefault       String?
+  // ── Olva Courier (api.olva-api.lat) ──────────────────────────────────────
+  // El proveedor autentica TODO con una API key global (OLVA_API_KEY): no hay
+  // cuenta por negocio que conectar como en Shalom Pro. Lo único propio de cada
+  // empresa es desde qué agencia despacha y el opt-in del rastreo automático.
+  olvaAgenciaOrigenCodigo   String?
+  olvaAgenciaOrigenNombre   String?
+  // Ubigeo de esa agencia: lo pide la calculadora de precio de Olva.
+  olvaAgenciaOrigenUbigeo   String?
+  // Rastreo automático Olva (cron): opt-in por empresa, igual que Shalom.
+  olvaAutoTrackingActivo    Boolean                       @default(false)
   yapeNumero                String?
   yapeQrUrl                 String?
   aceptaEnvio               Boolean                       @default(true)
@@ -310,9 +350,7 @@ model Empresa {
   tiendaVentaSinStock     Boolean                        @default(false)
   sireClientSecret        String?
   sireUsuarioSol          String?
-  /**
-   * Clave SOL cifrada (AES-256-GCM). Nunca se devuelve al frontend.
-   */
+  /// Clave SOL cifrada (AES-256-GCM). Nunca se devuelve al frontend.
   sireClaveSol            String?
   qpseExternalId          String?
   usaDemo                 Boolean                        @default(false)
@@ -341,6 +379,12 @@ model Empresa {
   vehiculos               Vehiculo[]
   contratosVehiculares    ContratoVehicular[]
   listasPrecio            ListaPrecio[]
+  // Modo offline-first de la app móvil (Fase 1): la app puede vender/cajear sin
+  // red y sincronizar después vía /sync/operaciones. OFF por defecto (rollout
+  // gradual por empresa desde el panel de sistema).
+  offlineHabilitado       Boolean                        @default(false)
+  operacionesSync         OperacionSync[]
+  dispositivosMoviles     DispositivoMovil[]
   reglasComision          ReglaComision[]
 
   @@index([providerToken])
@@ -564,6 +608,13 @@ model Producto {
   contratosVehiculares     ContratoVehicular[]
   listaPrecioItems         ListaPrecioItem[]
   reglasComision           ReglaComision[]
+  /// Qué se le puede prometer al cliente. Null = se deduce del stock, que es
+  /// lo correcto para quien sí lleva inventario; puesto a mano, manda sobre el
+  /// stock, que es lo que necesita quien no lo lleva.
+  disponibilidad           DisponibilidadProducto?
+  /// Cuánto empujar este producto frente a otros equivalentes: 4 muy alta,
+  /// 3 alta, 2 media, 1 baja. Ordena lo que se ofrece primero; no obliga.
+  prioridadVenta           Int?
 
   @@unique([empresaId, codigo])
   @@unique([empresaId, codigoDigemid])
@@ -930,6 +981,9 @@ model Comprobante {
   // serie a nivel de BD. Es la red que hace efectivo el reintento anti-colisión
   // de crearComprobanteConReintento (P2002) cuando varias sedes/cajas emiten a la
   // vez sobre la misma serie.
+  // uuid de la operación offline que lo originó (null = emitido online).
+  origenSyncUuid String?
+
   @@unique([empresaId, tipoDoc, serie, correlativo])
   // Panel de ventas / reportes: filtran por empresa + rango de fecha, opcional sede/usuario
   @@index([empresaId, fechaEmision])
@@ -962,6 +1016,11 @@ model DetalleComprobante {
   // de lista y el ahorro; el precio ya viene con descuento en mtoPrecioUnitario/mtoValorVenta,
   // por lo que NO afecta el XML enviado a SUNAT.
   mtoDescuento       Float?          @default(0)
+  // Descripción / detalle adicional de la línea, multilínea (p. ej. una cotización
+  // de servicios: "Retiro de pintura antigua\nRaspado, lijado..."). Se imprime en
+  // el PDF debajo de la descripción (el título). NO va al XML UBL de SUNAT: allí
+  // el ítem sigue saliendo solo con `descripcion`.
+  detalleAdicional   String?
   // Farmacia: trazabilidad de lote dispensado
   loteId             Int?
   // Farmacia: datos de receta médica y medicamentos controlados
@@ -1146,6 +1205,9 @@ model MovimientoKardex {
   movimientoLotes       MovimientoKardexLote[]
   movimientosProduccion MovimientoProduccion[]
 
+  // uuid de la operación offline que lo originó (null = movimiento online).
+  origenSyncUuid String?
+
   @@index([productoId, fecha])
   @@index([empresaId, fecha])
   @@index([tipoMovimiento])
@@ -1222,6 +1284,9 @@ model MovimientoCaja {
   numeroOperacionDeposito String?
   depositadoPorUsuarioId  Int?
   depositadoPor           Usuario?        @relation("DepositoCajaRealizadoPor", fields: [depositadoPorUsuarioId], references: [id])
+
+  // uuid de la operación offline que lo originó (null = registrado online).
+  origenSyncUuid String?
 
   @@index([usuarioId, fecha])
   @@index([empresaId, fecha])
@@ -1584,6 +1649,9 @@ model ProductoCodigoBarras {
   alias              String?
   /// Imagen propia del paquete (S3), opcional — solo presentación/orden.
   imagenUrl          String?
+  /// Código interno del negocio para esta presentación (ej. "22005-CJ" para la
+  /// caja). Se busca y se escanea/tipea en el POS igual que el código de barras.
+  codigoInterno      String?
   creadoEn           DateTime @default(now())
   producto           Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
 
@@ -1779,11 +1847,6 @@ model Compra {
   // del mes (neto, sin IGV: ese IGV es crédito fiscal). Por defecto se marca
   // sola cuando ninguna línea está enlazada a un producto del catálogo.
   esGasto              Boolean            @default(false)
-  // Revisión del contador antes de que la compra entre al SIRE.
-  estadoContador       EstadoContador     @default(PENDIENTE)
-  motivoContador       String?
-  revisadoContadorEn   DateTime?
-  revisadoContadorPor  Int?
   creadoEn             DateTime           @default(now())
   actualizadoEn        DateTime           @updatedAt
   cuotas               Json?
@@ -1798,6 +1861,15 @@ model Compra {
 
   sedeId Int?
   sede   Sede? @relation(fields: [sedeId], references: [id])
+
+  // Revisión del CONTADOR sobre esta compra para el SIRE (distinto de `estado`,
+  // que es el visto bueno interno del dueño a sus vendedores): PENDIENTE al
+  // registrarse, APROBADA entra al RCE, DENEGADA se excluye con su motivo
+  // (p.ej. "no corresponde al giro del negocio").
+  estadoContador      EstadoContador @default(PENDIENTE)
+  motivoContador      String?
+  revisadoContadorEn  DateTime?
+  revisadoContadorPor Int?
 
   @@index([empresaId])
   @@index([proveedorId])
@@ -2126,12 +2198,12 @@ enum TipoRepartidor {
 }
 
 model EnvioDespacho {
-  id                       Int            @id @default(autoincrement())
-  comprobanteId            Int            @unique
-  comprobante              Comprobante    @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+  id                       Int                @id @default(autoincrement())
+  comprobanteId            Int                @unique
+  comprobante              Comprobante        @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
   transportista            String?
   codigoGuia               String?
-  estado                   EstadoDespacho @default(PREPARANDO)
+  estado                   EstadoDespacho     @default(PREPARANDO)
   observaciones            String?
   direccionDestino         String?
   fechaEstimada            DateTime?
@@ -2140,7 +2212,7 @@ model EnvioDespacho {
   tipoEnvio                String? // AGENCIA | DOMICILIO
   agenciaDestino           String? // Nombre de agencia destino (ej: "Shalom Cusco Centro")
   celularDest              String? // Celular del destinatario
-  nroPaquetes              Int?           @default(1)
+  nroPaquetes              Int?               @default(1)
   turnoEnvio               String? // MANANA | TARDE | NOCHE
   tipoMercaderia           String? // Clasificación para el courier (Shalom)
   claveEnvio               String?
@@ -2150,7 +2222,7 @@ model EnvioDespacho {
   // Estado de rastreo Shalom / Olva (mismos campos que mype; los usa el
   // análisis de clientes y envíos del Análisis Financiero).
   shalomEstado             String?
-  shalomEntregado          Boolean        @default(false)
+  shalomEntregado          Boolean            @default(false)
   shalomTrackingJson       Json?
   shalomOseId              String?
   shalomSyncAt             DateTime?
@@ -2164,7 +2236,7 @@ model EnvioDespacho {
   entregadoEn              DateTime?
   shalomGuiaCreadaEn       DateTime?
   olvaEstado               String?
-  olvaEntregado            Boolean        @default(false)
+  olvaEntregado            Boolean            @default(false)
   olvaTrackingJson         Json?
   olvaSyncAt               DateTime?
   olvaAgenciaDestinoCodigo String?
@@ -2172,7 +2244,7 @@ model EnvioDespacho {
   olvaRespuestaJson        Json?
   pesoKg                   Float?
   repartidorId             Int?
-  repartidor               Repartidor?    @relation(fields: [repartidorId], references: [id], onDelete: SetNull)
+  repartidor               Repartidor?        @relation(fields: [repartidorId], references: [id], onDelete: SetNull)
   empaquetador             String? // Nombre del empaquetador
   // Datos del destinatario (Shalom)
   nombreDestinatario       String? // Nombre completo del destinatario
@@ -2186,17 +2258,18 @@ model EnvioDespacho {
   distrito                 String? // nombre del distrito (como lo lista el courier)
   coordenadas              String? // "lat,lng" de la dirección de entrega (opcional)
   formaPagoCobro           String? // EFECTIVO | YAPE | PLIN | TRANSFERENCIA | POS | NO_COBRAR
-  revisarProducto          Boolean        @default(false) // el cliente puede abrir/revisar antes de pagar
-  costoEnvio               Float?         @default(0) // Monto cobrado al cliente o absorbido por el negocio
+  revisarProducto          Boolean            @default(false) // el cliente puede abrir/revisar antes de pagar
+  costoEnvio               Float?             @default(0) // Monto cobrado al cliente o absorbido por el negocio
   /// Lo que el NEGOCIO le paga al courier por este despacho (motorizado, courier
   /// local, Shalom, Olva). Es el costo real del envío, la contracara de
   /// `costoEnvio`, que es lo que se le cobra al cliente. Alimenta el reporte de
   /// gasto de envío por courier.
   costoCourier             Float?
-  pagarFlete               String?        @default("NEGOCIO") // CLIENTE | NEGOCIO
-  aplicacionMontoCliente   String?        @default("NEGOCIO") // ITEM_ENVIO | ADELANTO | NEGOCIO
-  creadoEn                 DateTime       @default(now())
-  actualizadoEn            DateTime       @updatedAt
+  pagarFlete               String?            @default("NEGOCIO") // CLIENTE | NEGOCIO
+  aplicacionMontoCliente   String?            @default("NEGOCIO") // ITEM_ENVIO | ADELANTO | NEGOCIO
+  evidencias               EvidenciaEntrega[]
+  creadoEn                 DateTime           @default(now())
+  actualizadoEn            DateTime           @updatedAt
 
   @@index([comprobanteId])
   @@index([repartidorId])
@@ -2960,6 +3033,12 @@ model ListaPrecioItem {
   @@index([productoId])
 }
 
+// =============================================
+// REGLAS DE COMISIÓN
+// Excepciones a la comisión de siempre: por producto, por vendedor y/o por día
+// de la semana. Sin reglas, el cálculo queda exactamente como estaba.
+// =============================================
+
 model ReglaComision {
   id            Int      @id @default(autoincrement())
   empresaId     Int
@@ -2985,4 +3064,108 @@ model ReglaComision {
   @@index([empresaId, activa])
   @@index([productoId])
   @@index([vendedorId])
+}
+
+// =============================================
+// DISPONIBILIDAD DEL PRODUCTO
+// Cuatro estados, que es lo que el negocio necesita para contestar "¿lo
+// tienes?" sin inventar un número de stock que no lleva.
+// =============================================
+
+enum DisponibilidadProducto {
+  /// Lo tiene a la mano; se despacha sin condiciones.
+  INMEDIATA
+  /// Lo consigue con proveedor. Se ofrece sin prometer fecha y se avisa antes
+  /// de despachar.
+  BAJO_PEDIDO
+  /// Agotado: no se ofrece, pero PUEDE volver. Quien lo pidió entra en la
+  /// lista de espera y se le avisa cuando entre stock.
+  NO_DISPONIBLE
+  /// Descontinuado: ya no se vende y no va a volver. No se ofrece y NO genera
+  /// lista de espera — avisar "ya llegó" de algo que nunca llegará es peor
+  /// que no avisar.
+  NO_COMERCIAL
+}
+
+// =============================================
+// EVIDENCIA DE ENTREGA
+// La foto del paquete entregado. Lo que convierte "ya se entregó" en algo que
+// se puede mostrar cuando el cliente dice que no le llegó.
+// =============================================
+
+enum TipoEvidenciaEntrega {
+  FOTO_PAQUETE
+  FOTO_RECEPTOR
+  FIRMA
+  DOCUMENTO
+}
+
+model EvidenciaEntrega {
+  id            Int                  @id @default(autoincrement())
+  despachoId    Int
+  despacho      EnvioDespacho        @relation(fields: [despachoId], references: [id], onDelete: Cascade)
+  /// Desnormalizado para filtrar por empresa sin pasar por el comprobante.
+  /// No lleva relación a Empresa: el borrado ya cae en cascada por el
+  /// despacho, que depende del comprobante.
+  empresaId     Int
+  url           String
+  tipo          TipoEvidenciaEntrega @default(FOTO_PAQUETE)
+  nota          String?
+  /// Quién la registró: el usuario del panel o el repartidor en la calle.
+  usuarioId     Int?
+  usuarioNombre String?
+  repartidorId  Int?
+  /// Cuándo se tomó la entrega. Por defecto el momento de subirla, pero se
+  /// puede corregir: el motorizado sube las fotos del día al volver.
+  tomadaEn      DateTime             @default(now())
+  /// Una evidencia no se borra: se anula y queda el rastro de quién lo hizo.
+  /// Una prueba que se puede hacer desaparecer sin dejar huella no prueba nada.
+  anuladaEn     DateTime?
+  anuladaPor    String?
+  creadoEn      DateTime             @default(now())
+
+  @@index([despachoId])
+  @@index([empresaId, anuladaEn])
+}
+
+// =============================================
+// SINCRONIZACIÓN DE LA APP MÓVIL (OFFLINE-FIRST)
+// La app vende y cajea sin red y manda las operaciones después. El uuid de la
+// operación es la llave de idempotencia: reenviar lo mismo no duplica nada.
+// =============================================
+
+model DispositivoMovil {
+  id                    String    @id // uuid generado por la app
+  empresaId             Int
+  usuarioId             Int
+  nombre                String?
+  plataforma            String?
+  appVersion            String?
+  ultimoSyncEn          DateTime?
+  ultimoCatalogoVersion String?
+  pendientesReportados  Int       @default(0)
+  creadoEn              DateTime  @default(now())
+  empresa               Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId, ultimoSyncEn])
+}
+
+model OperacionSync {
+  id            Int      @id @default(autoincrement())
+  uuid          String   @unique
+  empresaId     Int
+  usuarioId     Int
+  sedeId        Int?
+  dispositivoId String
+  tipo          String // VENTA_INFORMAL | CAJA_APERTURA | CAJA_EGRESO | CAJA_CIERRE
+  realizadoEn   DateTime // hora real en el dispositivo
+  recibidoEn    DateTime @default(now())
+  estado        String // OK | ERROR | DESCARTADA
+  resultado     Json? // { comprobanteId, serie, correlativo, movimientoCajaId, avisos }
+  error         String?
+  payloadHash   String // sha256 del payload: mismo uuid con otro hash => 409
+  empresa       Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId, dispositivoId, recibidoEn])
+  @@index([empresaId, estado])
 }

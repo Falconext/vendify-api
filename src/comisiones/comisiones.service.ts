@@ -457,10 +457,7 @@ export class ComisionesService {
     fechaFin?: string,
   ) {
     const comisiones = await this.prisma.comisionVendedor.findMany({
-      where: {
-        empresaId,
-        ...this.wherePeriodo(mes, anio, fechaInicio, fechaFin),
-      },
+      where: { empresaId, ...this.wherePeriodo(mes, anio, fechaInicio, fechaFin) },
       include: {
         vendedor: { select: { nombre: true, dni: true, rol: true } },
         comprobante: {

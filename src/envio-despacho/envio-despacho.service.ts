@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,6 +16,7 @@ import * as XLSX from 'xlsx';
 import { DespachoConfigDto } from './dto/despacho-config.dto';
 import { RepartidorService } from '../repartidor/repartidor.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
+import { planPermiteShalomPro } from '../shalom/shalom.util';
 import { parseFechaSoloDia } from '../common/utils/fecha';
 
 const ESTADOS_NOTIFICABLES = new Set([
@@ -49,6 +51,9 @@ const DESPACHO_FIELDS = [
   'nombreDestinatario',
   'dniDestinatario',
   'contenidoPaquete',
+  'shalomTipoProducto',
+  'shalomAgenciaDestinoId',
+  'pesoKg',
   'montoCOD',
   'costoEnvio',
   'costoCourier',
@@ -109,6 +114,20 @@ export class EnvioDespachoService {
       where: { comprobanteId },
       include: {
         repartidor: true,
+        // La prueba de entrega viaja con el despacho: quien abre la ficha por
+        // un reclamo la necesita ahí mismo, no en otra pestaña.
+        evidencias: {
+          where: { anuladaEn: null },
+          orderBy: { tomadaEn: 'asc' },
+          select: {
+            id: true,
+            url: true,
+            tipo: true,
+            nota: true,
+            tomadaEn: true,
+            usuarioNombre: true,
+          },
+        },
         // Sede desde la que sale el pedido: el reparto propio la muestra y la
         // exporta como origen (no es editable, es la del comprobante).
         comprobante: {
@@ -181,6 +200,11 @@ export class EnvioDespachoService {
     });
     await this.syncAdelantoDesdeEnvio(comprobanteId, empresaId, dto);
     await this.syncPedidoTiendaByComprobante(comprobanteId, estadoInicial);
+    await this.backfillTelefonoCliente(
+      comprobante.clienteId,
+      comprobante.cliente?.telefono,
+      dto.celularDest,
+    );
     return this.withLegacyRepartidor(envio);
   }
 
@@ -203,7 +227,10 @@ export class EnvioDespachoService {
     dto: UpdateEnvioDespachoDto,
     usuarioId?: number,
   ) {
-    await this.validateComprobante(comprobanteId, empresaId);
+    const comprobante = await this.validateComprobante(
+      comprobanteId,
+      empresaId,
+    );
     const envio = await this.prisma.envioDespacho.findUnique({
       where: { comprobanteId },
     });
@@ -241,6 +268,13 @@ export class EnvioDespachoService {
       where: { comprobanteId },
       data: {
         ...(dto.estado !== undefined && { estado: dto.estado as any }),
+        // La hora de la entrega se sella cuando pasa a ENTREGADO: el reclamo
+        // "no me llegó" siempre se discute con una fecha, y dentro del
+        // historial Json no se puede filtrar ni ordenar.
+        ...(estadoCambia &&
+          dto.estado === EstadoDespacho.ENTREGADO && {
+            entregadoEn: new Date(),
+          }),
         ...(dto.fechaEstimada !== undefined && {
           fechaEstimada: parseFechaSoloDia(dto.fechaEstimada),
         }),
@@ -252,6 +286,20 @@ export class EnvioDespachoService {
     });
 
     await this.syncAdelantoDesdeEnvio(comprobanteId, empresaId, dto);
+    await this.backfillTelefonoCliente(
+      comprobante.clienteId,
+      comprobante.cliente?.telefono,
+      dto.celularDest,
+    );
+    if (dto.actualizarFichaCliente) {
+      await this.completarFichaCliente(
+        comprobante.clienteId,
+        empresaId,
+        dto.dniDestinatario,
+        dto.nombreDestinatario,
+        dto.celularDest,
+      );
+    }
 
     if (
       estadoCambia &&
@@ -275,27 +323,84 @@ export class EnvioDespachoService {
     return this.withLegacyRepartidor(updated);
   }
 
-  async getConfig(empresaId: number) {
-    const config = await this.prisma.despachoMensajeTemplate.findUnique({
-      where: { empresaId },
+  /**
+   * La automatización de despacho (rastreo automático + plantillas de WhatsApp)
+   * tiene la característica `tieneShalomGuias`. El resto ve la configuración, pero no la
+   * puede modificar: el candado se aplica acá, no solo en la UI.
+   */
+  private async validarPlanAutomatizacion(empresaId: number) {
+    const empresa = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: {
+        plan: {
+          select: {
+            nombre: true,
+            features: { select: { featureKey: true, enabled: true } },
+          },
+        },
+      },
     });
-    return (
-      config ?? {
-        empresaId,
-        mensajeEnCamino: MENSAJES_DEFAULT.EN_CAMINO,
-        mensajeEntregado: MENSAJES_DEFAULT.ENTREGADO,
-        notificarEnCamino: true,
-        notificarEntregado: true,
-      }
-    );
+    if (!planPermiteShalomPro(empresa?.plan)) {
+      throw new ForbiddenException(
+        'Tu plan no incluye la automatización de despacho. Consulta con tu asesor para habilitarla.',
+      );
+    }
+  }
+
+  async getConfig(empresaId: number) {
+    const [config, empresa] = await Promise.all([
+      this.prisma.despachoMensajeTemplate.findUnique({ where: { empresaId } }),
+      this.prisma.empresa.findUnique({
+        where: { id: empresaId },
+        select: {
+          shalomAutoTrackingActivo: true,
+          plan: {
+            select: {
+              nombre: true,
+              features: { select: { featureKey: true, enabled: true } },
+            },
+          },
+        },
+      }),
+    ]);
+    const base = config ?? {
+      empresaId,
+      mensajeEnCamino: MENSAJES_DEFAULT.EN_CAMINO,
+      mensajeEntregado: MENSAJES_DEFAULT.ENTREGADO,
+      notificarEnCamino: true,
+      notificarEntregado: true,
+    };
+    return {
+      ...base,
+      // Opt-in del rastreo automático Shalom (cron 30 min). Default false.
+      shalomAutoTrackingActivo: empresa?.shalomAutoTrackingActivo ?? false,
+      // El plan permite editar esta configuración (`tieneShalomGuias`).
+      habilitadoPorPlan: planPermiteShalomPro(empresa?.plan),
+    };
   }
 
   async upsertConfig(empresaId: number, dto: DespachoConfigDto) {
+    await this.validarPlanAutomatizacion(empresaId);
     return this.prisma.despachoMensajeTemplate.upsert({
       where: { empresaId },
       create: { empresaId, ...dto },
       update: dto,
     });
+  }
+
+  /**
+   * Activa/desactiva el rastreo automático Shalom para la empresa. Con `false`
+   * (default) el cron de 30 min no actualiza estados ni envía WhatsApp a sus
+   * clientes. Se activa recién cuando el empresario está avisado del automatismo.
+   */
+  async setAutoTracking(empresaId: number, activo: boolean) {
+    await this.validarPlanAutomatizacion(empresaId);
+    const empresa = await this.prisma.empresa.update({
+      where: { id: empresaId },
+      data: { shalomAutoTrackingActivo: activo },
+      select: { shalomAutoTrackingActivo: true },
+    });
+    return { shalomAutoTrackingActivo: empresa.shalomAutoTrackingActivo };
   }
 
   async remove(comprobanteId: number, empresaId: number) {
@@ -571,6 +676,8 @@ export class EnvioDespachoService {
     const esEnAgencia = estado === EstadoDespacho.EN_AGENCIA;
     const pedidoRef = `${comprobante.serie}-${String(comprobante.correlativo).padStart(8, '0')}`;
 
+    const nombre = comprobante?.cliente?.nombre ?? 'Cliente';
+
     if (esEnAgencia) {
       const saldo = Number((comprobante as any)?.saldo ?? 0);
       const agencia =
@@ -580,7 +687,10 @@ export class EnvioDespachoService {
             select: { agenciaDestino: true },
           })
         )?.agenciaDestino ?? 'la agencia';
-      const msg = `Hola ${comprobante?.cliente?.nombre ?? 'Cliente'}! 📦 Tu pedido ${pedidoRef} llegó a ${agencia}. Para retirarlo confirma el pago restante de S/ ${saldo.toFixed(2)}. Te avisamos cuando esté listo. — ${empresa?.razonSocial ?? ''}`;
+      const msg =
+        saldo > 0
+          ? `Hola ${nombre}! 📦 Tu pedido ${pedidoRef} llegó a ${agencia}. Para retirarlo confirma el pago restante de S/ ${saldo.toFixed(2)}. Te avisamos cuando esté listo. — ${empresa?.razonSocial ?? ''}`
+          : `Hola ${nombre}! 📦 Tu pedido ${pedidoRef} ya está en ${agencia} y puedes recogerlo. — ${empresa?.razonSocial ?? ''}`;
       await this.whatsapp.enviarTexto(telefono, msg);
       return;
     }
@@ -595,7 +705,7 @@ export class EnvioDespachoService {
       : (config?.mensajeEntregado ?? MENSAJES_DEFAULT.ENTREGADO);
 
     const mensaje = plantilla
-      .replace(/\{\{nombre\}\}/g, comprobante.cliente?.nombre ?? 'Cliente')
+      .replace(/\{\{nombre\}\}/g, nombre)
       .replace(/\{\{pedido\}\}/g, pedidoRef)
       .replace(/\{\{repartidor\}\}/g, repartidorNombre ?? 'Sin asignar')
       .replace(/\{\{empresa\}\}/g, empresa?.razonSocial ?? '');
@@ -649,7 +759,8 @@ export class EnvioDespachoService {
         select: { razonSocial: true },
       });
       const pedidoRef = `${comprobante.serie}-${String(comprobante.correlativo).padStart(8, '0')}`;
-      const msg = `Hola ${comprobante.cliente?.nombre ?? 'Cliente'}! ✅ Tu pago fue confirmado. Ya puedes retirar tu pedido ${pedidoRef} de la agencia. ¡Gracias por tu compra! — ${empresa?.razonSocial ?? ''}`;
+      const nombre = comprobante.cliente?.nombre ?? 'Cliente';
+      const msg = `Hola ${nombre}! ✅ Tu pago fue confirmado. Ya puedes retirar tu pedido ${pedidoRef} de la agencia. ¡Gracias por tu compra! — ${empresa?.razonSocial ?? ''}`;
       this.whatsapp
         .enviarTexto(telefono, msg)
         .catch((e) =>
@@ -804,6 +915,85 @@ export class EnvioDespachoService {
     });
     if (!comprobante) throw new NotFoundException('Comprobante no encontrado.');
     return comprobante;
+  }
+
+  /**
+   * Completa el teléfono del cliente con el celular del destinatario del
+   * despacho, SOLO si el cliente todavía no tiene uno guardado. Sin esto, un
+   * cliente recurrente nunca queda con celular registrado (el que se tipea
+   * en "Celular destinatario" solo vivía en el despacho puntual) y el
+   * siguiente despacho para el mismo cliente vuelve a pedirlo desde cero.
+   */
+  /**
+   * Cliente registrado solo con WhatsApp ("WSP 9…" y sin documento) o sin DNI:
+   * al completar el destinatario de la guía se corrige su ficha (DNI + nombre
+   * + celular) para que la siguiente venta y su boleta ya salgan bien. Nunca
+   * pisa un DNI/RUC válido ya registrado.
+   */
+  private async completarFichaCliente(
+    clienteId: number | null | undefined,
+    empresaId: number,
+    dni?: string,
+    nombre?: string,
+    celular?: string,
+  ) {
+    if (!clienteId) return;
+    const dniLimpio = String(dni ?? '').replace(/\D/g, '');
+    const nombreLimpio = String(nombre ?? '').trim();
+    if (dniLimpio.length !== 8 || !nombreLimpio) return;
+    const cliente = await this.prisma.cliente.findFirst({
+      where: { id: clienteId, empresaId },
+      select: { id: true, nroDoc: true, nombre: true, telefono: true },
+    });
+    if (!cliente) return;
+    const docActual = String(cliente.nroDoc ?? '').trim();
+    const tieneDocValido =
+      /^\d{8}$/.test(docActual) || /^\d{11}$/.test(docActual);
+    if (tieneDocValido && docActual !== dniLimpio) return;
+    const tipoDni = await this.prisma.tipoDocumento.findFirst({
+      where: {
+        OR: [
+          { codigo: '1' },
+          { descripcion: { contains: 'DNI', mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true },
+    });
+    const celularLimpio = String(celular ?? '').replace(/\D/g, '');
+    await this.prisma.cliente
+      .update({
+        where: { id: cliente.id },
+        data: {
+          nroDoc: dniLimpio,
+          nombre: nombreLimpio,
+          ...(tipoDni ? { tipoDocumentoId: tipoDni.id } : {}),
+          ...(/^9\d{8}$/.test(celularLimpio) && !cliente.telefono
+            ? { telefono: celularLimpio }
+            : {}),
+        },
+      })
+      .catch((e) =>
+        this.logger.warn(
+          `No se pudo completar la ficha del cliente ${cliente.id}: ${e?.message}`,
+        ),
+      );
+  }
+
+  private async backfillTelefonoCliente(
+    clienteId: number | null | undefined,
+    telefonoActual: string | null | undefined,
+    celularDest: string | null | undefined,
+  ) {
+    if (!clienteId || telefonoActual) return;
+    const celular = String(celularDest ?? '').replace(/\D/g, '');
+    if (celular.length !== 9 || !celular.startsWith('9')) return;
+    await this.prisma.cliente
+      .update({ where: { id: clienteId }, data: { telefono: celular } })
+      .catch((e) =>
+        this.logger.warn(
+          `No se pudo completar el teléfono del cliente ${clienteId}: ${e?.message}`,
+        ),
+      );
   }
 
   private async syncPedidoTiendaByComprobante(
@@ -1321,7 +1511,6 @@ export class EnvioDespachoService {
     }
     return [...porFecha.values()].sort((a, b) => a.fecha.localeCompare(b.fecha));
   }
-
 
   async exportarReparto(empresaId: number, q: ExportarRepartoQueryDto) {
     const modo = this.modoReporte(q.courier);

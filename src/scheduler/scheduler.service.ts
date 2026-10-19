@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { VerificarPendientesSunatService } from './services/verificar-pendientes-sunat.service';
+import { VerificarEnviosShalomService } from './services/verificar-envios-shalom.service';
+import { VerificarEnviosOlvaService } from './services/verificar-envios-olva.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { InventarioNotificacionesService } from '../notificaciones/inventario-notificaciones.service';
 import { ResellerService } from '../reseller/reseller.service';
@@ -12,14 +14,87 @@ export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name);
   private sunatJobsDisabledLogged = false;
 
+  private shalomJobsDisabledLogged = false;
+
+  private olvaJobsDisabledLogged = false;
+
   constructor(
     private readonly verificarSunat: VerificarPendientesSunatService,
+    private readonly verificarEnviosShalom: VerificarEnviosShalomService,
+    private readonly verificarEnviosOlva: VerificarEnviosOlvaService,
     private readonly notificacionesService: NotificacionesService,
     private readonly inventarioNotificacionesService: InventarioNotificacionesService,
     private readonly resellerService: ResellerService,
     private readonly prisma: PrismaService,
     private readonly whatsappService: WhatsAppService,
   ) {}
+
+  /**
+   * El rastreo automático de Shalom se puede apagar por entorno con
+   * SHALOM_JOBS_ENABLED=false. Igual que los jobs de SUNAT: cuando un backend
+   * de desarrollo apunta a una BD compartida, evita que su corrida pise la del
+   * backend desplegado y golpee el frágil upstream de Shalom por duplicado.
+   */
+  private shalomJobsEnabled(): boolean {
+    const enabled = process.env.SHALOM_JOBS_ENABLED !== 'false';
+    if (!enabled && !this.shalomJobsDisabledLogged) {
+      this.shalomJobsDisabledLogged = true;
+      this.logger.warn(
+        '⏸️ Rastreo automático de Shalom deshabilitado (SHALOM_JOBS_ENABLED=false).',
+      );
+    }
+    return enabled;
+  }
+
+  // Rastreo automático de envíos Shalom no entregados (cada 30 min).
+  @Cron('*/30 * * * *', {
+    name: 'verificar-envios-shalom',
+    timeZone: 'America/Lima',
+  })
+  async verificarEnviosShalomCron(): Promise<void> {
+    if (!this.shalomJobsEnabled()) return;
+    try {
+      await this.verificarEnviosShalom.execute();
+    } catch (error: any) {
+      this.logger.error(
+        `[Shalom] Error al verificar envíos: ${error?.message || 'Error desconocido'}`,
+      );
+    }
+  }
+
+  /**
+   * El rastreo automático de Olva se puede apagar por entorno con
+   * OLVA_JOBS_ENABLED=false, por el mismo motivo que los jobs de SUNAT: cuando
+   * un backend de desarrollo apunta a una BD compartida, evita que su corrida
+   * pise la del backend desplegado y golpee el upstream por duplicado.
+   */
+  private olvaJobsEnabled(): boolean {
+    const enabled = process.env.OLVA_JOBS_ENABLED !== 'false';
+    if (!enabled && !this.olvaJobsDisabledLogged) {
+      this.olvaJobsDisabledLogged = true;
+      this.logger.warn(
+        '⏸️ Rastreo automático de Olva deshabilitado (OLVA_JOBS_ENABLED=false).',
+      );
+    }
+    return enabled;
+  }
+
+  // Rastreo automático de envíos Olva no entregados (cada 30 min, en los
+  // minutos 15 y 45 para no competir con el resto de las corridas).
+  @Cron('15,45 * * * *', {
+    name: 'verificar-envios-olva',
+    timeZone: 'America/Lima',
+  })
+  async verificarEnviosOlvaCron(): Promise<void> {
+    if (!this.olvaJobsEnabled()) return;
+    try {
+      await this.verificarEnviosOlva.execute();
+    } catch (error: any) {
+      this.logger.error(
+        `[Olva] Error al verificar envíos: ${error?.message || 'Error desconocido'}`,
+      );
+    }
+  }
 
   /**
    * Los jobs de SUNAT (verificación y reintentos) se pueden apagar por entorno con

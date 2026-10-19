@@ -1,5 +1,10 @@
 import { num, round3 } from '../common/utils/stock';
 import {
+  cumpleFiltroStock,
+  stockEfectivoDeProducto,
+  type FiltroStock,
+} from './stock-efectivo';
+import {
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -7,7 +12,17 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { Prisma, EstadoReserva, EstadoType } from '@prisma/client';
+import {
+  DisponibilidadProducto,
+  Prisma,
+  EstadoReserva,
+  EstadoType,
+} from '@prisma/client';
+import {
+  escribirPrioridadVenta,
+  leerDisponibilidad,
+  leerPrioridadVenta,
+} from './disponibilidad.util';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
@@ -379,6 +394,10 @@ export class ProductoService {
       ubicacionSede?: string | null;
       /** Sedes donde queda disponible (ids). Si no viene, aplica el modo de la empresa. */
       sedesDisponibles?: number[] | null;
+      /** Qué prometerle al cliente. Sin valor, se deduce del stock. */
+      disponibilidad?: DisponibilidadProducto;
+      /** Empuje frente a equivalentes: 4 muy alta, 3 alta, 2 media, 1 baja. */
+      prioridadVenta?: number;
     },
     empresaId: number,
     sedeId?: number,
@@ -432,6 +451,8 @@ export class ProductoService {
       precioUnitarioSede,
       precioOfertaSede,
       ubicacionSede,
+      disponibilidad,
+      prioridadVenta,
     } = data;
 
     const porcentajes = this.normalizarPorcentajes(
@@ -540,6 +561,8 @@ export class ProductoService {
           stock,
           stockMinimo: stockMinimo != null ? stockMinimo : undefined,
           stockMaximo: stockMaximo != null ? stockMaximo : undefined,
+          disponibilidad: disponibilidad ?? undefined,
+          prioridadVenta: prioridadVenta ?? undefined,
           categoriaId:
             categoriaId && Number(categoriaId) > 0
               ? Number(categoriaId)
@@ -645,6 +668,8 @@ export class ProductoService {
           stock,
           stockMinimo: stockMinimo != null ? stockMinimo : undefined,
           stockMaximo: stockMaximo != null ? stockMaximo : undefined,
+          disponibilidad: disponibilidad ?? undefined,
+          prioridadVenta: prioridadVenta ?? undefined,
           categoriaId:
             categoriaId && Number(categoriaId) > 0
               ? Number(categoriaId)
@@ -1025,7 +1050,11 @@ export class ProductoService {
     soloVendibles?: boolean;
     usarPrecioSede?: boolean;
     usuarioId?: number;
+    /** Alias histórico de `stockFiltro: 'BAJO'` (link "Ver solo stock bajo"). */
     soloStockBajo?: boolean;
+    stockFiltro?: FiltroStock;
+    stockDesde?: number;
+    stockHasta?: number;
     priorizarStock?: boolean;
     /** Incluir productos NO disponibles en la sede (para asignarlos). */
     incluirOcultos?: boolean;
@@ -1087,17 +1116,6 @@ export class ProductoService {
       };
     }
 
-    if (params.soloStockBajo) {
-      // Pre-filter: only include products that have a stockMinimo configured > 0
-      // (products without stockMinimo can never be "low stock").
-      // Field-to-field comparison (stock <= stockMinimo) is not supported by Prisma,
-      // so a JS post-filter is applied after computing effective stock values.
-      where.AND = [
-        ...(where.AND ?? []),
-        { stockMinimo: { gt: 0 } },
-      ];
-    }
-
     // Prioriza productos con stock: los con stock (producto.stock = suma de sedes,
     // mantenida por kardex) van primero, y dentro de cada grupo se respeta el orden
     // pedido. Se activa solo con priorizarStock (ej. POS de facturación).
@@ -1105,10 +1123,71 @@ export class ProductoService {
       ? [{ stock: 'desc' }, { [sort]: order }]
       : { [sort]: order };
 
-    const [productosRaw, total] = await Promise.all([
+    // Filtro por stock ANTES de paginar. Antes "solo stock bajo" se aplicaba
+    // sobre la página ya cortada (50 productos): con 800 en catálogo encontraba
+    // 3 y el dashboard mostraba otros. Aquí se calcula el stock de todos los
+    // candidatos con la misma regla de la columna y se pagina lo que cumple.
+    const filtroStock: FiltroStock | undefined =
+      params.stockFiltro ?? (params.soloStockBajo ? 'BAJO' : undefined);
+    let skipPagina = skip;
+    let totalFiltrado: number | null = null;
+    if (filtroStock) {
+      const candidatos = await this.prisma.producto.findMany({
+        where,
+        orderBy,
+        select: {
+          id: true,
+          stock: true,
+          stockMinimo: true,
+          porcentajeProvision: true,
+          stocks: {
+            where: params.sedeId ? { sedeId: params.sedeId } : {},
+            select: { stock: true, stockMinimo: true },
+          },
+          lotes: {
+            where: { activo: true, stockActual: { gt: 0 } },
+            select: { stockActual: true },
+          },
+        },
+      });
+      const reservas = candidatos.length
+        ? await this.prisma.reserva.groupBy({
+            by: ['productoId'],
+            where: {
+              empresaId,
+              ...(params.sedeId ? { sedeId: params.sedeId } : {}),
+              productoId: { in: candidatos.map((c) => c.id) },
+              estado: {
+                in: [EstadoReserva.PENDIENTE, EstadoReserva.CONFIRMADA],
+              },
+            },
+            _sum: { cantidad: true },
+          })
+        : [];
+      const reservado = new Map(
+        reservas.map((r) => [r.productoId, r._sum.cantidad ?? 0]),
+      );
+      const desde = params.stockDesde != null ? Number(params.stockDesde) : null;
+      const hasta = params.stockHasta != null ? Number(params.stockHasta) : null;
+      const ids = candidatos
+        .filter((c) =>
+          cumpleFiltroStock(
+            stockEfectivoDeProducto(c, params.sedeId, reservado.get(c.id) ?? 0),
+            filtroStock,
+            Number.isFinite(desde) ? desde : null,
+            Number.isFinite(hasta) ? hasta : null,
+          ),
+        )
+        .map((c) => c.id);
+      totalFiltrado = ids.length;
+      where.id = { in: ids.slice(skip, skip + limitNumber) };
+      skipPagina = 0;
+    }
+
+    const [productosRaw, totalSinFiltro] = await Promise.all([
       this.prisma.producto.findMany({
         where,
-        skip,
+        skip: skipPagina,
         take: limitNumber,
         orderBy,
         select: {
@@ -1260,6 +1339,7 @@ export class ProductoService {
       }),
       this.prisma.producto.count({ where }),
     ]);
+    const total = totalFiltrado ?? totalSinFiltro;
 
     const productoIds = productosRaw.map((p) => p.id);
     const reservasAgrupadas =
@@ -1343,29 +1423,10 @@ export class ProductoService {
 
     const productos = await Promise.all(
       productosRaw.map(async (p) => {
-        const stockDesdeLotes = (p.lotes || []).reduce(
-          (acc, lote) => acc + Number(lote.stockActual || 0),
-          0,
-        );
-        const usaStockLotes = stockDesdeLotes > 0;
+        const reservado = reservadoPorProducto.get(p.id) ?? 0;
+        const { usaStockLotes, stockTotal, stockMinimo, stockDisponibleVenta } =
+          stockEfectivoDeProducto(p as any, params.sedeId, reservado);
         const loteFefoActual = usaStockLotes ? p.lotes[0] : null;
-
-        // Si se pide una sede específica, usar SOLO ese stock.
-        // Si no se pide sede, usar suma total como comportamiento histórico.
-        const stockTotalBase = params.sedeId
-          ? num(p.stocks[0]?.stock) // if sedeId is specific, and no ProductoStock exists, stock is 0
-          : p.stocks.length > 0
-            ? p.stocks.reduce((sum, s) => sum + num(s.stock), 0)
-            : num((p as any).stock);
-        // If a specific sede is requested, we MUST use the sede's specific stock from ProductoStock (stockTotalBase).
-        // Lotes don't have sedeId in this schema, so their sum is global.
-        const stockTotal =
-          usaStockLotes && !params.sedeId ? stockDesdeLotes : stockTotalBase;
-        const stockMinimo = params.sedeId
-          ? (p.stocks[0]?.stockMinimo ?? 0)
-          : p.stocks.length > 0
-            ? p.stocks.reduce((sum, s) => sum + (s.stockMinimo || 0), 0)
-            : ((p as any).stockMinimo ?? 0);
         const stockSede = params.sedeId
           ? (p.stocks[0] as any | undefined)
           : undefined;
@@ -1382,16 +1443,8 @@ export class ProductoService {
           Number(p.precioUnitario),
           p.precioOferta != null ? Number(p.precioOferta) : null,
         );
-        const reservado = reservadoPorProducto.get(p.id) ?? 0;
+        // Lo que viene en camino (OC aprobadas sin recibir), como en main.
         const enCaminoProducto = enCaminoPorProducto.get(p.id) ?? null;
-        const cupoProvision = Math.floor(
-          (stockTotal * (p.porcentajeProvision ?? 0)) / 100,
-        );
-        const cupoVenta = Math.max(0, stockTotal - cupoProvision);
-        const stockDisponibleVenta = Math.max(
-          0,
-          Math.min(stockTotal - reservado, cupoVenta),
-        );
 
         const imagenUrl = normalizePersistentImageUrl(
           (p as any).imagenUrl as string | null,
@@ -1519,18 +1572,7 @@ export class ProductoService {
       }),
     );
 
-    // Post-filter for soloStockBajo: keep only products where effective stock <= stockMinimo.
-    // Prisma can't express column-to-column comparison natively, so we filter in JS
-    // after computing the effective stock values.
-    const productosFinales = params.soloStockBajo
-      ? productos.filter((p: any) => {
-          const stockEfectivo = Number(p.stock ?? 0);
-          const minimo = Number(p.stockMinimo ?? 0);
-          return minimo > 0 && stockEfectivo <= minimo;
-        })
-      : productos;
-
-    return { productos: productosFinales, total: params.soloStockBajo ? productosFinales.length : total, page, limit };
+    return { productos, total, page, limit };
   }
 
   async resumen(params: {
@@ -2631,6 +2673,10 @@ export class ProductoService {
       ubicacionSede?: string | null;
       /** Sedes donde queda disponible (ids). Reemplaza la disponibilidad actual. */
       sedesDisponibles?: number[] | null;
+      /** Qué prometerle al cliente. null lo devuelve a deducirse del stock. */
+      disponibilidad?: DisponibilidadProducto | null;
+      /** Empuje frente a equivalentes: 4 muy alta, 3 alta, 2 media, 1 baja. */
+      prioridadVenta?: number | null;
 
       sedeId?: number; // Nueva propiedad opcional para identificar dónde se ajusta el stock
     },
@@ -4339,6 +4385,8 @@ export class ProductoService {
         STOCK: stockTotal,
         'VALOR INVENTARIO': valorInventario,
         'STOCK MINIMO': stockMinimo,
+        DISPONIBILIDAD: producto.disponibilidad ?? '',
+        PRIORIDAD: escribirPrioridadVenta(producto.prioridadVenta ?? null),
         CATEGORIA: producto.categoria?.nombre || '',
         MARCA: p?.marca?.nombre || '',
         LOCALIZACION: localizacion || '',
@@ -4808,6 +4856,18 @@ export class ProductoService {
           row['CATEGORIA'] ?? row['Categoría'] ?? row['categoria'] ?? null;
         const marcaRaw =
           row['MARCA'] ?? row['Marca'] ?? row['marca'] ?? null;
+        // Qué se le puede prometer al cliente y cuánto empujar el producto. Si
+        // vienen vacías o ilegibles se ignoran, y la disponibilidad se sigue
+        // deduciendo del stock.
+        const disponibilidadImport = leerDisponibilidad(
+          row['DISPONIBILIDAD'] ?? row['Disponibilidad'] ?? row['disponibilidad'],
+        );
+        const prioridadImport = leerPrioridadVenta(
+          row['PRIORIDAD'] ??
+            row['PRIORIDAD DE VENTA'] ??
+            row['Prioridad'] ??
+            row['prioridad'],
+        );
         // Fila sin CÓDIGO: es un producto nuevo que el empresario agregó al final
         // del Excel exportado (caso DEMENVER). Se le genera el siguiente PRxxx en
         // vez de rechazar la fila; si trae código de barras (columna opcional) o
@@ -5020,6 +5080,12 @@ export class ProductoService {
               ...(categoriaId != null ? { categoriaId } : {}),
               ...(marcaId != null ? { marcaId } : {}),
               ...(codigoBarras != null ? { codigoBarras } : {}),
+              ...(disponibilidadImport != null
+                ? { disponibilidad: disponibilidadImport }
+                : {}),
+              ...(prioridadImport != null
+                ? { prioridadVenta: prioridadImport }
+                : {}),
             },
           });
 

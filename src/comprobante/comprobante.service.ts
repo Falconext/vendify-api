@@ -1,4 +1,14 @@
 import { num, round3 } from '../common/utils/stock';
+import { lineasPagoMixto } from '../common/utils/pago-mixto';
+import {
+  cobroDeEdicion,
+  fecharPagosEdicion,
+  type PagoAnterior,
+} from './pagos-edicion';
+import {
+  lineasDetalleAdicional,
+  normalizarDetalleAdicional,
+} from './detalle-adicional';
 import {
   SunatValidezClient,
   SunatValidezResult,
@@ -34,6 +44,7 @@ import {
   type FormatoPdf,
 } from './pdf-generator.service';
 import { generarQrSunatDataUrl } from './qr-sunat.util';
+import { diaDeEnvio } from './dia-de-envio';
 import {
   baseRetencion,
   esRetencion,
@@ -60,7 +71,6 @@ import * as XLSX from 'xlsx';
 import * as XLSXStyle from 'xlsx-js-style';
 import { XMLParser } from 'fast-xml-parser';
 
-import { diaDeEnvio } from './dia-de-envio';
 import { aplicarDescuentoGlobal } from './descuento-global';
 import {
   agregarVentasPorProducto,
@@ -236,6 +246,8 @@ export class ComprobanteService {
     montoPagado: number;
     documento: string;
     fecha?: Date;
+    /** Solo al editar: los pagos que la nota tenía, para conservar sus fechas. */
+    pagosAnteriores?: PagoAnterior[];
   }) {
     const montoPagado = this.round2(Number(params.montoPagado || 0));
     if (montoPagado <= 0) return;
@@ -254,12 +266,17 @@ export class ComprobanteService {
     );
     if (lines.length === 0) return;
 
+    const fechaNueva = params.fecha ?? new Date();
+    const filas = params.pagosAnteriores
+      ? fecharPagosEdicion(params.pagosAnteriores, lines, fechaNueva)
+      : lines.map((line: any) => ({ ...line, fecha: fechaNueva, usuarioId: null }));
+
     await this.prisma.pago.createMany({
-      data: lines.map((line: any) => ({
+      data: filas.map((line: any) => ({
         comprobanteId: params.comprobanteId,
         empresaId: params.empresaId,
-        usuarioId: params.usuarioId ?? null,
-        fecha: params.fecha ?? new Date(),
+        usuarioId: line.usuarioId ?? params.usuarioId ?? null,
+        fecha: line.fecha,
         monto: line.amount,
         medioPago: line.method,
         observacion: `Pago registrado al emitir ${params.documento}`,
@@ -476,6 +493,7 @@ export class ComprobanteService {
                 },
                 unidad: true,
                 descripcion: true,
+                detalleAdicional: true,
                 cantidad: true,
                 mtoValorUnitario: true,
                 mtoValorVenta: true,
@@ -832,6 +850,7 @@ export class ComprobanteService {
             },
             unidad: true,
             descripcion: true,
+            detalleAdicional: true,
             cantidad: true,
             mtoValorUnitario: true,
             mtoValorVenta: true,
@@ -1104,6 +1123,16 @@ export class ComprobanteService {
     );
     const isFormal = ['01', '03', '08'].includes(comp.tipoDoc);
 
+    // Anular dos veces devolvía el stock dos veces: revertirStock encuentra la
+    // SALIDA original de nuevo y vuelve a sumar (NV de 5 unidades anulada dos
+    // veces = +10). Un comprobante ya anulado no tiene nada más que revertir.
+    if (
+      comp.estadoEnvioSunat === EstadoSunat.ANULADO ||
+      (comp as any).estadoPago === 'ANULADO'
+    ) {
+      throw new BadRequestException('Este comprobante ya está anulado.');
+    }
+
     // Documentos SUNAT formales: Boleta y Factura ya aceptadas NO pueden darse de baja directamente.
     // - Boleta (03): comunicación de baja SUNAT — use Nota de Crédito (botón "Generar NC")
     // - Factura (01): SUNAT exige Nota de Crédito, nunca baja directa
@@ -1118,6 +1147,20 @@ export class ComprobanteService {
       throw new BadRequestException(
         `Una ${tipoNombre} ya aceptada por SUNAT debe anularse emitiendo una Nota de Crédito. Use el botón "Generar NC (Anular)".`,
       );
+    }
+
+    // Se reclama la anulación de forma atómica ANTES de devolver stock: dos
+    // pedidos simultáneos (doble clic, dos pestañas) pasaban los dos el chequeo
+    // de arriba y devolvían el stock dos veces.
+    const reclamo = await this.prisma.comprobante.updateMany({
+      where: {
+        id: comprobanteId,
+        estadoEnvioSunat: { not: EstadoSunat.ANULADO },
+      },
+      data: { estadoEnvioSunat: EstadoSunat.ANULADO },
+    });
+    if (reclamo.count === 0) {
+      throw new BadRequestException('Este comprobante ya está anulado.');
     }
 
     // Revertir stock para todos los tipos de comprobantes que afectan inventario
@@ -1447,6 +1490,9 @@ export class ComprobanteService {
     empresaId: number,
     tipoDoc: string,
   ) {
+    // Las operaciones que vienen del sync offline ya son idempotentes por uuid
+    // (OperacionSync) y pueden traer legítimamente dos ventas iguales seguidas.
+    if (data?.origenSyncUuid) return;
     const clienteId = Number(data?.clienteId);
     if (!clienteId) return;
     const totalNuevo =
@@ -2005,32 +2051,49 @@ export class ComprobanteService {
       include: { unidadMedida: true },
     });
 
+    // La consulta de arriba filtra por `empresaId` y por nada más: un ítem que no
+    // vuelve es un producto de OTRA empresa (o de ninguna), o un id inexistente —
+    // nunca uno "inactivo", porque el estado no entra en el filtro. El mensaje
+    // anterior decía "encontrados pero inactivos" y luego imprimía "Estado: ACTIVO",
+    // que no orientaba a nadie. Ahora cada id dice su motivo real.
+    //
+    // Dos líneas del mismo producto hacen que `productos` (sin repetir) sea más
+    // corto que `productDetalles`; por eso los faltantes se calculan sobre ids
+    // únicos y no sobre la diferencia de longitudes.
     if (productos.length !== productDetalles.length) {
-      // Identificar cuáles productos no fueron encontrados
-      const productosEncontrados = productos.map((p) => p.id);
-      const productosFaltantes = productIds.filter(
-        (id) => !productosEncontrados.includes(id),
+      const encontrados = new Set(productos.map((p) => p.id));
+      const faltantes = [...new Set(productIds)].filter(
+        (id) => !encontrados.has(id),
       );
 
-      // Obtener información adicional de los productos faltantes
-      const productosInactivos = await this.prisma.producto.findMany({
-        where: { id: { in: productosFaltantes } },
-        select: { id: true, descripcion: true, estado: true, empresaId: true },
-      });
-      const productosRealmenteFaltantes = productosInactivos.filter(
-        (p) => p.estado !== ('PLACEHOLDER' as any),
-      );
+      if (faltantes.length > 0) {
+        // Sin filtro de empresa: así se distingue "no existe" de "existe, pero
+        // no es de esta empresa".
+        const enLaBase = await this.prisma.producto.findMany({
+          where: { id: { in: faltantes } },
+          select: { id: true, descripcion: true, estado: true, empresaId: true },
+        });
+        const porId = new Map(enLaBase.map((p) => [p.id, p]));
 
-      if (
-        productosRealmenteFaltantes.length > 0 ||
-        productosFaltantes.length > productosInactivos.length
-      ) {
-        const detalleError =
-          productosRealmenteFaltantes.length > 0
-            ? `Productos encontrados pero inactivos: ${productosRealmenteFaltantes.map((p) => `ID ${p.id} (${p.descripcion}) - Estado: ${p.estado}`).join('; ')}`
-            : `Productos no encontrados: IDs ${productosFaltantes.join(', ')}`;
+        const motivo = (id: number) => {
+          const p = porId.get(id);
+          if (!p) return `ID ${id}: no existe en la base de datos`;
+          if (p.empresaId !== empresaId) {
+            const duenio =
+              p.empresaId == null
+                ? 'sin empresa asignada'
+                : `empresa ${p.empresaId}`;
+            return `ID ${id} (${p.descripcion}): pertenece a ${duenio}, no a la empresa ${empresaId} que emite`;
+          }
+          // Defensivo: con el filtro actual este caso no debería darse.
+          return `ID ${id} (${p.descripcion}): no disponible (estado ${p.estado})`;
+        };
 
-        throw new BadRequestException(detalleError);
+        throw new BadRequestException(
+          `No se puede emitir el comprobante. Revisa estos productos: ${faltantes
+            .map(motivo)
+            .join('; ')}`,
+        );
       }
     }
     let mtoOperGravadas = 0;
@@ -2119,6 +2182,11 @@ export class ComprobanteService {
           productoId: null,
           unidad: unidadLibre || 'ZZ',
           descripcion: String(item.descripcion).trim(),
+          // Detalle multilínea bajo el título (cotización de servicios). Solo PDF;
+          // el XML de SUNAT usa `descripcion` (ver detalle-adicional.ts).
+          ...(normalizarDetalleAdicional(item.detalleAdicional)
+            ? { detalleAdicional: normalizarDetalleAdicional(item.detalleAdicional) }
+            : {}),
           cantidad,
           ...(numerosSerieLibre.length > 0
             ? { numerosSerie: numerosSerieLibre }
@@ -2238,6 +2306,9 @@ export class ComprobanteService {
         // Fraccionamiento: usar unidadVenta del ítem si viene (ej. TABLETA vs CAJA)
         unidad: item.unidadVenta || (prod as any).unidadMedida.codigo,
         descripcion,
+        ...(normalizarDetalleAdicional(item.detalleAdicional)
+          ? { detalleAdicional: normalizarDetalleAdicional(item.detalleAdicional) }
+          : {}),
         cantidad,
         mtoPrecioUnitario: esGratProd
           ? this.round2(valorUnitario)
@@ -2374,8 +2445,14 @@ export class ComprobanteService {
       empresaId: number;
       usuarioId?: number;
       sedeId?: number;
+      // Sync offline: la venta ya ocurrió (el cliente se llevó el producto), así
+      // que el faltante de stock no bloquea: se registra en `avisos` y el stock
+      // queda negativo.
+      soloAvisar?: boolean;
+      avisos?: string[];
     },
   ): Promise<number> {
+    const soloAvisar = data.soloAvisar === true;
     const sedeId = await this.resolverSedeParaStock(data);
 
     // Sobreventa configurable: si la empresa habilitó "permitirVentaSinStock",
@@ -2463,7 +2540,16 @@ export class ComprobanteService {
             `El lote ${lote.lote} de "${producto.descripcion}" está vencido`,
           );
         }
-        if (!permitirVentaSinStock && num(lote.stockActual) < cantidadLote) {
+        if (soloAvisar && num(lote.stockActual) < cantidadLote) {
+          data.avisos?.push(
+            `Lote ${lote.lote} de "${producto.descripcion}" quedó con stock insuficiente (había ${num(lote.stockActual)}, se vendieron ${cantidadLote}).`,
+          );
+        }
+        if (
+          !permitirVentaSinStock &&
+          !soloAvisar &&
+          num(lote.stockActual) < cantidadLote
+        ) {
           throw new BadRequestException(
             `Stock insuficiente en lote ${lote.lote} para "${producto.descripcion}". Disponible: ${num(lote.stockActual)}, solicitado: ${cantidadLote}.`,
           );
@@ -2496,7 +2582,12 @@ export class ComprobanteService {
         Math.min(stockBase - reservado, cupoVenta),
       );
 
-      if (!permitirVentaSinStock && disponibleVenta < cantidad) {
+      if (soloAvisar && disponibleVenta < cantidad) {
+        data.avisos?.push(
+          `"${producto.descripcion}" quedó con stock negativo: había ${disponibleVenta} y se vendieron ${cantidad} sin conexión.`,
+        );
+      }
+      if (!permitirVentaSinStock && !soloAvisar && disponibleVenta < cantidad) {
         throw new BadRequestException(
           `Stock no disponible para venta en "${producto.descripcion}". Disponible para venta: ${disponibleVenta}, solicitado: ${cantidad}.`,
         );
@@ -2515,6 +2606,9 @@ export class ComprobanteService {
 
       usuarioId?: number;
       sedeId?: number;
+      // Sync offline: hora real y uuid de la operación (van al kardex).
+      fecha?: Date;
+      origenSyncUuid?: string;
     },
   ) {
     if (!data) {
@@ -2523,7 +2617,12 @@ export class ComprobanteService {
       );
     }
 
-    const sedeId = await this.validarStockDisponibleParaVenta(detalles, data);
+    // Offline (origenSyncUuid): la venta ya ocurrió; el faltante ya se avisó en
+    // la validación previa, aquí solo se descuenta (puede quedar negativo).
+    const sedeId = await this.validarStockDisponibleParaVenta(detalles, {
+      ...data,
+      soloAvisar: Boolean(data.origenSyncUuid),
+    });
 
     for (const item of detalles) {
       const productoId = Number(item.productoId);
@@ -2559,6 +2658,8 @@ export class ComprobanteService {
           costoUnitario: costoUnitario,
           usuarioId: data.usuarioId,
           sedeId,
+          fecha: data.fecha,
+          origenSyncUuid: data.origenSyncUuid,
         });
 
         // Descuento de lote: atómico cuando viene loteId (farmacia), FEFO cuando no
@@ -2799,6 +2900,8 @@ export class ComprobanteService {
     empresaId: number,
     usuarioId?: number,
     sedeId?: number,
+    // Sync offline: la venta ocurrió en `fechaRef`, no "hoy".
+    fechaRef?: Date,
   ) {
     if (!usuarioId) return;
     const empresa = await this.prisma.empresa.findUnique({
@@ -2807,7 +2910,7 @@ export class ComprobanteService {
     });
     if (!empresa?.requiereCajaParaEmitir) return;
 
-    const today = new Date().toLocaleDateString('en-CA', {
+    const today = (fechaRef ?? new Date()).toLocaleDateString('en-CA', {
       timeZone: 'America/Lima',
     });
     const ultimoMovimiento = await this.prisma.movimientoCaja.findFirst({
@@ -4630,9 +4733,20 @@ export class ComprobanteService {
       // Serie/correlativo del documento original (modo importado).
       serie?: string;
       correlativo?: string;
+      // Sync offline (POST /sync/operaciones): la venta ya ocurrió en el
+      // dispositivo en `realizadoEn`. Se respeta esa hora en comprobante, pagos
+      // y kardex (para que caiga en el turno de caja correcto), el faltante de
+      // stock no bloquea (solo avisa) y se guarda el uuid de origen.
+      offline?: boolean;
+      realizadoEn?: Date;
+      origenSyncUuid?: string;
     },
   ) {
     const importado = opts?.importado === true;
+    const offline = opts?.offline === true;
+    const realizadoEn = offline ? opts?.realizadoEn : undefined;
+    const origenSyncUuid = offline ? opts?.origenSyncUuid : undefined;
+    const avisosOffline: string[] = [];
     // En modo importado (histórico) los flags vienen APAGADOS por defecto.
     const afectarStockImport = opts?.afectarStock === true;
     const afectarCajaImport = opts?.afectarCaja === true;
@@ -4671,7 +4785,12 @@ export class ComprobanteService {
     // Caja obligatoria (si la empresa lo configuró). Las cotizaciones (COT)
     // están exentas — no mueven stock ni caja — y las importaciones tampoco.
     if (!importado && String(tipoDoc).toUpperCase() !== 'COT') {
-      await this.exigirCajaAbiertaSiConfigurado(empresaId, usuarioId, sedeId);
+      await this.exigirCajaAbiertaSiConfigurado(
+        empresaId,
+        usuarioId,
+        sedeId,
+        realizadoEn,
+      );
     }
 
     // ¿Este informal debe afectar (descontar) el stock del almacén?
@@ -4852,6 +4971,10 @@ export class ComprobanteService {
       tipoOperacionId: tipoOperacionIdFinal ?? undefined,
       tipoDoc,
       fechaEmision: fecha,
+      // Offline: creadoEn = hora real en el dispositivo (la caja liga las
+      // ventas al turno por creadoEn/Pago.fecha) y rastro del uuid de origen.
+      ...(realizadoEn ? { creadoEn: realizadoEn } : {}),
+      ...(origenSyncUuid ? { origenSyncUuid } : {}),
       formaPagoTipo,
       formaPagoMoneda,
       tipoMoneda,
@@ -4930,6 +5053,8 @@ export class ComprobanteService {
         empresaId,
         sedeId: finalSedeId,
         usuarioId,
+        soloAvisar: offline,
+        avisos: avisosOffline,
       });
     }
 
@@ -4958,7 +5083,7 @@ export class ComprobanteService {
         splitPayments,
         montoPagado: montoPagadoInicial,
         documento: `${tipoDoc}-${comp.serie}-${comp.correlativo}`,
-        fecha,
+        fecha: realizadoEn ?? fecha,
       });
     }
 
@@ -4970,6 +5095,8 @@ export class ComprobanteService {
         concepto: `Venta ${tipoDoc} ${comp.serie}-${comp.correlativo}`,
         sedeId: finalSedeId,
         usuarioId,
+        fecha: realizadoEn,
+        origenSyncUuid,
       });
       await this.registrarSeriesVendidas(comp.id, empresaId, finalSedeId);
     }
@@ -5005,6 +5132,11 @@ export class ComprobanteService {
       }
     }
 
+    // Lo que la app tiene que mostrarle al vendedor al sincronizar: el stock
+    // que quedó negativo, el arqueo que no cuadró. Callarlo sería peor.
+    if (offline && avisosOffline.length) {
+      (comp as any).avisosOffline = avisosOffline;
+    }
     return comp;
   }
 
@@ -5152,6 +5284,8 @@ export class ComprobanteService {
                 productoId: d.productoId,
                 unidad: d.unidad,
                 descripcion: d.descripcion,
+                // Sin esto, editar la cotización borraba el detalle multilínea.
+                detalleAdicional: d.detalleAdicional ?? null,
                 cantidad: d.cantidad,
                 mtoValorUnitario: d.mtoValorUnitario,
                 mtoValorVenta: d.mtoValorVenta,
@@ -5569,6 +5703,7 @@ export class ComprobanteService {
       vendedorCampoNombre,
       cuotas,
       fechaVencimientoCredito,
+      vuelto,
     } = input;
 
     if (!Array.isArray(detalles) || detalles.length === 0)
@@ -5616,6 +5751,12 @@ export class ComprobanteService {
     // REEMPLAZAR: la pantalla de edición es la fuente de verdad del pago. Se borran
     // pagos y comisiones (se recrean); también detalles/leyendas viejos. El stock se
     // ajusta por diferencia más abajo.
+    // Los pagos viejos se leen antes de borrarlos para que lo ya cobrado
+    // conserve su fecha (ver fecharPagosEdicion).
+    const pagosAnteriores = await this.prisma.pago.findMany({
+      where: { comprobanteId: comp.id },
+      select: { monto: true, medioPago: true, fecha: true, usuarioId: true },
+    });
     await this.prisma.pago.deleteMany({ where: { comprobanteId: comp.id } });
     await this.prisma.comisionVendedor.deleteMany({
       where: { comprobanteId: comp.id },
@@ -5764,6 +5905,11 @@ export class ComprobanteService {
         mtoImpVenta,
         estadoPago,
         saldo,
+        // El vuelto de ESTA cobranza (sobre el saldo), para que la reimpresión
+        // no muestre el de la venta original. Clientes que no lo mandan: se deja.
+        ...(vuelto != null && !esCredito
+          ? { vuelto: this.round2(Math.max(0, Number(vuelto) || 0)) }
+          : {}),
         adelanto: esCredito && adelantoNorm > 0 ? adelantoNorm : null,
         fechaVencimientoCredito:
           esCredito && fechaVencimientoCredito
@@ -5814,6 +5960,7 @@ export class ComprobanteService {
         montoPagado,
         documento: `${comp.tipoDoc}-${comp.serie}-${comp.correlativo}`,
         fecha: new Date(fechaEmision ?? comp.fechaEmision),
+        pagosAnteriores,
       });
     }
     const vendedorComisionId = vendedorCampoIdFinal ?? usuarioId;
@@ -6144,14 +6291,16 @@ export class ComprobanteService {
         },
         detalles: { include: { producto: { select: { imagenUrl: true } } } },
         // La fecha de entrega programada se imprime en el ticket: el cliente se
-        // lleva el papel y quiere saber cuándo le llega (pedido de COMERCIAL
-        // LINNA MODA, que despacha por día).
+        // lleva el papel y quiere saber cuándo le llega (negocio que despacha
+        // por día de entrega).
         envioDespacho: { select: { fechaEstimada: true, turnoEnvio: true } },
         // Necesarias para imprimir la leyenda de Ley de Amazonía (código 2000).
         leyendas: { select: { code: true, value: true } },
         tipoDetraccion: true,
         medioPagoDetraccion: true,
         usuario: { select: { nombre: true, celular: true, email: true } },
+        // Desglose del pago MIXTO en documentos sin paymentDetails.splitPayments.
+        pagos: { select: { medioPago: true, monto: true } },
       },
     });
   }
@@ -6224,6 +6373,7 @@ export class ComprobanteService {
       (acc: number, d: any) => acc + Number(d.mtoDescuento || 0),
       0,
     );
+    const isDocumentoFiscalPdf = ['01', '03', '07', '08'].includes(full.tipoDoc);
     const productos = full.detalles.map((d: any, i: number) => {
       const cantidad = Number(d.cantidad || 0);
       const descLinea = Number(d.mtoDescuento || 0);
@@ -6237,6 +6387,10 @@ export class ComprobanteService {
         cantidad: formatCantidad(d.cantidad),
         unidadMedida: (d.unidad || 'NIU').toUpperCase(),
         descripcion: (d.descripcion || '').toUpperCase(),
+        // Detalle multilínea bajo el título, en letra normal. En factura/boleta/
+        // notas NO se imprime: el XML a SUNAT solo lleva `descripcion` y la
+        // representación impresa no debe decir más que el XML sobre el ítem.
+        detalleLineas: isDocumentoFiscalPdf ? [] : lineasDetalleAdicional(d.detalleAdicional),
         precioUnitario: precioLista.toFixed(2),
         total: Number((d.mtoPrecioUnitario || 0) * d.cantidad).toFixed(2),
         imagenUrl: buildLogoDataUrl(d.producto?.imagenUrl || d.imagenUrl),
@@ -6325,6 +6479,13 @@ export class ComprobanteService {
         full.cliente?.tipoDocumento?.codigo === '6' ? 'RUC' : 'DNI',
       clienteNumDoc: full.cliente?.nroDoc || '',
       clienteDireccion: (full.cliente?.direccion || '-').toUpperCase(),
+      // Celular del cliente y día de entrega: el ticket solo mostraba la fecha
+      // de emisión, y el celular que salía arriba es el del negocio.
+      clienteCelular: (full.cliente as any)?.telefono || '',
+      fechaEnvioProgramado: diaDeEnvio(
+        (full as any)?.envioDespacho?.fechaEstimada,
+      ),
+      turnoEnvioProgramado: (full as any)?.envioDespacho?.turnoEnvio || '',
       clienteEmail: (full.cliente as any)?.email || undefined,
       clienteTelefono: (full.cliente as any)?.telefono || undefined,
       productos,
@@ -6346,8 +6507,12 @@ export class ComprobanteService {
         esVentaCredito && montoPagado <= 0
           ? '—'
           : (full.medioPago || 'EFECTIVO').toUpperCase(),
+      pagosMixtos: lineasPagoMixto(full),
       vuelto: Number((full as any).vuelto || 0).toFixed(2),
       pagado: montoPagado.toFixed(2),
+      // Nota editada que ya estaba cobrada: el vuelto es sobre el saldo, así
+      // que se imprime lo pagado antes y lo recibido en la edición.
+      ...cobroDeEdicion((full as any).paymentDetails, esVentaCredito),
       saldoPendiente:
         saldoPendiente > 0 ? saldoPendiente.toFixed(2) : undefined,
       // Cobranza en campo: prioriza el vendedor de campo atribuido.

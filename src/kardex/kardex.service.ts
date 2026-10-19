@@ -222,6 +222,10 @@ export class KardexService {
     sedeId: number; // Changed to required
     lote?: string;
     fechaVencimiento?: Date;
+    // Sync offline: hora real del movimiento en el dispositivo y uuid de la
+    // operación que lo originó. Sin ellos se usa now() (comportamiento previo).
+    fecha?: Date;
+    origenSyncUuid?: string;
   }) {
     // Obtener el producto stock en la sede
     let productoStock = await this.prisma.productoStock.findUnique({
@@ -330,6 +334,8 @@ export class KardexService {
         observacion: data.observacion,
         lote: data.lote,
         fechaVencimiento: data.fechaVencimiento,
+        ...(data.fecha ? { fecha: data.fecha } : {}),
+        ...(data.origenSyncUuid ? { origenSyncUuid: data.origenSyncUuid } : {}),
       },
       include: {
         producto: {
@@ -1047,7 +1053,14 @@ export class KardexService {
       await this.prisma.productoStock.update({
         where: { productoId_sedeId: { productoId, sedeId } },
         data: {
-          stock: round3(Math.max(0, nuevoStock)),
+          // Un ingreso SUMA de forma atómica, igual que la salida resta. Con
+          // el valor absoluto leído antes, un ingreso y una venta simultáneos
+          // se pisaban: dos anulaciones a la vez dejaban dos INGRESO en el
+          // Kardex y una sola devolución en el stock.
+          stock:
+            tipoMovimiento === 'INGRESO' && cantidad != null
+              ? { increment: round3(num(cantidad)) }
+              : round3(Math.max(0, nuevoStock)),
           // Un ingreso (o un ajuste positivo) de stock en la sede la deja
           // DISPONIBLE ahí (catálogo por sede): nunca puede haber stock de un
           // producto "invisible".

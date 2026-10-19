@@ -184,6 +184,11 @@ export class UpdateEmpresaDto {
   @IsBoolean()
   permitirVentaSinStock?: boolean;
 
+  // Modo offline-first de la app móvil (se activa por empresa desde el panel de sistema).
+  @IsOptional()
+  @IsBoolean()
+  offlineHabilitado?: boolean;
+
   @IsOptional()
   @IsBoolean()
   cobranzaCampo?: boolean;
@@ -311,6 +316,24 @@ export class UpdateEmpresaDto {
   @IsOptional()
   @IsString()
   sunatClientSecret?: string;
+
+  // Credenciales de API del SIRE (se generan aparte; ver sire.client.ts).
+  @IsOptional()
+  @IsString()
+  sireClientId?: string;
+
+  @IsOptional()
+  @IsString()
+  sireClientSecret?: string;
+
+  @IsOptional()
+  @IsString()
+  sireUsuarioSol?: string;
+
+  /** Clave SOL en claro solo de entrada: se guarda cifrada y nunca se devuelve. */
+  @IsOptional()
+  @IsString()
+  sireClaveSol?: string;
 
   @IsOptional()
   @IsString()

@@ -21,6 +21,7 @@ import {
 import { numeroALetras } from './utils/numero-a-letras';
 import axios from 'axios';
 import { QpseClient, QpseSendResponse } from '../common/utils/qpse.client';
+import { lineasPagoMixto } from '../common/utils/pago-mixto';
 import { buildUblXml } from '../common/utils/ubl-xml';
 import { ApisPeruClient } from '../common/utils/apis-peru.client';
 import { JambleClient } from '../common/utils/jamble.client';
@@ -2533,6 +2534,7 @@ export class EnviarSunatService {
               formaPago:
                 comp.formaPagoTipo === 'Contado' ? 'CONTADO' : 'CRÉDITO',
               medioPago: (comp.medioPago || 'EFECTIVO').toUpperCase(),
+              pagosMixtos: lineasPagoMixto(comp),
               observaciones: comp.observaciones
                 ? comp.observaciones.toUpperCase()
                 : undefined,
@@ -3803,6 +3805,7 @@ export class EnviarSunatService {
         totalEnLetras: numeroALetras(Number(comp.mtoImpVenta)).toUpperCase(),
         formaPago: comp.formaPagoTipo === 'Contado' ? 'CONTADO' : 'CRÉDITO',
         medioPago: (comp.medioPago || 'EFECTIVO').toUpperCase(),
+        pagosMixtos: lineasPagoMixto(comp),
         observaciones: comp.observaciones
           ? comp.observaciones.toUpperCase()
           : undefined,

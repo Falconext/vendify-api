@@ -339,6 +339,11 @@ export class OrdenCompraService {
       throw new BadRequestException('La orden está anulada');
     }
 
+    // ¿La orden se emitió sin IGV? No hay columna `aplicaIgv`: se deduce del
+    // monto guardado, el mismo criterio que ya usa el PDF de la orden. Si el
+    // proveedor no cobra IGV (RUS, exonerado) la compra tampoco debe sumarlo.
+    const ordenSinIgv = Number(orden.igv ?? 0) <= 0;
+
     const compra = await this.comprasService.crear(
       empresaId,
       usuarioId,
@@ -366,6 +371,11 @@ export class OrdenCompraService {
           cantidad: Number(d.cantidad),
           precioUnitario: Number(d.precioUnitario),
           incluyeIgv: orden.igvIncluido,
+          // Lo que se pactó en la orden manda sobre la afectación del producto.
+          // Sin esto, una orden emitida SIN IGV se convertía en una compra que
+          // sí lo sumaba: S/ 72 acordados entraban como S/ 84.96, y el saldo
+          // por pagar al proveedor nacía mal.
+          ...(ordenSinIgv ? { gravado: false } : {}),
         })),
       } as any,
       reqSedeId,
