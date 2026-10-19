@@ -26,6 +26,7 @@ import {
   formatFechaLima,
   getDiasRestantesLima,
 } from '../common/utils/fecha-lima';
+import { diaCalendarioLima } from '../common/utils/fecha';
 
 function parseDDMMYYYY(input: string): Date {
   if (!input || input.trim() === '') {
@@ -1140,10 +1141,25 @@ export class EmpresaService {
       };
       // Empresas recién activadas que aún no facturan no deben salir en rojo:
       // se cuentan los días desde la última venta, o desde la activación si nunca vendió.
-      const referencia = s.ultimaVenta ?? e.fechaActivacion ?? ahora;
-      const diasSinVender = Math.floor(
-        (ahora.getTime() - new Date(referencia).getTime()) /
-          (24 * 60 * 60 * 1000),
+      // Son días calendario de Lima, no bloques de 24 h: "hoy" tiene que ser hoy.
+      // La activación es una fecha sin hora guardada a medianoche UTC; su día
+      // es el de la fecha UTC, no el de Lima (que sería el anterior).
+      const diaReferencia = s.ultimaVenta
+        ? diaCalendarioLima(new Date(s.ultimaVenta))
+        : e.fechaActivacion
+          ? Math.floor(
+              Date.UTC(
+                e.fechaActivacion.getUTCFullYear(),
+                e.fechaActivacion.getUTCMonth(),
+                e.fechaActivacion.getUTCDate(),
+              ) /
+                (24 * 60 * 60 * 1000),
+            )
+          : diaCalendarioLima(ahora);
+      // Una venta con fecha futura (emisión adelantada) cuenta como de hoy.
+      const diasSinVender = Math.max(
+        0,
+        diaCalendarioLima(ahora) - diaReferencia,
       );
       let estado: 'sana' | 'riesgo' | 'critico';
       if (diasSinVender <= 7) estado = 'sana';
