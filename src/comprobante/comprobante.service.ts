@@ -1,4 +1,5 @@
 import { num, round3 } from '../common/utils/stock';
+import { lineasPagoMixto } from '../common/utils/pago-mixto';
 import {
   SunatValidezClient,
   SunatValidezResult,
@@ -2003,32 +2004,49 @@ export class ComprobanteService {
       include: { unidadMedida: true },
     });
 
+    // La consulta de arriba filtra por `empresaId` y por nada más: un ítem que no
+    // vuelve es un producto de OTRA empresa (o de ninguna), o un id inexistente —
+    // nunca uno "inactivo", porque el estado no entra en el filtro. El mensaje
+    // anterior decía "encontrados pero inactivos" y luego imprimía "Estado: ACTIVO",
+    // que no orientaba a nadie. Ahora cada id dice su motivo real.
+    //
+    // Dos líneas del mismo producto hacen que `productos` (sin repetir) sea más
+    // corto que `productDetalles`; por eso los faltantes se calculan sobre ids
+    // únicos y no sobre la diferencia de longitudes.
     if (productos.length !== productDetalles.length) {
-      // Identificar cuáles productos no fueron encontrados
-      const productosEncontrados = productos.map((p) => p.id);
-      const productosFaltantes = productIds.filter(
-        (id) => !productosEncontrados.includes(id),
+      const encontrados = new Set(productos.map((p) => p.id));
+      const faltantes = [...new Set(productIds)].filter(
+        (id) => !encontrados.has(id),
       );
 
-      // Obtener información adicional de los productos faltantes
-      const productosInactivos = await this.prisma.producto.findMany({
-        where: { id: { in: productosFaltantes } },
-        select: { id: true, descripcion: true, estado: true, empresaId: true },
-      });
-      const productosRealmenteFaltantes = productosInactivos.filter(
-        (p) => p.estado !== ('PLACEHOLDER' as any),
-      );
+      if (faltantes.length > 0) {
+        // Sin filtro de empresa: así se distingue "no existe" de "existe, pero
+        // no es de esta empresa".
+        const enLaBase = await this.prisma.producto.findMany({
+          where: { id: { in: faltantes } },
+          select: { id: true, descripcion: true, estado: true, empresaId: true },
+        });
+        const porId = new Map(enLaBase.map((p) => [p.id, p]));
 
-      if (
-        productosRealmenteFaltantes.length > 0 ||
-        productosFaltantes.length > productosInactivos.length
-      ) {
-        const detalleError =
-          productosRealmenteFaltantes.length > 0
-            ? `Productos encontrados pero inactivos: ${productosRealmenteFaltantes.map((p) => `ID ${p.id} (${p.descripcion}) - Estado: ${p.estado}`).join('; ')}`
-            : `Productos no encontrados: IDs ${productosFaltantes.join(', ')}`;
+        const motivo = (id: number) => {
+          const p = porId.get(id);
+          if (!p) return `ID ${id}: no existe en la base de datos`;
+          if (p.empresaId !== empresaId) {
+            const duenio =
+              p.empresaId == null
+                ? 'sin empresa asignada'
+                : `empresa ${p.empresaId}`;
+            return `ID ${id} (${p.descripcion}): pertenece a ${duenio}, no a la empresa ${empresaId} que emite`;
+          }
+          // Defensivo: con el filtro actual este caso no debería darse.
+          return `ID ${id} (${p.descripcion}): no disponible (estado ${p.estado})`;
+        };
 
-        throw new BadRequestException(detalleError);
+        throw new BadRequestException(
+          `No se puede emitir el comprobante. Revisa estos productos: ${faltantes
+            .map(motivo)
+            .join('; ')}`,
+        );
       }
     }
     let mtoOperGravadas = 0;
@@ -6172,6 +6190,8 @@ export class ComprobanteService {
         tipoDetraccion: true,
         medioPagoDetraccion: true,
         usuario: { select: { nombre: true, celular: true, email: true } },
+        // Desglose del pago MIXTO en documentos sin paymentDetails.splitPayments.
+        pagos: { select: { medioPago: true, monto: true } },
       },
     });
   }
@@ -6373,6 +6393,7 @@ export class ComprobanteService {
         esVentaCredito && montoPagado <= 0
           ? '—'
           : (full.medioPago || 'EFECTIVO').toUpperCase(),
+      pagosMixtos: lineasPagoMixto(full),
       vuelto: Number((full as any).vuelto || 0).toFixed(2),
       pagado: montoPagado.toFixed(2),
       saldoPendiente:

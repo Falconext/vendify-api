@@ -936,6 +936,9 @@ export class ProductoController {
       usarPrecioSede: query.usarPrecioSede,
       usuarioId: user.id,
       soloStockBajo: query.soloStockBajo,
+      stockFiltro: query.stockFiltro,
+      stockDesde: query.stockDesde,
+      stockHasta: query.stockHasta,
       priorizarStock: query.priorizarStock,
       incluirOcultos: query.incluirOcultos,
     });

@@ -268,7 +268,7 @@
         <span class="lbl">FORMA PAGO:</span>
         <span class="val">{{formaPago}}</span>
         <span class="lbl">MEDIO PAGO:</span>
-        <span class="val">{{medioPago}} {{simboloMoneda}} {{pagado}}</span>
+        <span class="val">{{#if pagosMixtosFmt}}{{#each pagosMixtosFmt}}{{this.medio}} {{../simboloMoneda}} {{this.monto}}{{#unless @last}} · {{/unless}}{{/each}}{{else}}{{medioPago}} {{simboloMoneda}} {{pagado}}{{/if}}</span>
         <span class="lbl">VUELTO:</span>
         <span class="val">{{simboloMoneda}} {{vuelto}}</span>
         <span class="lbl">PAGADO:</span>
