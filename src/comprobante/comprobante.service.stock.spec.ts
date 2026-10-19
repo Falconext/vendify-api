@@ -23,6 +23,7 @@ describe('ComprobanteService - Stock Management', () => {
     comprobante: {
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       create: jest.fn(),
       findFirst: jest.fn(),
     },
@@ -311,6 +312,54 @@ describe('ComprobanteService - Stock Management', () => {
         where: { id: 4 },
         data: { estadoEnvioSunat: 'ANULADO' },
       });
+    });
+
+    it('no vuelve a devolver stock si el comprobante ya estaba anulado', async () => {
+      // QA: una NV de 5 anulada dos veces dejaba +10 en el stock.
+      mockPrismaService.comprobante.findUnique.mockResolvedValue({
+        id: 7,
+        tipoDoc: 'NV',
+        estadoEnvioSunat: 'ANULADO',
+        estadoPago: 'ANULADO',
+        empresaId: 5,
+        detalles: [{ id: 1, productoId: 100, cantidad: 5 }],
+      });
+      mockPrismaService.movimientoKardex.findMany.mockResolvedValue([
+        { id: 501, productoId: 100, sedeId: 1, tipoMovimiento: 'SALIDA' },
+      ]);
+
+      await expect(service.anularComprobante(7)).rejects.toThrow(
+        'ya está anulado',
+      );
+      expect(mockKardexService.registrarMovimiento).not.toHaveBeenCalled();
+      expect(mockPrismaService.comprobante.update).not.toHaveBeenCalled();
+    });
+
+    it('dos anulaciones simultáneas devuelven el stock una sola vez', async () => {
+      // Las dos leen el comprobante sin anular; solo una gana el reclamo.
+      mockPrismaService.comprobante.findUnique.mockResolvedValue({
+        id: 9,
+        tipoDoc: 'NV',
+        estadoEnvioSunat: 'NO_APLICA',
+        empresaId: 5,
+        detalles: [{ id: 1, productoId: 100, cantidad: 3 }],
+      });
+      mockPrismaService.producto.findUnique.mockResolvedValue({ id: 100, stock: 7, costoPromedio: 1 });
+      mockPrismaService.movimientoKardex.findMany.mockResolvedValue([
+        { id: 700, productoId: 100, sedeId: 1, tipoMovimiento: 'SALIDA' },
+      ]);
+      mockPrismaService.comprobante.update.mockResolvedValue({ id: 9 });
+      mockPrismaService.comprobante.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 });
+
+      const r = await Promise.allSettled([
+        service.anularComprobante(9),
+        service.anularComprobante(9),
+      ]);
+
+      expect(r.map((x) => x.status).sort()).toEqual(['fulfilled', 'rejected']);
+      expect(mockKardexService.registrarMovimiento).toHaveBeenCalledTimes(1);
     });
 
     it('debería lanzar NotFoundException si el comprobante no existe', async () => {

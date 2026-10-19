@@ -1006,7 +1006,14 @@ export class KardexService {
       await this.prisma.productoStock.update({
         where: { productoId_sedeId: { productoId, sedeId } },
         data: {
-          stock: round3(Math.max(0, nuevoStock)),
+          // Un ingreso SUMA de forma atómica, igual que la salida resta. Con
+          // el valor absoluto leído antes, un ingreso y una venta simultáneos
+          // se pisaban: dos anulaciones a la vez dejaban dos INGRESO en el
+          // Kardex y una sola devolución en el stock.
+          stock:
+            tipoMovimiento === 'INGRESO' && cantidad != null
+              ? { increment: round3(num(cantidad)) }
+              : round3(Math.max(0, nuevoStock)),
           // Un ingreso (o un ajuste positivo) de stock en la sede la deja
           // DISPONIBLE ahí (catálogo por sede): nunca puede haber stock de un
           // producto "invisible".

@@ -1100,6 +1100,16 @@ export class ComprobanteService {
     );
     const isFormal = ['01', '03', '08'].includes(comp.tipoDoc);
 
+    // Anular dos veces devolvía el stock dos veces: revertirStock encuentra la
+    // SALIDA original de nuevo y vuelve a sumar (NV de 5 unidades anulada dos
+    // veces = +10). Un comprobante ya anulado no tiene nada más que revertir.
+    if (
+      comp.estadoEnvioSunat === EstadoSunat.ANULADO ||
+      (comp as any).estadoPago === 'ANULADO'
+    ) {
+      throw new BadRequestException('Este comprobante ya está anulado.');
+    }
+
     // Documentos SUNAT formales: Boleta y Factura ya aceptadas NO pueden darse de baja directamente.
     // - Boleta (03): comunicación de baja SUNAT — use Nota de Crédito (botón "Generar NC")
     // - Factura (01): SUNAT exige Nota de Crédito, nunca baja directa
@@ -1114,6 +1124,20 @@ export class ComprobanteService {
       throw new BadRequestException(
         `Una ${tipoNombre} ya aceptada por SUNAT debe anularse emitiendo una Nota de Crédito. Use el botón "Generar NC (Anular)".`,
       );
+    }
+
+    // Se reclama la anulación de forma atómica ANTES de devolver stock: dos
+    // pedidos simultáneos (doble clic, dos pestañas) pasaban los dos el chequeo
+    // de arriba y devolvían el stock dos veces.
+    const reclamo = await this.prisma.comprobante.updateMany({
+      where: {
+        id: comprobanteId,
+        estadoEnvioSunat: { not: EstadoSunat.ANULADO },
+      },
+      data: { estadoEnvioSunat: EstadoSunat.ANULADO },
+    });
+    if (reclamo.count === 0) {
+      throw new BadRequestException('Este comprobante ya está anulado.');
     }
 
     // Revertir stock para todos los tipos de comprobantes que afectan inventario
