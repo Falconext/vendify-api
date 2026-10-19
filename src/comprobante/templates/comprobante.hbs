@@ -269,8 +269,13 @@
         <span class="val">{{formaPago}}</span>
         <span class="lbl">MEDIO PAGO:</span>
         <span class="val">{{#if pagosMixtosFmt}}{{#each pagosMixtosFmt}}{{this.medio}} {{../simboloMoneda}} {{this.monto}}{{#unless @last}} · {{/unless}}{{/each}}{{else}}{{medioPago}} {{simboloMoneda}} {{pagado}}{{/if}}</span>
-        <span class="lbl">VUELTO:</span>
-        <span class="val">{{simboloMoneda}} {{vuelto}}</span>
+        {{#if pagoAnterior}}<span class="lbl">PAGO ANTERIOR:</span>
+        <span class="val">{{simboloMoneda}} {{pagoAnterior}}</span>{{/if}}
+        {{#if recibido}}<span class="lbl">RECIBIDO:</span>
+        <span class="val">{{simboloMoneda}} {{recibido}}</span>{{/if}}
+        {{#if devolucion}}<span class="lbl">DEVOLUCIÓN:</span>
+        <span class="val">{{simboloMoneda}} {{devolucion}}</span>{{else}}<span class="lbl">VUELTO:</span>
+        <span class="val">{{simboloMoneda}} {{vuelto}}</span>{{/if}}
         <span class="lbl">PAGADO:</span>
         <span class="val">{{simboloMoneda}} {{pagado}}</span>
         {{#if saldoPendiente}}

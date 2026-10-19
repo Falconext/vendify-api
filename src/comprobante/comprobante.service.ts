@@ -1,6 +1,11 @@
 import { num, round3 } from '../common/utils/stock';
 import { lineasPagoMixto } from '../common/utils/pago-mixto';
 import {
+  cobroDeEdicion,
+  fecharPagosEdicion,
+  type PagoAnterior,
+} from './pagos-edicion';
+import {
   lineasDetalleAdicional,
   normalizarDetalleAdicional,
 } from './detalle-adicional';
@@ -236,6 +241,8 @@ export class ComprobanteService {
     montoPagado: number;
     documento: string;
     fecha?: Date;
+    /** Solo al editar: los pagos que la nota tenía, para conservar sus fechas. */
+    pagosAnteriores?: PagoAnterior[];
   }) {
     const montoPagado = this.round2(Number(params.montoPagado || 0));
     if (montoPagado <= 0) return;
@@ -254,12 +261,17 @@ export class ComprobanteService {
     );
     if (lines.length === 0) return;
 
+    const fechaNueva = params.fecha ?? new Date();
+    const filas = params.pagosAnteriores
+      ? fecharPagosEdicion(params.pagosAnteriores, lines, fechaNueva)
+      : lines.map((line: any) => ({ ...line, fecha: fechaNueva, usuarioId: null }));
+
     await this.prisma.pago.createMany({
-      data: lines.map((line: any) => ({
+      data: filas.map((line: any) => ({
         comprobanteId: params.comprobanteId,
         empresaId: params.empresaId,
-        usuarioId: params.usuarioId ?? null,
-        fecha: params.fecha ?? new Date(),
+        usuarioId: line.usuarioId ?? params.usuarioId ?? null,
+        fecha: line.fecha,
         monto: line.amount,
         medioPago: line.method,
         observacion: `Pago registrado al emitir ${params.documento}`,
@@ -5679,6 +5691,7 @@ export class ComprobanteService {
       vendedorCampoNombre,
       cuotas,
       fechaVencimientoCredito,
+      vuelto,
     } = input;
 
     if (!Array.isArray(detalles) || detalles.length === 0)
@@ -5726,6 +5739,12 @@ export class ComprobanteService {
     // REEMPLAZAR: la pantalla de edición es la fuente de verdad del pago. Se borran
     // pagos y comisiones (se recrean); también detalles/leyendas viejos. El stock se
     // ajusta por diferencia más abajo.
+    // Los pagos viejos se leen antes de borrarlos para que lo ya cobrado
+    // conserve su fecha (ver fecharPagosEdicion).
+    const pagosAnteriores = await this.prisma.pago.findMany({
+      where: { comprobanteId: comp.id },
+      select: { monto: true, medioPago: true, fecha: true, usuarioId: true },
+    });
     await this.prisma.pago.deleteMany({ where: { comprobanteId: comp.id } });
     await this.prisma.comisionVendedor.deleteMany({
       where: { comprobanteId: comp.id },
@@ -5874,6 +5893,11 @@ export class ComprobanteService {
         mtoImpVenta,
         estadoPago,
         saldo,
+        // El vuelto de ESTA cobranza (sobre el saldo), para que la reimpresión
+        // no muestre el de la venta original. Clientes que no lo mandan: se deja.
+        ...(vuelto != null && !esCredito
+          ? { vuelto: this.round2(Math.max(0, Number(vuelto) || 0)) }
+          : {}),
         adelanto: esCredito && adelantoNorm > 0 ? adelantoNorm : null,
         fechaVencimientoCredito:
           esCredito && fechaVencimientoCredito
@@ -5924,6 +5948,7 @@ export class ComprobanteService {
         montoPagado,
         documento: `${comp.tipoDoc}-${comp.serie}-${comp.correlativo}`,
         fecha: new Date(fechaEmision ?? comp.fechaEmision),
+        pagosAnteriores,
       });
     }
     const vendedorComisionId = vendedorCampoIdFinal ?? usuarioId;
@@ -6441,6 +6466,9 @@ export class ComprobanteService {
       pagosMixtos: lineasPagoMixto(full),
       vuelto: Number((full as any).vuelto || 0).toFixed(2),
       pagado: montoPagado.toFixed(2),
+      // Nota editada que ya estaba cobrada: el vuelto es sobre el saldo, así
+      // que se imprime lo pagado antes y lo recibido en la edición.
+      ...cobroDeEdicion((full as any).paymentDetails, esVentaCredito),
       saldoPendiente:
         saldoPendiente > 0 ? saldoPendiente.toFixed(2) : undefined,
       // Cobranza en campo: prioriza el vendedor de campo atribuido.
