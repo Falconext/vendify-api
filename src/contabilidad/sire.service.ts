@@ -39,6 +39,44 @@ export class SireService {
     return `${anio}${String(mes).padStart(2, '0')}00`;
   }
 
+  /**
+   * Periodo del SIRE: AAAAMM (6 dígitos), campo 3 del RVIE y del RCE.
+   * OJO: el PLE antiguo usaba AAAAMM00 (8 dígitos con el día en '00'); el
+   * SIRE NO lleva ese sufijo. Ver RS 000112-2021/SUNAT anexo 2/3 campo 3.
+   */
+  private periodoSire(mes: number, anio: number): string {
+    return `${anio}${String(mes).padStart(2, '0')}`;
+  }
+
+  /** Fecha en formato AAAA-MM-DD (RVIE campo 29: doc. modificado). */
+  private formatFechaIso(date: Date | null | undefined): string {
+    if (!date) return '';
+    const d = new Date(date.getTime() - 5 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 10);
+  }
+
+  /**
+   * Texto libre entre palotes. La norma prohíbe los caracteres | / \ dentro
+   * de los campos de texto (RS 112-2021, reglas generales del archivo).
+   */
+  private texto(val: string | null | undefined): string {
+    return (val ?? '').replace(/[|/\\]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * Los comprobantes guardan el documento afectado como "SERIE-NUMERO"
+   * (p. ej. "F0A1-316"), pero el SIRE exige serie y número en campos
+   * separados. Se parte por el último guion para no romper series que lo
+   * contengan.
+   */
+  private splitSerieNumero(ref: string | null | undefined): [string, string] {
+    const val = (ref ?? '').trim();
+    if (!val) return ['', ''];
+    const i = val.lastIndexOf('-');
+    if (i <= 0) return [val, ''];
+    return [val.slice(0, i), val.slice(i + 1)];
+  }
+
   private inferTipoDocIdentidad(
     nroDoc: string,
     tipoDocCodigo?: string,
@@ -76,661 +114,20 @@ export class SireService {
     return `SIRE_${tipo === 'ventas' ? 'RVIE' : 'RCE'}_${periodo}.${ext}`;
   }
 
-  // ──────────────── VENTAS (RVIE) ────────────────
-
-  private async fetchVentas(
-    empresaId: number,
-    mes: number,
-    anio: number,
-    empresarial: boolean,
-    sedeId?: number,
-  ) {
-    const fechaEmision = this.getDateRange(mes, anio);
-    return this.prisma.comprobante.findMany({
-      where: {
-        empresaId,
-        ...(empresarial || !sedeId ? {} : { sedeId }),
-        tipoDoc: { in: ['01', '03', '07', '08'] },
-        fechaEmision,
-        estadoEnvioSunat: { not: 'PENDIENTE' as any },
-      },
-      orderBy: { fechaEmision: 'asc' },
-      select: {
-        id: true,
-        tipoDoc: true,
-        serie: true,
-        correlativo: true,
-        fechaEmision: true,
-        tipoMoneda: true,
-        mtoOperGravadas: true,
-        mtoIGV: true,
-        mtoOperInafectas: true,
-        mtoOperExoneradas: true,
-        mtoOperExportacion: true,
-        mtoDescuentoGlobal: true,
-        mtoImpVenta: true,
-        tipDocAfectado: true,
-        numDocAfectado: true,
-        estadoEnvioSunat: true,
-        cliente: {
-          select: {
-            nombre: true,
-            nroDoc: true,
-            tipoDocumento: { select: { codigo: true } },
-          },
-        },
-      },
-    });
-  }
-
-  async generarTxtVentas(
-    empresaId: number,
-    mes: number,
-    anio: number,
-    simple: boolean,
-    empresarial: boolean,
-    sedeId?: number,
-  ): Promise<Buffer> {
-    const comprobantes = await this.fetchVentas(
-      empresaId,
-      mes,
-      anio,
-      empresarial,
-      sedeId,
-    );
-    const periodo = this.getPeriodo(mes, anio);
-    const lines: string[] = [];
-
-    for (const c of comprobantes) {
-      const cuo = String(c.id).padStart(10, '0');
-      const fecEmision = this.formatFecha(c.fechaEmision);
-      const tipoDocCliente = this.inferTipoDocIdentidad(
-        c.cliente?.nroDoc ?? '',
-        c.cliente?.tipoDocumento?.codigo,
-      );
-      const nroDocCliente = c.cliente?.nroDoc ?? '';
-      const razonSocial = (c.cliente?.nombre ?? '').replace(/\|/g, ' ');
-      const baseGravadas = this.fmt(c.mtoOperGravadas);
-      const igv = this.fmt(c.mtoIGV);
-      const inafectas = this.fmt(c.mtoOperInafectas);
-      const exoneradas = this.fmt(c.mtoOperExoneradas);
-      const exportacion = this.fmt(c.mtoOperExportacion);
-      // mtoOperGravadas ya viene NETO del descuento global (el descuento se
-      // pliega en el precio unitario al emitir); este campo es solo
-      // informativo para SUNAT, no se resta de nuevo.
-      const dctoBaseImp = this.fmt(c.mtoDescuentoGlobal);
-      const total = this.fmt(c.mtoImpVenta);
-      const tipoCambio = c.tipoMoneda === 'USD' ? '' : '1.000';
-      const tipRef = c.tipDocAfectado ?? '';
-      const nroRef = c.numDocAfectado ?? '';
-      const estado = (c.estadoEnvioSunat as any) === 'ANULADO' ? '6' : '1';
-
-      if (simple) {
-        lines.push(
-          [
-            periodo,
-            cuo,
-            '',
-            fecEmision,
-            '',
-            c.tipoDoc,
-            c.serie,
-            String(c.correlativo),
-            tipoDocCliente,
-            nroDocCliente,
-            razonSocial,
-            exportacion,
-            baseGravadas,
-            dctoBaseImp,
-            igv,
-            '0.00',
-            exoneradas,
-            inafectas,
-            total,
-            estado,
-          ].join('|'),
-        );
-      } else {
-        // Formato RVIE 14.1 — 33 campos
-        lines.push(
-          [
-            periodo, // 1  Período
-            cuo, // 2  CUO
-            '', // 3  Correlativo asiento
-            fecEmision, // 4  Fecha emisión
-            '', // 5  Fecha vencimiento
-            c.tipoDoc, // 6  Tipo CDP
-            c.serie, // 7  Serie
-            String(c.correlativo), // 8  Número
-            tipoDocCliente, // 9  Tipo doc identidad cliente
-            nroDocCliente, // 10 Nro doc cliente
-            razonSocial, // 11 Razón social
-            exportacion, // 12 Exportación
-            baseGravadas, // 13 Base imp. gravadas
-            dctoBaseImp, // 14 Dcto. base imp.
-            igv, // 15 IGV / IPM
-            '0.00', // 16 Dcto. IGV
-            exoneradas, // 17 Exoneradas
-            inafectas, // 18 Inafectas
-            '0.00', // 19 ISC
-            '0.00', // 20 Base IVAP
-            '0.00', // 21 IVAP
-            '0.00', // 22 ICBPER
-            '0.00', // 23 Otros tributos
-            total, // 24 Importe total
-            tipoCambio, // 25 Tipo de cambio
-            '', // 26 Fecha CDP referencia
-            tipRef, // 27 Tipo CDP referencia
-            nroRef, // 28 Nro CDP referencia
-            '', // 29 ID contrato
-            '0', // 30 Indicador pago beneficio
-            estado, // 31 Estado
-            '', // 32 Código error
-            '1', // 33 Indicador medio pago
-          ].join('|'),
-        );
-      }
-    }
-
-    // SUNAT exige el TXT en ANSI (Windows-1252/ISO-8859-1), no UTF-8: con
-    // UTF-8, cualquier nombre con tilde o Ñ sale corrupto o es rechazado por
-    // el validador. 'latin1' cubre correctamente los caracteres del español.
-    return Buffer.from(lines.join('\r\n'), 'latin1');
-  }
-
-  async generarExcelVentas(
-    empresaId: number,
-    mes: number,
-    anio: number,
-    simple: boolean,
-    empresarial: boolean,
-    sedeId?: number,
-  ): Promise<Buffer> {
-    const comprobantes = await this.fetchVentas(
-      empresaId,
-      mes,
-      anio,
-      empresarial,
-      sedeId,
-    );
-    const periodo = this.getPeriodo(mes, anio);
-
-    const rows = comprobantes.map((c) => {
-      const tipoDocCliente = this.inferTipoDocIdentidad(
-        c.cliente?.nroDoc ?? '',
-        c.cliente?.tipoDocumento?.codigo,
-      );
-      const estado = (c.estadoEnvioSunat as any) === 'ANULADO' ? '6' : '1';
-
-      if (simple) {
-        return {
-          PERIODO: periodo,
-          CUO: String(c.id).padStart(10, '0'),
-          'FECHA EMISIÓN': this.formatFecha(c.fechaEmision),
-          'TIPO CDP': c.tipoDoc,
-          SERIE: c.serie,
-          NÚMERO: c.correlativo,
-          'TIPO DOC CLIENTE': tipoDocCliente,
-          'NRO DOC CLIENTE': c.cliente?.nroDoc ?? '',
-          'RAZÓN SOCIAL': c.cliente?.nombre ?? '',
-          'BASE GRAVADA': +(c.mtoOperGravadas ?? 0).toFixed(2),
-          IGV: +(c.mtoIGV ?? 0).toFixed(2),
-          INAFECTAS: +(c.mtoOperInafectas ?? 0).toFixed(2),
-          'IMPORTE TOTAL': +(c.mtoImpVenta ?? 0).toFixed(2),
-          ESTADO: estado,
-        };
-      }
-
-      return {
-        PERÍODO: periodo,
-        CUO: String(c.id).padStart(10, '0'),
-        'CORR. ASIENTO': '',
-        'FECHA EMISIÓN': this.formatFecha(c.fechaEmision),
-        'FECHA VENCIM.': '',
-        'TIPO CDP': c.tipoDoc,
-        SERIE: c.serie,
-        NÚMERO: c.correlativo,
-        'TIPO DOC CLIENTE': tipoDocCliente,
-        'NRO DOC CLIENTE': c.cliente?.nroDoc ?? '',
-        'RAZÓN SOCIAL': c.cliente?.nombre ?? '',
-        EXPORTACIÓN: +(c.mtoOperExportacion ?? 0).toFixed(2),
-        'BASE GRAVADA': +(c.mtoOperGravadas ?? 0).toFixed(2),
-        'DCTO. BASE IMP.': +(c.mtoDescuentoGlobal ?? 0).toFixed(2),
-        IGV: +(c.mtoIGV ?? 0).toFixed(2),
-        'DCTO. IGV': 0,
-        EXONERADAS: +(c.mtoOperExoneradas ?? 0).toFixed(2),
-        INAFECTAS: +(c.mtoOperInafectas ?? 0).toFixed(2),
-        ISC: 0,
-        'BASE IVAP': 0,
-        IVAP: 0,
-        ICBPER: 0,
-        'OTROS TRIBUTOS': 0,
-        'IMPORTE TOTAL': +(c.mtoImpVenta ?? 0).toFixed(2),
-        'TIPO CAMBIO': c.tipoMoneda === 'USD' ? '' : 1,
-        'FECHA CDP REF.': '',
-        'TIPO CDP REF.': c.tipDocAfectado ?? '',
-        'NRO CDP REF.': c.numDocAfectado ?? '',
-        ESTADO: estado,
-      };
-    });
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = Object.keys(rows[0] ?? {}).map((k) => ({
-      wch: Math.max(k.length, 12),
-    }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Libro Ventas');
-    return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
-  }
-
-  // ──────────────── COMPRAS (RCE) ────────────────
-
-  private async fetchCompras(
-    empresaId: number,
-    mes: number,
-    anio: number,
-    sedeId?: number,
-  ) {
-    const fechaEmision = this.getDateRange(mes, anio);
-    return this.prisma.compra.findMany({
-      where: {
-        empresaId,
-        ...(sedeId ? { sedeId } : {}),
-        fechaEmision,
-        // Solo compras vigentes: las anuladas, rechazadas o pendientes de
-        // aprobación nunca aplicaron efectos (ni stock ni crédito fiscal).
-        estado: 'REGISTRADO' as any,
-      },
-      orderBy: { fechaEmision: 'asc' },
-      include: {
-        proveedor: { include: { tipoDocumento: true } },
-        // Para separar la base gravada de las adquisiciones no gravadas:
-        // líneas de productos exonerados/inafectos van sin IGV.
-        detalles: { select: { subtotal: true, igv: true } },
-      },
-    });
-  }
-
-  private r2(n: number): number {
-    return Number((n || 0).toFixed(2));
-  }
-
   /**
-   * Base gravada vs. no gravada de una compra según sus líneas: las que
-   * llevan IGV suman a la base imponible; las de productos exonerados/inafectos
-   * (IGV 0) van como adquisiciones no gravadas. Sin detalle (compras antiguas)
-   * todo se toma como gravado.
+   * Nombre del TXT según la tabla 6 del anexo 1 (RS 112-2021 para el RVIE y
+   * RS 040-2022 para el RCE). SUNAT valida el nombre, no solo el contenido:
+   *
+   *   LE + RUC(11) + AAAAMM + DD + LLLLLL + CC + O + I + M + G + .TXT
+   *
+   *   DD     '00' (el RVIE/RCE no es de periodicidad diaria)
+   *   LLLLLL identificador del libro: 140400 ventas, 080400 compras
+   *   CC     oportunidad: 01 acepta propuesta, 02 reemplaza, 03 ajustes
+   *   O      indicador de operaciones: 1 = empresa operativa
+   *   I      indicador de contenido: 1 = con información, 0 = sin
+   *   M      moneda: 1 = soles, 2 = dólares
+   *   G      '2' fijo = generado por el nuevo sistema (MIGE IGV)
    */
-  private desgloseBaseCompra(c: {
-    subtotal: any;
-    igv: any;
-    detalles?: Array<{ subtotal: any; igv: any }>;
-  }) {
-    const dets = c.detalles ?? [];
-    if (!dets.length) {
-      return { gravada: Number(c.subtotal ?? 0), noGravada: 0 };
-    }
-    let gravada = 0;
-    let noGravada = 0;
-    for (const d of dets) {
-      if (Number(d.igv ?? 0) > 0) gravada += Number(d.subtotal ?? 0);
-      else noGravada += Number(d.subtotal ?? 0);
-    }
-    if (noGravada === 0) return { gravada: Number(c.subtotal ?? 0), noGravada: 0 };
-    if (gravada === 0) return { gravada: 0, noGravada: Number(c.subtotal ?? 0) };
-    return { gravada: this.r2(gravada), noGravada: this.r2(noGravada) };
-  }
-
-  async generarTxtCompras(
-    empresaId: number,
-    mes: number,
-    anio: number,
-    simple: boolean,
-    sedeId?: number,
-  ): Promise<Buffer> {
-    const compras = await this.fetchCompras(empresaId, mes, anio, sedeId);
-    const periodo = this.getPeriodo(mes, anio);
-    const lines: string[] = [];
-
-    for (const c of compras) {
-      const cuo = String(c.id).padStart(10, '0');
-      const fecEmision = this.formatFecha(c.fechaEmision);
-      const fecVcto = this.formatFecha(c.fechaVencimiento ?? null);
-      const tipoDocSunat = TIPO_DOC_COMPRA_MAP[c.tipoDoc] ?? '01';
-      const tipoDocProveedor = this.inferTipoDocIdentidad(
-        c.proveedor?.nroDoc ?? '',
-        c.proveedor?.tipoDocumento?.codigo,
-      );
-      const nroDocProveedor = c.proveedor?.nroDoc ?? '';
-      const razonSocial = (c.proveedor?.nombre ?? '').replace(/\|/g, ' ');
-      // Importes en soles (factura en US$ × TC de la compra); las notas de
-      // crédito de compra restan crédito fiscal (negativo). Los exonerados/
-      // inafectos van como adquisiciones no gravadas (campo 19).
-      const signo = tipoDocSunat === '07' ? -1 : 1;
-      const factor = factorCompraASoles(c) * signo;
-      const base = this.desgloseBaseCompra(c);
-      const igvN = Number(c.igv ?? 0) * factor;
-      const totalN = Number(c.total ?? 0) * factor;
-      const baseGravada = this.fmt(base.gravada * factor);
-      const noGravadas = this.fmt(base.noGravada * factor);
-      const igvStr = this.fmt(igvN);
-      const totalStr = this.fmt(totalN);
-      const tipoCambio =
-        (c.moneda ?? 'PEN') === 'USD'
-          ? Number(c.tipoCambio ?? 1).toFixed(3)
-          : '1.000';
-
-      if (simple) {
-        lines.push(
-          [
-            periodo,
-            cuo,
-            '',
-            fecEmision,
-            fecVcto,
-            tipoDocSunat,
-            c.serie,
-            '',
-            c.numero,
-            tipoDocProveedor,
-            nroDocProveedor,
-            razonSocial,
-            baseGravada,
-            igvStr,
-            '0.00',
-            '0.00',
-            '0.00',
-            '0.00',
-            noGravadas,
-            '0.00',
-            '0.00',
-            '0.00',
-            totalStr,
-            '1',
-          ].join('|'),
-        );
-      } else {
-        // Formato RCE 8.1 — 33 campos
-        lines.push(
-          [
-            periodo, // 1  Período
-            cuo, // 2  CUO
-            '', // 3  Correlativo asiento
-            fecEmision, // 4  Fecha emisión
-            fecVcto, // 5  Fecha vencimiento
-            tipoDocSunat, // 6  Tipo CDP
-            c.serie, // 7  Serie
-            '', // 8  Año DUA/DSI
-            c.numero, // 9  Número
-            tipoDocProveedor, // 10 Tipo doc proveedor
-            nroDocProveedor, // 11 Nro doc proveedor
-            razonSocial, // 12 Razón social
-            baseGravada, // 13 Base adq. gravadas (op. gravadas)
-            igvStr, // 14 IGV adq. gravadas (op. gravadas)
-            '0.00', // 15 Base adq. gravadas (op. gravadas y no gravadas)
-            '0.00', // 16 IGV adq. gravadas (op. gravadas y no gravadas)
-            '0.00', // 17 Base adq. gravadas (op. no gravadas)
-            '0.00', // 18 IGV adq. gravadas (op. no gravadas)
-            noGravadas, // 19 Valor adq. no gravadas (exonerados/inafectos)
-            '0.00', // 20 ISC
-            '0.00', // 21 ICBPER
-            '0.00', // 22 Otros tributos
-            totalStr, // 23 Total
-            tipoCambio, // 24 Tipo de cambio
-            '', // 25 Fecha CDP referencia
-            '', // 26 Tipo CDP referencia
-            '', // 27 Nro CDP referencia
-            '', // 28 Nro constancia detracción
-            '', // 29 Fecha constancia detracción
-            '', // 30 Indicador anticipo
-            '', // 31 Período crédito fiscal
-            '1', // 32 Estado
-            '', // 33 Código error
-          ].join('|'),
-        );
-      }
-    }
-
-    // SUNAT exige el TXT en ANSI (Windows-1252/ISO-8859-1), no UTF-8: con
-    // UTF-8, cualquier nombre con tilde o Ñ sale corrupto o es rechazado por
-    // el validador. 'latin1' cubre correctamente los caracteres del español.
-    return Buffer.from(lines.join('\r\n'), 'latin1');
-  }
-
-  async generarExcelCompras(
-    empresaId: number,
-    mes: number,
-    anio: number,
-    simple: boolean,
-    sedeId?: number,
-  ): Promise<Buffer> {
-    const compras = await this.fetchCompras(empresaId, mes, anio, sedeId);
-    const periodo = this.getPeriodo(mes, anio);
-
-    const rows = compras.map((c) => {
-      const tipoDocSunat = TIPO_DOC_COMPRA_MAP[c.tipoDoc] ?? '01';
-      const tipoDocProveedor = this.inferTipoDocIdentidad(
-        c.proveedor?.nroDoc ?? '',
-        c.proveedor?.tipoDocumento?.codigo,
-      );
-      // Mismo criterio que el TXT: soles, NC en negativo, no gravadas aparte.
-      const signo = tipoDocSunat === '07' ? -1 : 1;
-      const factor = factorCompraASoles(c) * signo;
-      const base = this.desgloseBaseCompra(c);
-      const subtotalN = base.gravada * factor;
-      const noGravadasN = base.noGravada * factor;
-      const igvN = Number(c.igv ?? 0) * factor;
-      const totalN = Number(c.total ?? 0) * factor;
-
-      if (simple) {
-        return {
-          PERIODO: periodo,
-          CUO: String(c.id).padStart(10, '0'),
-          'FECHA EMISIÓN': this.formatFecha(c.fechaEmision),
-          'FECHA VENCIM.': this.formatFecha(c.fechaVencimiento ?? null),
-          'TIPO CDP': tipoDocSunat,
-          SERIE: c.serie,
-          NÚMERO: c.numero,
-          'TIPO DOC PROVEEDOR': tipoDocProveedor,
-          'NRO DOC PROVEEDOR': c.proveedor?.nroDoc ?? '',
-          'RAZÓN SOCIAL PROVEEDOR': c.proveedor?.nombre ?? '',
-          'BASE GRAVADA': +subtotalN.toFixed(2),
-          IGV: +igvN.toFixed(2),
-          'IMPORTE TOTAL': +totalN.toFixed(2),
-          ESTADO: '1',
-        };
-      }
-
-      return {
-        PERÍODO: periodo,
-        CUO: String(c.id).padStart(10, '0'),
-        'CORR. ASIENTO': '',
-        'FECHA EMISIÓN': this.formatFecha(c.fechaEmision),
-        'FECHA VENCIM.': this.formatFecha(c.fechaVencimiento ?? null),
-        'TIPO CDP': tipoDocSunat,
-        SERIE: c.serie,
-        'AÑO DUA/DSI': '',
-        NÚMERO: c.numero,
-        'TIPO DOC PROVEEDOR': tipoDocProveedor,
-        'NRO DOC PROVEEDOR': c.proveedor?.nroDoc ?? '',
-        'RAZÓN SOCIAL': c.proveedor?.nombre ?? '',
-        'BASE ADQ. GRAVADAS': +subtotalN.toFixed(2),
-        'IGV ADQ. GRAVADAS': +igvN.toFixed(2),
-        'BASE ADQ. GRAV. (MX)': 0,
-        'IGV ADQ. GRAV. (MX)': 0,
-        'BASE ADQ. GRAV. (NG)': 0,
-        'IGV ADQ. GRAV. (NG)': 0,
-        'ADQ. NO GRAVADAS': +noGravadasN.toFixed(2),
-        ISC: 0,
-        ICBPER: 0,
-        'OTROS TRIBUTOS': 0,
-        'IMPORTE TOTAL': +totalN.toFixed(2),
-        'TIPO CAMBIO': (c.moneda ?? 'PEN') === 'USD' ? +(c.tipoCambio ?? 1) : 1,
-        'FECHA CDP REF.': '',
-        'TIPO CDP REF.': '',
-        'NRO CDP REF.': '',
-        'NRO CONSTANCIA DET.': '',
-        'FECHA CONSTANCIA DET.': '',
-        'PERÍODO CRÉDITO': '',
-        ESTADO: '1',
-      };
-    });
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = Object.keys(rows[0] ?? {}).map((k) => ({
-      wch: Math.max(k.length, 12),
-    }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Registro Compras');
-    return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
-  }
-
-  // ──────────────── EMAIL ────────────────
-
-  async enviarPorCorreo(params: {
-    tipo: 'ventas' | 'compras';
-    mes: number;
-    anio: number;
-    simple: boolean;
-    empresarial?: boolean;
-    empresaId: number;
-    destinatario: string;
-    sedeId?: number;
-  }): Promise<void> {
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = parseInt(process.env.SMTP_PORT ?? '587', 10);
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    const smtpFrom = process.env.SMTP_FROM ?? smtpUser;
-
-    if (!smtpHost || !smtpUser || !smtpPass) {
-      throw new BadRequestException(
-        'El servidor de correo no está configurado. Agrega SMTP_HOST, SMTP_USER y SMTP_PASS en el archivo .env',
-      );
-    }
-
-    const {
-      tipo,
-      mes,
-      anio,
-      simple,
-      empresarial,
-      empresaId,
-      destinatario,
-      sedeId,
-    } = params;
-
-    let txtBuffer: Buffer;
-    let xlsxBuffer: Buffer;
-
-    if (tipo === 'ventas') {
-      txtBuffer = await this.generarTxtVentas(
-        empresaId,
-        mes,
-        anio,
-        simple,
-        empresarial ?? false,
-        sedeId,
-      );
-      xlsxBuffer = await this.generarExcelVentas(
-        empresaId,
-        mes,
-        anio,
-        simple,
-        empresarial ?? false,
-        sedeId,
-      );
-    } else {
-      txtBuffer = await this.generarTxtCompras(
-        empresaId,
-        mes,
-        anio,
-        simple,
-        sedeId,
-      );
-      xlsxBuffer = await this.generarExcelCompras(
-        empresaId,
-        mes,
-        anio,
-        simple,
-        sedeId,
-      );
-    }
-
-    const nombreTxt = this.getNombreArchivo(tipo, mes, anio, 'txt');
-    const nombreXlsx = this.getNombreArchivo(tipo, mes, anio, 'xlsx');
-    const label =
-      tipo === 'ventas'
-        ? 'Libro Electrónico de Ventas (RVIE)'
-        : 'Registro de Compras (RCE)';
-    const periodo = `${String(mes).padStart(2, '0')}/${anio}`;
-
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: { user: smtpUser, pass: smtpPass },
-    });
-
-    await transporter.sendMail({
-      from: `"Vendify SIRE" <${smtpFrom}>`,
-      to: destinatario,
-      subject: `SIRE - ${label} | Período ${periodo}`,
-      html: `
-        <p>Estimado(a),</p>
-        <p>Adjunto encontrará el <strong>${label}</strong> correspondiente al período <strong>${periodo}</strong>.</p>
-        <p>Se adjuntan dos archivos:</p>
-        <ul>
-          <li><strong>${nombreTxt}</strong> — Formato TXT para importar en el sistema SIRE de SUNAT.</li>
-          <li><strong>${nombreXlsx}</strong> — Versión Excel para revisión.</li>
-        </ul>
-        <p>Generado por <strong>Vendify</strong>.</p>
-      `,
-      attachments: [
-        { filename: nombreTxt, content: txtBuffer, contentType: 'text/plain' },
-        {
-          filename: nombreXlsx,
-          content: xlsxBuffer,
-          contentType:
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        },
-      ],
-    });
-  }
-
-  private periodoSire(mes: number, anio: number): string {
-    return `${anio}${String(mes).padStart(2, '0')}`;
-  }
-
-  /** Fecha en formato AAAA-MM-DD (RVIE campo 29: doc. modificado). */
-  private formatFechaIso(date: Date | null | undefined): string {
-    if (!date) return '';
-    const d = new Date(date.getTime() - 5 * 60 * 60 * 1000);
-    return d.toISOString().slice(0, 10);
-  }
-
-  /**
-   * Texto libre entre palotes. La norma prohíbe los caracteres | / \ dentro
-   * de los campos de texto (RS 112-2021, reglas generales del archivo).
-   */
-  private texto(val: string | null | undefined): string {
-    return (val ?? '').replace(/[|/\\]/g, ' ').replace(/\s+/g, ' ').trim();
-  }
-
-  /**
-   * Los comprobantes guardan el documento afectado como "SERIE-NUMERO"
-   * (p. ej. "F0A1-316"), pero el SIRE exige serie y número en campos
-   * separados. Se parte por el último guion para no romper series que lo
-   * contengan.
-   */
-  private splitSerieNumero(ref: string | null | undefined): [string, string] {
-    const val = (ref ?? '').trim();
-    if (!val) return ['', ''];
-    const i = val.lastIndexOf('-');
-    if (i <= 0) return [val, ''];
-    return [val.slice(0, i), val.slice(i + 1)];
-  }
-
   async nombreArchivoTxtSire(
     empresaId: number,
     tipo: 'ventas' | 'compras',
@@ -770,6 +167,163 @@ export class SireService {
 
   // ──────────────── VENTAS (RVIE) ────────────────
 
+  private async fetchVentas(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    empresarial: boolean,
+    sedeId?: number,
+  ) {
+    const fechaEmision = this.getDateRange(mes, anio);
+    return this.prisma.comprobante.findMany({
+      where: {
+        empresaId,
+        ...(empresarial || !sedeId ? {} : { sedeId }),
+        tipoDoc: { in: ['01', '03', '07', '08'] },
+        fechaEmision,
+        // Excluir no válidos para el Libro de Ventas: PENDIENTE (sin enviar),
+        // RECHAZADO y FALLIDO_ENVIO (no aceptados por SUNAT). Antes se colaban como estado '1'.
+        estadoEnvioSunat: {
+          notIn: ['PENDIENTE', 'RECHAZADO', 'FALLIDO_ENVIO'] as any,
+        },
+      },
+      orderBy: { fechaEmision: 'asc' },
+      select: {
+        id: true,
+        tipoDoc: true,
+        serie: true,
+        correlativo: true,
+        fechaEmision: true,
+        tipoMoneda: true,
+        tipoCambio: true,
+        mtoOperGravadas: true,
+        mtoIGV: true,
+        mtoOperInafectas: true,
+        mtoOperExoneradas: true,
+        mtoOperExportacion: true,
+        mtoDescuentoGlobal: true,
+        mtoImpVenta: true,
+        tipDocAfectado: true,
+        numDocAfectado: true,
+        estadoEnvioSunat: true,
+        cliente: {
+          select: {
+            nombre: true,
+            nroDoc: true,
+            tipoDocumento: { select: { codigo: true } },
+          },
+        },
+      },
+    });
+  }
+
+  async generarTxtVentas(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    empresarial: boolean,
+    sedeId?: number,
+  ): Promise<Buffer> {
+    const [generador, comprobantes] = await Promise.all([
+      this.fetchGenerador(empresaId),
+      this.fetchVentas(empresaId, mes, anio, empresarial, sedeId),
+    ]);
+    const periodo = this.periodoSire(mes, anio);
+    // El texto de la RS 112-2021 dice "Formato YYYY-MM-DD" para el campo 29,
+    // pero el validador oficial (PVSIRE 1.9.0) lo rechaza con el error 206
+    // "Fecha de emisión no contiene el formato establecido" y sí acepta
+    // DD/MM/AAAA, igual que el campo 5. Se sigue al validador.
+    const fechasDocModificado = await this.fetchFechasDocModificado(
+      empresaId,
+      comprobantes,
+      'ddmmyyyy',
+    );
+    const lines: string[] = [];
+
+    for (const c of comprobantes) {
+      const esNota = c.tipoDoc === '07' || c.tipoDoc === '08';
+      // Las notas de crédito (07) reducen el registro: sus montos van en
+      // NEGATIVO ("- #.##" según la norma, campos 14 a 26).
+      const signo = c.tipoDoc === '07' ? -1 : 1;
+      // La norma manda 0.00 para un comprobante "anulado", pero eso aplica a
+      // los dados de BAJA ante SUNAT (tabla 9: baja comunicada por el
+      // contribuyente). Acá `ANULADO` significa otra cosa: o se anuló
+      // internamente, o una nota de crédito de anulación afectó al original
+      // (ver comprobante.service.ts:1078 y :4067). En ambos casos el CDR fue
+      // aceptado y SUNAT lo sigue contando a valor completo — la reducción la
+      // hace la nota de crédito. Ponerlos en 0.00 restaría dos veces: se
+      // verificó contra la propuesta RVIE real de SUNAT (07/2026), que cuadra
+      // al céntimo informando los montos tal cual. No hay flujo de
+      // comunicación de baja en el sistema.
+      const monto = (val: number | null | undefined) =>
+        this.fmt(Number(val ?? 0) * signo);
+
+      const [serieRef, nroRef] = this.splitSerieNumero(c.numDocAfectado);
+      const moneda = c.tipoMoneda || 'PEN';
+
+      // Formato RVIE — 33 campos (RS 000112-2021/SUNAT, anexo 2/3).
+      lines.push(
+        [
+          generador.ruc, //                              1  RUC del generador
+          generador.razonSocial, //                      2  Razón social del generador
+          periodo, //                                    3  Periodo AAAAMM
+          '', //                                         4  CAR (lo completa SUNAT)
+          this.formatFecha(c.fechaEmision), //           5  Fecha emisión DD/MM/AAAA
+          '', //                                         6  Fecha vencimiento/pago (solo tipo 14)
+          c.tipoDoc, //                                  7  Tipo CP
+          c.serie, //                                    8  Serie del CDP
+          String(c.correlativo), //                      9  Número del CP
+          '', //                                        10  Nro final (rango)
+          this.inferTipoDocIdentidad(
+            c.cliente?.nroDoc ?? '',
+            c.cliente?.tipoDocumento?.codigo,
+          ), //                                         11  Tipo doc identidad cliente
+          c.cliente?.nroDoc ?? '', //                   12  Nro doc identidad cliente
+          this.texto(c.cliente?.nombre), //             13  Razón social del cliente
+          monto(c.mtoOperExportacion), //               14  Valor facturado exportación
+          monto(c.mtoOperGravadas), //                  15  Base imponible gravada
+          // 16 Dscto BI: solo aplica en notas que modifican periodos
+          // anteriores. mtoOperGravadas ya viene neto del descuento global,
+          // así que no se vuelve a restar acá.
+          '0.00', //                                    16  Descuento de la base imponible
+          monto(c.mtoIGV), //                           17  IGV / IPM
+          '0.00', //                                    18  Descuento del IGV
+          monto(c.mtoOperExoneradas), //                19  Exonerado
+          monto(c.mtoOperInafectas), //                 20  Inafecto
+          '0.00', //                                    21  ISC
+          '0.00', //                                    22  Base imponible IVAP
+          '0.00', //                                    23  IVAP
+          '0.00', //                                    24  ICBPER
+          '0.00', //                                    25  Otros tributos y cargos
+          monto(c.mtoImpVenta), //                      26  Importe total del CP
+          moneda, //                                    27  Moneda ISO 4217
+          // 28 Tipo de cambio: obligatorio solo si la moneda no es PEN.
+          moneda === 'PEN' ? '' : this.fmt(Number(c.tipoCambio ?? 0)),
+          esNota ? fechasDocModificado.get(c.id) ?? '' : '', // 29 Fecha doc. modificado AAAA-MM-DD
+          esNota ? c.tipDocAfectado ?? '' : '', //      30  Tipo CP modificado
+          esNota ? serieRef : '', //                    31  Serie CP modificado
+          esNota ? nroRef : '', //                      32  Número CP modificado
+          '', //                                        33  ID contrato / proyecto
+        ].join('|'),
+      );
+    }
+
+    // SUNAT exige el TXT en ANSI (Windows-1252/ISO-8859-1), no UTF-8: con
+    // UTF-8, cualquier nombre con tilde o Ñ sale corrupto o es rechazado por
+    // el validador. 'latin1' cubre correctamente los caracteres del español.
+    // Cada línea termina en CRLF, incluida la última.
+    return Buffer.from(
+      lines.map((l) => `${l}\r\n`).join(''),
+      'latin1',
+    );
+  }
+
+  /**
+   * El campo 29 del RVIE (y el 28 del RCE) pide la fecha de emisión del
+   * comprobante ORIGINAL que la nota modifica, dato que no se guarda en el
+   * comprobante. Se resuelve buscando el documento referenciado en una sola
+   * consulta por lote.
+   */
   private async fetchFechasDocModificado(
     empresaId: number,
     comprobantes: Array<{
@@ -828,6 +382,321 @@ export class SireService {
     return salida;
   }
 
+  async generarExcelVentas(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    empresarial: boolean,
+    sedeId?: number,
+  ): Promise<Buffer> {
+    const [generador, comprobantes] = await Promise.all([
+      this.fetchGenerador(empresaId),
+      this.fetchVentas(empresaId, mes, anio, empresarial, sedeId),
+    ]);
+    const periodo = this.periodoSire(mes, anio);
+    const fechasDocModificado = await this.fetchFechasDocModificado(
+      empresaId,
+      comprobantes,
+      'ddmmyyyy',
+    );
+
+    // El Excel espeja campo por campo el TXT oficial (mismos nombres que la
+    // plantilla de SUNAT), para que el contador pueda cuadrar una cosa con la
+    // otra sin traducir cabeceras.
+    const rows = comprobantes.map((c) => {
+      const esNota = c.tipoDoc === '07' || c.tipoDoc === '08';
+      const signo = c.tipoDoc === '07' ? -1 : 1;
+      const n = (val: any) => +(Number(val ?? 0) * signo).toFixed(2);
+      const [serieRef, nroRef] = this.splitSerieNumero(c.numDocAfectado);
+      const moneda = c.tipoMoneda || 'PEN';
+
+      return {
+        RUC: generador.ruc,
+        ID: generador.razonSocial,
+        PERIODO: periodo,
+        'CAR SUNAT': '',
+        'FECHA DE EMISIÓN': this.formatFecha(c.fechaEmision),
+        'FECHA VCTO/PAGO': '',
+        'TIPO CP/DOC.': c.tipoDoc,
+        'SERIE DEL CDP': c.serie,
+        'NRO CP O DOC.': c.correlativo,
+        'NRO FINAL (RANGO)': '',
+        'TIPO DOC IDENTIDAD': this.inferTipoDocIdentidad(
+          c.cliente?.nroDoc ?? '',
+          c.cliente?.tipoDocumento?.codigo,
+        ),
+        'NRO DOC IDENTIDAD': c.cliente?.nroDoc ?? '',
+        'APELLIDOS NOMBRES/ RAZÓN SOCIAL': this.texto(c.cliente?.nombre),
+        'VALOR FACTURADO EXPORTACIÓN': n(c.mtoOperExportacion),
+        'BI GRAVADA': n(c.mtoOperGravadas),
+        'DSCTO BI': 0,
+        'IGV / IPM DG': n(c.mtoIGV),
+        'DSCTO IGV / IPM': 0,
+        'MTO EXONERADO': n(c.mtoOperExoneradas),
+        'MTO INAFECTO': n(c.mtoOperInafectas),
+        ISC: 0,
+        'BI GRAV IVAP': 0,
+        IVAP: 0,
+        ICBPER: 0,
+        'OTROS TRIBUTOS': 0,
+        'TOTAL CP': n(c.mtoImpVenta),
+        MONEDA: moneda,
+        'TIPO DE CAMBIO': moneda === 'PEN' ? '' : Number(c.tipoCambio ?? 0),
+        'FECHA EMISIÓN DOC MODIFICADO': esNota
+          ? fechasDocModificado.get(c.id) ?? ''
+          : '',
+        'TIPO CP MODIFICADO': esNota ? c.tipDocAfectado ?? '' : '',
+        'SERIE CP MODIFICADO': esNota ? serieRef : '',
+        'NRO CP MODIFICADO': esNota ? nroRef : '',
+        'ID PROYECTO OPERADORES ATRIBUCIÓN': '',
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = Object.keys(rows[0] ?? {}).map((k) => ({
+      wch: Math.max(k.length, 12),
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'RVIE');
+    return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+  }
+
+  // ──────────────── COMPRAS (RCE) ────────────────
+
+  private async fetchCompras(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    sedeId?: number,
+  ) {
+    const fechaEmision = this.getDateRange(mes, anio);
+    return this.prisma.compra.findMany({
+      where: {
+        empresaId,
+        ...(sedeId ? { sedeId } : {}),
+        fechaEmision,
+        // Excluir compras que nunca aplicaron efectos reales: ANULADA,
+        // RECHAZADA (el admin la rechazó) y PENDIENTE_APROBACION (aún sin
+        // visto bueno, sin stock ni pago). Solo REGISTRADO va al RCE.
+        estado: 'REGISTRADO' as any,
+        // El contador puede denegar una compra (p.ej. no corresponde al giro):
+        // esa no se declara, así que queda fuera del RCE y de los totales.
+        estadoContador: { not: 'DENEGADA' } as any,
+      },
+      orderBy: { fechaEmision: 'asc' },
+      include: {
+        proveedor: { include: { tipoDocumento: true } },
+        usuario: { select: { nombre: true } },
+        // Para separar la base gravada (campo 15) de las adquisiciones no
+        // gravadas (campo 21): líneas de exonerados/inafectos van sin IGV.
+        detalles: { select: { subtotal: true, igv: true } },
+      },
+    });
+  }
+
+  /**
+   * Base gravada vs. no gravada de una compra según sus líneas: las que
+   * llevan IGV suman a la base imponible (campo 15 del RCE); las de productos
+   * exonerados/inafectos (IGV 0) van como adquisiciones no gravadas (campo 21).
+   * Sin detalle (compras antiguas/importadas) todo se toma como gravado.
+   */
+  private desgloseBaseCompra(c: {
+    subtotal: any;
+    igv: any;
+    detalles?: Array<{ subtotal: any; igv: any }>;
+  }) {
+    const dets = c.detalles ?? [];
+    if (!dets.length) {
+      return { gravada: Number(c.subtotal ?? 0), noGravada: 0 };
+    }
+    let gravada = 0;
+    let noGravada = 0;
+    for (const d of dets) {
+      if (Number(d.igv ?? 0) > 0) gravada += Number(d.subtotal ?? 0);
+      else noGravada += Number(d.subtotal ?? 0);
+    }
+    // Si toda la compra es gravada se respeta el subtotal de cabecera (puede
+    // absorber centavos de redondeo del total tecleado).
+    if (noGravada === 0) return { gravada: Number(c.subtotal ?? 0), noGravada: 0 };
+    if (gravada === 0) return { gravada: 0, noGravada: Number(c.subtotal ?? 0) };
+    return { gravada: this.r2(gravada), noGravada: this.r2(noGravada) };
+  }
+
+  async generarTxtCompras(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    sedeId?: number,
+  ): Promise<Buffer> {
+    const [generador, compras] = await Promise.all([
+      this.fetchGenerador(empresaId),
+      this.fetchCompras(empresaId, mes, anio, sedeId),
+    ]);
+    const periodo = this.periodoSire(mes, anio);
+    const lines: string[] = [];
+
+    for (const c of compras) {
+      const tipoDocSunat = TIPO_DOC_COMPRA_MAP[c.tipoDoc] ?? '01';
+      // Las notas de crédito de compra restan crédito fiscal: montos en
+      // negativo, igual criterio que en el RVIE.
+      const signo = tipoDocSunat === '07' ? -1 : 1;
+      // Los importes del RCE van en moneda nacional: una factura en dólares se
+      // convierte con el TC de la compra (columnas 26/27 llevan moneda y TC).
+      const factor = factorCompraASoles(c);
+      const monto = (val: any) => this.fmt(Number(val ?? 0) * factor * signo);
+      const moneda = c.moneda || 'PEN';
+      const base = this.desgloseBaseCompra(c);
+
+      // Formato RCE — 37 campos (RS 000040-2022/SUNAT).
+      lines.push(
+        [
+          generador.ruc, //                             1  RUC del generador
+          generador.razonSocial, //                     2  Razón social del generador
+          periodo, //                                   3  Periodo AAAAMM
+          '', //                                        4  CAR (lo completa SUNAT)
+          this.formatFecha(c.fechaEmision), //          5  Fecha emisión DD/MM/AAAA
+          this.formatFecha(c.fechaVencimiento ?? null), // 6 Fecha vencimiento/pago
+          tipoDocSunat, //                              7  Tipo CP
+          c.serie, //                                   8  Serie del CDP
+          '', //                                        9  Año emisión DAM/DSI (solo importaciones)
+          c.numero, //                                 10  Número del CP
+          '', //                                       11  Nro final (rango)
+          this.inferTipoDocIdentidad(
+            c.proveedor?.nroDoc ?? '',
+            c.proveedor?.tipoDocumento?.codigo,
+          ), //                                        12  Tipo doc identidad proveedor
+          c.proveedor?.nroDoc ?? '', //                13  Nro doc identidad proveedor
+          this.texto(c.proveedor?.nombre), //          14  Razón social del proveedor
+          // Campos 15/16: adquisiciones gravadas destinadas a operaciones
+          // gravadas y/o de exportación (el caso normal). Los pares 17/18 y
+          // 19/20 son para uso mixto y para compras sin derecho a crédito,
+          // que el sistema no discrimina hoy.
+          monto(base.gravada), //                      15  Base imponible gravada (con derecho a crédito)
+          monto(c.igv), //                             16  IGV / IPM de la base 15
+          '0.00', //                                   17  Base gravada uso mixto
+          '0.00', //                                   18  IGV uso mixto
+          '0.00', //                                   19  Base gravada sin derecho a crédito
+          '0.00', //                                   20  IGV sin derecho a crédito
+          monto(base.noGravada), //                    21  Valor de adquisiciones no gravadas (exonerados/inafectos)
+          '0.00', //                                   22  ISC
+          '0.00', //                                   23  ICBPER
+          '0.00', //                                   24  Otros conceptos, tributos y cargos
+          monto(c.total), //                           25  Importe total de la adquisición
+          moneda, //                                   26  Moneda ISO 4217
+          // 27 Tipo de cambio: obligatorio solo si la moneda no es PEN.
+          moneda === 'PEN' ? '' : this.fmt(Number(c.tipoCambio ?? 0)),
+          // Campos 28 a 32: SUNAT los exige cuando el tipo de CP es nota de
+          // crédito o débito (07/08/87/88), pero el modelo Compra no guarda
+          // referencia al documento que la nota modifica. Hoy no se dispara
+          // (todas las compras registradas son facturas); si algún día se
+          // registran notas de compra, hay que agregar esos campos al modelo
+          // antes de que el archivo pase la validación de SUNAT.
+          '', //                                       28  Fecha emisión doc. modificado DD/MM/AAAA
+          '', //                                       29  Tipo CP modificado
+          '', //                                       30  Serie CP modificado
+          '', //                                       31  Código dependencia aduanera
+          '', //                                       32  Número CP modificado
+          '', //                                       33  Clasificación de bienes y servicios
+          '', //                                       34  ID contrato / proyecto
+          '', //                                       35  Porcentaje de participación
+          '0.00', //                                   36  Impuesto materia de beneficio (Ley 31053)
+          '', //                                       37  CAR original / indicador exclusión-inclusión
+        ].join('|'),
+      );
+    }
+
+    // SUNAT exige el TXT en ANSI (Windows-1252/ISO-8859-1), no UTF-8: con
+    // UTF-8, cualquier nombre con tilde o Ñ sale corrupto o es rechazado por
+    // el validador. Cada línea termina en CRLF, incluida la última.
+    return Buffer.from(lines.map((l) => `${l}\r\n`).join(''), 'latin1');
+  }
+
+  async generarExcelCompras(
+    empresaId: number,
+    mes: number,
+    anio: number,
+    sedeId?: number,
+  ): Promise<Buffer> {
+    const [generador, compras] = await Promise.all([
+      this.fetchGenerador(empresaId),
+      this.fetchCompras(empresaId, mes, anio, sedeId),
+    ]);
+    const periodo = this.periodoSire(mes, anio);
+
+    // Espeja campo por campo el TXT oficial del RCE (mismos nombres que la
+    // plantilla de SUNAT) para poder cuadrar Excel contra TXT.
+    const rows = compras.map((c) => {
+      const tipoDocSunat = TIPO_DOC_COMPRA_MAP[c.tipoDoc] ?? '01';
+      const signo = tipoDocSunat === '07' ? -1 : 1;
+      // Importes en soles (ver RCE TXT): factura en US$ × TC de la compra.
+      const factor = factorCompraASoles(c);
+      const n = (val: any) => +(Number(val ?? 0) * factor * signo).toFixed(2);
+      const moneda = c.moneda || 'PEN';
+      const base = this.desgloseBaseCompra(c);
+
+      return {
+        RUC: generador.ruc,
+        'APELLIDOS Y NOMBRES O RAZON SOCIAL': generador.razonSocial,
+        PERIODO: periodo,
+        'CAR SUNAT': '',
+        'FECHA DE EMISION': this.formatFecha(c.fechaEmision),
+        'FECHA VCTO/PAGO': this.formatFecha(c.fechaVencimiento ?? null),
+        'TIPO CP/DOC.': tipoDocSunat,
+        'SERIE DEL CDP': c.serie,
+        'ANIO': '',
+        'NRO CP O DOC.': c.numero,
+        'NRO FINAL (RANGO)': '',
+        'TIPO DOC IDENTIDAD': this.inferTipoDocIdentidad(
+          c.proveedor?.nroDoc ?? '',
+          c.proveedor?.tipoDocumento?.codigo,
+        ),
+        'NRO DOC IDENTIDAD': c.proveedor?.nroDoc ?? '',
+        'APELLIDOS NOMBRES/ RAZON SOCIAL': this.texto(c.proveedor?.nombre),
+        'BI GRAVADO DG': n(base.gravada),
+        'IGV / IPM DG': n(c.igv),
+        'BI GRAVADO DGNG': 0,
+        'IGV / IPM DGNG': 0,
+        'BI GRAVADO DNG': 0,
+        'IGV / IPM DNG': 0,
+        'VALOR ADQ. NG': n(base.noGravada),
+        ISC: 0,
+        ICBPER: 0,
+        'OTROS TRIB/ CARGOS': 0,
+        'TOTAL CP': n(c.total),
+        MONEDA: moneda,
+        'TIPO DE CAMBIO': moneda === 'PEN' ? '' : Number(c.tipoCambio ?? 0),
+        'FECHA EMISION DOC MODIFICADO': '',
+        'TIPO CP MODIFICADO': '',
+        'SERIE CP MODIFICADO': '',
+        'COD. DAM O DSI': '',
+        'NRO CP MODIFICADO': '',
+        'CLASIF DE BSS Y SSS': '',
+        'ID PROYECTO OPERADORES/PARTICIPES': '',
+        PORCPART: '',
+        IMB: 0,
+        'CAR ORIG': '',
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = Object.keys(rows[0] ?? {}).map((k) => ({
+      wch: Math.max(k.length, 12),
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'RCE');
+    return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+  }
+
+  // ──────────────── RESÚMENES (previsualización) ────────────────
+
+  private r2(n: number): number {
+    return Number((n || 0).toFixed(2));
+  }
+
+  /**
+   * Revisión previa del período: lo que un contador necesita mirar ANTES de
+   * generar el archivo. Detecta lo que SUNAT observaría después.
+   */
   async obtenerRevisionVentas(
     empresaId: number,
     mes: number,
@@ -1296,6 +1165,117 @@ export class SireService {
 
   // ──────────────── EMAIL ────────────────
 
+  async enviarPorCorreo(params: {
+    tipo: 'ventas' | 'compras';
+    mes: number;
+    anio: number;
+    empresarial?: boolean;
+    empresaId: number;
+    destinatario: string;
+    sedeId?: number;
+  }): Promise<void> {
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = parseInt(process.env.SMTP_PORT ?? '587', 10);
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const smtpFrom = process.env.SMTP_FROM ?? smtpUser;
+
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      throw new BadRequestException(
+        'El servidor de correo no está configurado. Agrega SMTP_HOST, SMTP_USER y SMTP_PASS en el archivo .env',
+      );
+    }
+
+    const {
+      tipo,
+      mes,
+      anio,
+      empresarial,
+      empresaId,
+      destinatario,
+      sedeId,
+    } = params;
+
+    let txtBuffer: Buffer;
+    let xlsxBuffer: Buffer;
+
+    if (tipo === 'ventas') {
+      txtBuffer = await this.generarTxtVentas(
+        empresaId,
+        mes,
+        anio,
+        empresarial ?? false,
+        sedeId,
+      );
+      xlsxBuffer = await this.generarExcelVentas(
+        empresaId,
+        mes,
+        anio,
+        empresarial ?? false,
+        sedeId,
+      );
+    } else {
+      txtBuffer = await this.generarTxtCompras(
+        empresaId,
+        mes,
+        anio,
+        sedeId,
+      );
+      xlsxBuffer = await this.generarExcelCompras(
+        empresaId,
+        mes,
+        anio,
+        sedeId,
+      );
+    }
+
+    const nombreTxt = this.getNombreArchivo(tipo, mes, anio, 'txt');
+    const nombreXlsx = this.getNombreArchivo(tipo, mes, anio, 'xlsx');
+    const label =
+      tipo === 'ventas'
+        ? 'Libro Electrónico de Ventas (RVIE)'
+        : 'Registro de Compras (RCE)';
+    const periodo = `${String(mes).padStart(2, '0')}/${anio}`;
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: { user: smtpUser, pass: smtpPass },
+    });
+
+    await transporter.sendMail({
+      from: `"Falconext SIRE" <${smtpFrom}>`,
+      to: destinatario,
+      subject: `SIRE - ${label} | Período ${periodo}`,
+      html: `
+        <p>Estimado(a),</p>
+        <p>Adjunto encontrará el <strong>${label}</strong> correspondiente al período <strong>${periodo}</strong>.</p>
+        <p>Se adjuntan dos archivos:</p>
+        <ul>
+          <li><strong>${nombreTxt}</strong> — Formato TXT para importar en el sistema SIRE de SUNAT.</li>
+          <li><strong>${nombreXlsx}</strong> — Versión Excel para revisión.</li>
+        </ul>
+        <p>Generado por <strong>Falconext MyPE</strong>.</p>
+      `,
+      attachments: [
+        { filename: nombreTxt, content: txtBuffer, contentType: 'text/plain' },
+        {
+          filename: nombreXlsx,
+          content: xlsxBuffer,
+          contentType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+      ],
+    });
+  }
+
+  // ───────────────────────── Revisión del contador (RCE) ─────────────────────
+  /**
+   * Compras del período con su estado de revisión, para que el contador las
+   * apruebe o deniegue una por una. A diferencia del resumen/TXT, aquí SÍ se
+   * listan las denegadas: el negocio tiene que ver qué le rechazaron y por qué.
+   */
   async obtenerRevisionCompras(
     empresaId: number,
     mes: number,
@@ -1884,4 +1864,5 @@ export class SireService {
     });
     return { ...cruce, origen: 'SUNAT' as const };
   }
+
 }

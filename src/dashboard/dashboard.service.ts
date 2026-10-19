@@ -4,7 +4,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ProductoService } from '../producto/producto.service';
 import { montoEnPen } from '../common/utils/moneda.util';
 import { egresosCajaWhere } from '../common/utils/egresos-caja.util';
+import { excluirNotasCreditoDeAnulacion } from '../common/utils/notas-credito.util';
 import { montoCompraEnSoles } from '../common/utils/moneda-compra';
+import { costoDeSede } from '../kardex/costo-sede';
+import {
+  ingresoLineaSinIgv,
+  normalizarCriterio,
+  type CriterioIgvVentas,
+} from '../finanzas/igv-ventas';
 
 @Injectable()
 export class DashboardService {
@@ -39,8 +46,13 @@ export class DashboardService {
           },
         },
         {
-          // Excluir documentos de pre-venta que no son ventas cerradas
-          tipoDoc: { notIn: ['NP', 'COT', 'OT'] },
+          // Excluir SOLO cotizaciones (COT) y órdenes de trabajo (OT): son
+          // documentos previos que no representan una venta en ningún rubro.
+          // La Nota de Pedido (NP) SÍ cuenta como venta: para muchos negocios
+          // informales la NP es su comprobante de venta real. Si la NP se
+          // convierte luego en boleta/factura, la cláusula 1 (arriba) la excluye
+          // por comprobantesDerivados, evitando el doble conteo.
+          tipoDoc: { notIn: ['COT', 'OT'] },
         },
       ],
     };
@@ -128,6 +140,106 @@ export class DashboardService {
     return Object.keys(whereFecha).length ? whereFecha : undefined;
   }
 
+  // Lima es siempre UTC-5 (sin DST). Extrae "YYYY-MM-DD" en hora Lima.
+  /**
+   * Utilidad bruta de las ventas del rango, en PEN: valor de venta (sin IGV)
+   * menos el costo promedio actual del producto por las unidades vendidas.
+   * Es el mismo criterio que la "ganancia" por producto de topProductos, así
+   * el KPI del dashboard y el ranking cuadran entre sí. Las líneas sin
+   * producto (servicios, ítems manuales) cuentan con costo 0.
+   *
+   * Distinto de financiero.ganancias (ingresos − compras − gastos), que es
+   * flujo de caja: si el negocio compró mercadería ese día, "ganancias" sale
+   * bajo o negativo aunque las ventas hayan dejado margen. Esto responde a
+   * "¿cuánto gané con lo que vendí hoy?".
+   */
+  private async utilidadBrutaPen(
+    comprobanteWhere: any,
+    criterio: CriterioIgvVentas,
+  ): Promise<{ venta: number; costo: number; utilidad: number }> {
+    const detalles = await this.prisma.detalleComprobante.findMany({
+      where: { comprobante: comprobanteWhere },
+      select: {
+        cantidad: true,
+        unidadesPorPaquete: true,
+        mtoValorVenta: true,
+        // Para decidir si a esta línea se le descuenta IGV hace falta el tipo
+        // de documento y el precio bruto; `mtoValorVenta` solo trae el neto.
+        mtoPrecioUnitario: true,
+        tipAfeIgv: true,
+        productoId: true,
+        producto: { select: { costoPromedio: true } },
+        comprobante: {
+          select: {
+            tipoMoneda: true,
+            tipoCambio: true,
+            sedeId: true,
+            tipoDoc: true,
+          },
+        },
+      },
+    });
+
+    // Cada venta se cuesta con lo que pagó LA SEDE que la hizo. Antes se usaba
+    // el costo global del producto, así que una compra cara en un local
+    // castigaba el margen de todos los demás.
+    //
+    // Se traen todos los costos de una vez —productos × sedes involucradas— en
+    // lugar de consultar línea por línea: un P&L del mes son miles de líneas.
+    const costoSedePorClave = new Map<string, unknown>();
+    const productoIds = [
+      ...new Set(detalles.map((d) => d.productoId).filter(Boolean)),
+    ] as number[];
+    const sedeIds = [
+      ...new Set(detalles.map((d) => d.comprobante.sedeId).filter(Boolean)),
+    ] as number[];
+    if (productoIds.length && sedeIds.length) {
+      const filas = await this.prisma.productoStock.findMany({
+        where: { productoId: { in: productoIds }, sedeId: { in: sedeIds } },
+        select: { productoId: true, sedeId: true, costoPromedio: true },
+      });
+      for (const f of filas) {
+        costoSedePorClave.set(`${f.productoId}:${f.sedeId}`, f.costoPromedio);
+      }
+    }
+
+    let venta = 0;
+    let costo = 0;
+    for (const d of detalles) {
+      // El IGV se descuenta según el criterio de la empresa, igual que en el
+      // P&L: con ELECTRONICOS una nota de venta cuenta íntegra, porque ese IGV
+      // nunca se declara y se queda en el negocio. Antes el dashboard restaba
+      // IGV a todo por igual y daba una utilidad distinta a la de Rentabilidad
+      // sobre las mismas ventas.
+      venta += montoEnPen(
+        ingresoLineaSinIgv(
+          String(d.comprobante.tipoDoc ?? ''),
+          {
+            cantidad: Number(d.cantidad ?? 0),
+            mtoPrecioUnitario: Number(d.mtoPrecioUnitario ?? 0),
+            mtoValorVenta: d.mtoValorVenta as any,
+            tipAfeIgv: d.tipAfeIgv as any,
+          },
+          criterio,
+        ),
+        d.comprobante.tipoMoneda,
+        d.comprobante.tipoCambio,
+      );
+      // Paquete vendido como UNA línea (Empresa.paquetesComoUnaLinea): el
+      // costo real son las unidades físicas = cantidad × unidadesPorPaquete,
+      // no la cantidad facturada (p.ej. 1 caja).
+      const uPaquete = Number(d.unidadesPorPaquete) || 1;
+      const costoUnitario = costoDeSede(
+        costoSedePorClave.get(`${d.productoId}:${d.comprobante.sedeId}`),
+        d.producto?.costoPromedio,
+      );
+      costo += costoUnitario * Number(d.cantidad ?? 0) * uPaquete;
+    }
+    venta = Number(venta.toFixed(2));
+    costo = Number(costo.toFixed(2));
+    return { venta, costo, utilidad: Number((venta - costo).toFixed(2)) };
+  }
+
   /**
    * Distribuye las ventas agrupadas por `medioPago` en los baldes del
    * gráfico "Ventas por Canal". Los comprobantes "MIXTO" (pagados con más
@@ -167,38 +279,69 @@ export class DashboardService {
       else sumOtros += t;
     }
     if (sumMixtoLump > 0) {
-      const pagosMixtos = await this.prisma.pago.findMany({
-        where: { comprobante: mixtoWhere },
+      const mixtos = await this.prisma.comprobante.findMany({
+        where: mixtoWhere,
         select: {
-          monto: true,
-          medioPago: true,
-          comprobante: { select: { tipoMoneda: true, tipoCambio: true } },
+          mtoImpVenta: true,
+          tipoMoneda: true,
+          tipoCambio: true,
+          pagos: { select: { monto: true, medioPago: true } },
+          // Una nota de venta ya cobrada que se convierte en boleta/factura
+          // deja sus filas de `Pago` en la nota: no se copian al formal a
+          // propósito, para no contar la plata dos veces en caja. El formal
+          // queda entonces sin pagos y su mezcla real vive en el origen, así
+          // que se lee de ahí en vez de mandar la venta entera a "Otros".
+          comprobanteOrigen: {
+            select: { pagos: { select: { monto: true, medioPago: true } } },
+          },
         },
       });
       let sumMixtoDistribuido = 0;
-      for (const p of pagosMixtos) {
-        const mp = (p.medioPago || '').toString().toUpperCase();
-        const monto = montoEnPen(
-          p.monto,
-          p.comprobante?.tipoMoneda,
-          p.comprobante?.tipoCambio,
+      for (const c of mixtos) {
+        const pagos = [
+          ...((c as any).pagos ?? []),
+          ...((c as any).comprobanteOrigen?.pagos ?? []),
+        ];
+        const total = montoEnPen(
+          (c as any).mtoImpVenta,
+          (c as any).tipoMoneda,
+          (c as any).tipoCambio,
         );
-        if (mp === 'TARJETA') sumTarjeta += monto;
-        else if (mp === 'TRANSFERENCIA') sumTransferencia += monto;
-        else if (mp === 'YAPE' || mp === 'PLIN') sumRedes += monto;
-        else if (mp === 'EFECTIVO') sumEfectivo += monto;
-        else sumOtros += monto;
-        sumMixtoDistribuido += monto;
+        const bruto = pagos.reduce(
+          (acc: number, p: any) =>
+            acc +
+            montoEnPen(p.monto, (c as any).tipoMoneda, (c as any).tipoCambio),
+          0,
+        );
+        // Si entre el formal y su origen quedaron pagos por más que la venta
+        // (dato duplicado), se reparte a prorrata: el gráfico nunca puede
+        // sumar más que las Ventas Totales de la cabecera.
+        const factor = bruto > total && bruto > 0 ? total / bruto : 1;
+        let repartido = 0;
+        for (const p of pagos) {
+          const mp = (p.medioPago || '').toString().toUpperCase();
+          const monto =
+            montoEnPen(p.monto, (c as any).tipoMoneda, (c as any).tipoCambio) *
+            factor;
+          if (mp === 'TARJETA') sumTarjeta += monto;
+          else if (mp === 'TRANSFERENCIA') sumTransferencia += monto;
+          else if (mp === 'YAPE' || mp === 'PLIN') sumRedes += monto;
+          else if (mp === 'EFECTIVO') sumEfectivo += monto;
+          else sumOtros += monto;
+          repartido += monto;
+        }
+        sumMixtoDistribuido += repartido;
       }
-      // Si algún comprobante MIXTO no tiene sus filas de Pago (dato viejo o
-      // incompleto), no perder ese monto: cae a "Otros" en vez de desaparecer.
+      // Lo que ni el formal ni su origen explican no se inventa ni se pierde:
+      // queda en "Otros". Cubre la venta a crédito a medio cobrar, la nota
+      // vieja marcada como pagada sin filas de Pago, y el comprobante que el
+      // groupBy contó pero esta consulta no trajo.
       const faltante = sumMixtoLump - sumMixtoDistribuido;
       if (faltante > 0.01) sumOtros += faltante;
     }
     return { sumTarjeta, sumTransferencia, sumRedes, sumEfectivo, sumOtros };
   }
 
-  // Lima es siempre UTC-5 (sin DST). Extrae "YYYY-MM-DD" en hora Lima.
   private toFechaLima(d: Date): string {
     return new Date(d.getTime() - 5 * 60 * 60 * 1000)
       .toISOString()
@@ -251,9 +394,10 @@ export class DashboardService {
             codigo: { notIn: ['DGD', 'IPM', 'PLD'] },
           },
         }),
-        // Los ingresos manuales son casi siempre de toda la empresa (sedeId
-        // null); con sede activa se incluyen los de esa sede + los de toda
-        // la empresa, en vez de descartarlos por completo.
+        // Mismo criterio que overview() más abajo: los ingresos manuales son
+        // casi siempre de toda la empresa (sedeId null); con sede activa se
+        // incluyen los de esa sede + los de toda la empresa, en vez de
+        // descartarlos por completo.
         this.prisma.ingresoManual.findMany({
           where: {
             empresaId,
@@ -402,44 +546,110 @@ export class DashboardService {
         estadoEnvioSunat: { not: 'ANULADO' as any },
         ...this.filtroExcluirConvertidos,
       },
-      select: { id: true },
+      select: { id: true, tipoDoc: true },
     });
     const compIds = comprobantes.map((c) => c.id);
     if (compIds.length === 0) return [];
+    const tipoDocPorComprobante = new Map(
+      comprobantes.map((c) => [c.id, String(c.tipoDoc ?? '')]),
+    );
+    const criterio = normalizarCriterio(
+      (
+        await this.prisma.empresa.findUnique({
+          where: { id: empresaId },
+          select: { criterioIgvVentas: true },
+        })
+      )?.criterioIgvVentas,
+    );
+
     // NOTA: el ranking y los importes (mtoValorVenta) se suman en moneda nativa
     // del detalle. Para comprobantes en USD (edge case) el monto no se convierte
     // a soles aquí porque la moneda vive en el comprobante padre, no en el
     // detalle. El ranking por unidades (cantidad) no se ve afectado.
-    const detalles = await this.prisma.detalleComprobante.groupBy({
-      by: ['productoId'],
+    //
+    // Se agrupa en memoria y no con groupBy porque descontar el IGV depende del
+    // TIPO DE DOCUMENTO de cada línea, y el groupBy por producto lo pierde. El
+    // conjunto ya viene acotado por los comprobantes del rango.
+    const lineas = await this.prisma.detalleComprobante.findMany({
       where: { comprobanteId: { in: compIds } },
-      _sum: { cantidad: true, mtoValorVenta: true },
-      orderBy: { _sum: { mtoValorVenta: 'desc' } },
-      take: limit,
-    });
-    if (detalles.length === 0) return [];
-    const productos = await this.prisma.producto.findMany({
-      where: {
-        id: {
-          in: detalles
-            .map((d) => d.productoId)
-            .filter((id): id is number => id !== null),
-        },
-      },
       select: {
-        id: true,
-        descripcion: true,
-        codigo: true,
-        stock: true,
-        costoPromedio: true,
-        precioUnitario: true,
+        productoId: true,
+        comprobanteId: true,
+        cantidad: true,
+        mtoValorVenta: true,
+        mtoPrecioUnitario: true,
+        tipAfeIgv: true,
       },
     });
+    const acumulado = new Map<
+      number | null,
+      { cantidad: number; total: number }
+    >();
+    for (const l of lineas) {
+      const previo = acumulado.get(l.productoId) ?? { cantidad: 0, total: 0 };
+      previo.cantidad += Number(l.cantidad ?? 0);
+      previo.total += ingresoLineaSinIgv(
+        tipoDocPorComprobante.get(l.comprobanteId) ?? '',
+        {
+          cantidad: Number(l.cantidad ?? 0),
+          mtoPrecioUnitario: Number(l.mtoPrecioUnitario ?? 0),
+          mtoValorVenta: l.mtoValorVenta as any,
+          tipAfeIgv: l.tipAfeIgv as any,
+        },
+        criterio,
+      );
+      acumulado.set(l.productoId, previo);
+    }
+    const detalles = [...acumulado.entries()]
+      .map(([productoId, v]) => ({
+        productoId,
+        _sum: { cantidad: v.cantidad, mtoValorVenta: v.total },
+      }))
+      .sort((a, b) => b._sum.mtoValorVenta - a._sum.mtoValorVenta)
+      .slice(0, limit);
+    if (detalles.length === 0) return [];
+    const productoIds = detalles
+      .map((d) => d.productoId)
+      .filter((id): id is number => id !== null);
+    const [productos, lineasPaquete] = await Promise.all([
+      this.prisma.producto.findMany({
+        where: { id: { in: productoIds } },
+        select: {
+          id: true,
+          descripcion: true,
+          codigo: true,
+          stock: true,
+          costoPromedio: true,
+          precioUnitario: true,
+        },
+      }),
+      // Paquete vendido como UNA línea (Empresa.paquetesComoUnaLinea): el
+      // _sum.cantidad del groupBy de arriba son "paquetes" (p.ej. 1 caja), no
+      // unidades reales. Se recalculan aparte —solo para los productos del
+      // ranking— multiplicando por unidadesPorPaquete cuando aplica.
+      this.prisma.detalleComprobante.findMany({
+        where: { comprobanteId: { in: compIds }, productoId: { in: productoIds } },
+        select: { productoId: true, cantidad: true, unidadesPorPaquete: true },
+      }),
+    ]);
+    const unidadesRealesPorProducto = new Map<number, number>();
+    for (const d of lineasPaquete) {
+      if (d.productoId == null) continue;
+      const u = Number(d.unidadesPorPaquete) || 1;
+      unidadesRealesPorProducto.set(
+        d.productoId,
+        (unidadesRealesPorProducto.get(d.productoId) ?? 0) +
+          Number(d.cantidad ?? 0) * u,
+      );
+    }
     const mapProd = new Map(productos.map((p) => [p.id, p] as const));
     return detalles.map((d) => {
       const prod = d.productoId ? mapProd.get(d.productoId) || null : null;
       const stock = prod ? (prod as any).stock : 0;
-      const cantidad = Number(d._sum.cantidad ?? 0);
+      const cantidad =
+        d.productoId != null
+          ? (unidadesRealesPorProducto.get(d.productoId) ?? 0)
+          : Number(d._sum.cantidad ?? 0);
       const total = Number(d._sum.mtoValorVenta ?? 0);
       // Rentabilidad por producto: valor de venta (sin IGV) menos el costo
       // promedio por las unidades vendidas en el periodo.
@@ -519,21 +729,40 @@ export class DashboardService {
       .map((d) => d.productoId)
       .filter((id): id is number => id !== null);
 
-    const productos = await this.prisma.producto.findMany({
-      where: {
-        id: { in: productoIds },
-        ...(categoriaId ? { categoriaId } : {}),
-      },
-      select: {
-        id: true,
-        descripcion: true,
-        codigo: true,
-        stock: true,
-        categoriaId: true,
-        categoria: { select: { id: true, nombre: true } },
-      },
-    });
+    const [productos, lineasPaquete] = await Promise.all([
+      this.prisma.producto.findMany({
+        where: {
+          id: { in: productoIds },
+          ...(categoriaId ? { categoriaId } : {}),
+        },
+        select: {
+          id: true,
+          descripcion: true,
+          codigo: true,
+          stock: true,
+          categoriaId: true,
+          categoria: { select: { id: true, nombre: true } },
+        },
+      }),
+      // Paquete vendido como UNA línea (Empresa.paquetesComoUnaLinea): el
+      // _sum.cantidad de arriba son "paquetes" (p.ej. 1 caja), no unidades
+      // reales. Se recalculan aparte multiplicando por unidadesPorPaquete.
+      this.prisma.detalleComprobante.findMany({
+        where: { comprobanteId: { in: compIds }, productoId: { in: productoIds } },
+        select: { productoId: true, cantidad: true, unidadesPorPaquete: true },
+      }),
+    ]);
     const mapProd = new Map(productos.map((p) => [p.id, p] as const));
+    const unidadesRealesPorProducto = new Map<number, number>();
+    for (const d of lineasPaquete) {
+      if (d.productoId == null) continue;
+      const u = Number(d.unidadesPorPaquete) || 1;
+      unidadesRealesPorProducto.set(
+        d.productoId,
+        (unidadesRealesPorProducto.get(d.productoId) ?? 0) +
+          Number(d.cantidad ?? 0) * u,
+      );
+    }
 
     // Agrupar por categoría
     const SIN_CATEGORIA_ID = 0;
@@ -549,7 +778,7 @@ export class DashboardService {
       const catId = prod.categoriaId ?? SIN_CATEGORIA_ID;
       const catNombre = prod.categoria?.nombre ?? 'Sin categoría';
       const total = Number(d._sum.mtoValorVenta ?? 0);
-      const cantidad = Number(d._sum.cantidad ?? 0);
+      const cantidad = unidadesRealesPorProducto.get(d.productoId) ?? 0;
       const grupo =
         grupos.get(catId) ||
         {
@@ -673,8 +902,9 @@ export class DashboardService {
         empresaId,
       ),
       // Los ingresos manuales son casi siempre de toda la empresa (sedeId
-      // null); con sede activa se incluyen los de esa sede + los de toda la
-      // empresa, en vez de descartarlos por completo.
+      // null); antes, si había una sede activa, se descartaban por completo
+      // en vez de filtrarse por ella. Igual que compraSedeFilter arriba:
+      // con sede activa se incluyen los de esa sede + los de toda la empresa.
       this.prisma.ingresoManual.findMany({
         where: {
           empresaId,
@@ -735,6 +965,46 @@ export class DashboardService {
       pedidosPrev === 0
         ? 100
         : ((pedidosCurr - pedidosPrev) / pedidosPrev) * 100;
+
+    // Utilidad bruta de las ventas (KPI "Utilidad" del dashboard).
+    // Un solo lugar del que sale el criterio, para que el KPI y el ranking de
+    // productos no puedan quedar con criterios distintos.
+    const criterioIgv = normalizarCriterio(
+      (
+        await this.prisma.empresa.findUnique({
+          where: { id: empresaId },
+          select: { criterioIgvVentas: true },
+        })
+      )?.criterioIgvVentas,
+    );
+    const [utilidadCurr, utilidadPrev] = await Promise.all([
+      this.utilidadBrutaPen(
+        {
+          ...baseComprobanteWhere,
+          fechaEmision: currentRange,
+          tipoDoc: { notIn: ['07'] },
+        },
+        criterioIgv,
+      ),
+      this.utilidadBrutaPen(
+        {
+          ...baseComprobanteWhere,
+          fechaEmision: prevRange,
+          tipoDoc: { notIn: ['07'] },
+        },
+        criterioIgv,
+      ),
+    ]);
+    const utilidadTrend =
+      utilidadPrev.utilidad === 0
+        ? 100
+        : ((utilidadCurr.utilidad - utilidadPrev.utilidad) /
+            Math.abs(utilidadPrev.utilidad)) *
+          100;
+    const utilidadMargen =
+      utilidadCurr.venta > 0
+        ? (utilidadCurr.utilidad / utilidadCurr.venta) * 100
+        : 0;
 
     const clientesNuevosCurrRows = await this.clientesNuevos(
       empresaId,
@@ -803,7 +1073,13 @@ export class DashboardService {
 
     const ventasCanalRows = await this.prisma.comprobante.groupBy({
       by: ['medioPago', 'tipoMoneda', 'tipoCambio'],
-      where: { ...baseComprobanteWhere, fechaEmision: currentRange },
+      // Excluir notas de crédito (07): su mtoImpVenta está guardado en positivo y
+      // antes inflaba los importes por canal en vez de representar ventas reales.
+      where: {
+        ...baseComprobanteWhere,
+        tipoDoc: { not: '07' },
+        fechaEmision: currentRange,
+      },
       _sum: { mtoImpVenta: true },
     });
 
@@ -847,12 +1123,18 @@ export class DashboardService {
             },
           ].filter((x) => x.value > 0);
 
-    const recientes = await this.prisma.comprobante.findMany({
+    // Se traen algunos de más para poder saltar las NC de anulación (su
+    // boleta ya no aparece porque está ANULADA; mostrar además un "reembolso"
+    // negativo confundía) y quedarse con 4.
+    const recientesRaw = await this.prisma.comprobante.findMany({
       where: baseComprobanteWhere,
       orderBy: { fechaEmision: 'desc' },
-      take: 4,
+      take: 8,
       include: { cliente: { select: { nombre: true } } },
     });
+    const recientes = (
+      await excluirNotasCreditoDeAnulacion(this.prisma, empresaId, recientesRaw)
+    ).slice(0, 4);
     const actividad = recientes.map((r: any) => {
       const montoPen = montoEnPen(r.mtoImpVenta, r.tipoMoneda, r.tipoCambio);
       return {
@@ -869,7 +1151,7 @@ export class DashboardService {
       empresaId,
       fechaInicio,
       fechaFin,
-      4,
+      5,
       sedeId,
     );
 
@@ -1135,6 +1417,14 @@ export class DashboardService {
         pedidos: { value: pedidosCurr, trend: pedidosTrend },
         clientes: { value: clientesNuevosCurr, trend: clientesTrend },
         conversion: { value: conversionCurr, trend: conversionTrend },
+        // Utilidad bruta del periodo: venta neta (sin IGV) − costo de lo vendido.
+        utilidad: {
+          value: utilidadCurr.utilidad,
+          trend: utilidadTrend,
+          ventaNeta: utilidadCurr.venta,
+          costo: utilidadCurr.costo,
+          margen: utilidadMargen,
+        },
       },
       chartVentas,
       chartCanales,

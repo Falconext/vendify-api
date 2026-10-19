@@ -21,6 +21,8 @@ describe('actualizarStockYCosto: stock de sede y global', () => {
           return Promise.resolve({});
         }),
         aggregate: jest.fn().mockResolvedValue({ _sum: { stock: 0 } }),
+        // alinearCostoGlobal (costo por sede, de main) lee las filas de sedes.
+        findMany: jest.fn().mockResolvedValue([]),
       },
       producto: {
         findUnique: jest.fn().mockResolvedValue({ costoPromedio: 0, productoPadreId: null }),

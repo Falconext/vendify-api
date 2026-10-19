@@ -377,110 +377,6 @@ export class ContabilidadController {
     return res.end(buffer, 'binary');
   }
 
-  @Get('obtener-arqueo')
-  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
-  async obtenerArqueo(
-    @User() user: any,
-    @Query('fechaInicio') fechaInicio?: string,
-    @Query('fechaFin') fechaFin?: string,
-    @Query('sedeId') sedeId?: string,
-  ) {
-    if (!fechaInicio || !fechaFin)
-      throw new BadRequestException('fechaInicio y fechaFin son requeridos');
-    const data = await this.arqueoService.obtenerArqueoCaja(
-      user.empresaId,
-      fechaInicio,
-      fechaFin,
-      sedeId ? Number(sedeId) : undefined,
-    );
-    return data;
-  }
-
-  @Get('arqueo-exportar')
-  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
-  async exportarArqueo(
-    @User() user: any,
-    @Query('fechaInicio') fechaInicio: string,
-    @Query('fechaFin') fechaFin: string,
-    @Res() res: Response,
-    @Query('sedeId') sedeId?: string,
-  ) {
-    if (!fechaInicio || !fechaFin)
-      throw new BadRequestException('fechaInicio y fechaFin son requeridos');
-    const { resumen, movimientosCaja, ingresosPorMedioPago } =
-      await this.arqueoService.obtenerArqueoCaja(
-        user.empresaId,
-        fechaInicio,
-        fechaFin,
-        sedeId ? Number(sedeId) : undefined,
-      );
-
-    // Preparar datos para Excel siguiendo formato del proyecto Node original
-    const datosExcel = movimientosCaja.map((mov) => ({
-      TIPO: mov.tipo,
-      DOCUMENTO: mov.documento,
-      CLIENTE: mov.cliente,
-      FECHA: new Date(mov.fecha).toISOString().split('T')[0],
-      CONCEPTO: mov.concepto,
-      'MEDIO PAGO': mov.medioPago,
-      MONTO: Number(mov.monto),
-      REFERENCIA: mov.referencia || '-',
-    }));
-
-    // Crear hoja de cálculo
-    const worksheet = XLSX.utils.json_to_sheet(datosExcel);
-
-    // Ajustar anchos de columnas
-    worksheet['!cols'] = [
-      { wch: 12 }, // TIPO
-      { wch: 20 }, // DOCUMENTO
-      { wch: 30 }, // CLIENTE
-      { wch: 15 }, // FECHA
-      { wch: 25 }, // CONCEPTO
-      { wch: 15 }, // MEDIO PAGO
-      { wch: 12 }, // MONTO
-      { wch: 20 }, // REFERENCIA
-    ];
-
-    // Agregar filas vacías de separación
-    XLSX.utils.sheet_add_aoa(worksheet, [[''], ['']], { origin: -1 });
-
-    // Agregar resumen de arqueo
-    const resumenData = [
-      ['RESUMEN ARQUEO DE CAJA', ''],
-      ['TOTAL EFECTIVO', resumen.detalleEfectivo],
-      ['TOTAL YAPE', resumen.detalleYape],
-      ['TOTAL PLIN', resumen.detallePlin],
-      ['TOTAL TRANSFERENCIA', resumen.detalleTransferencia],
-      ['TOTAL TARJETA', resumen.detalleTarjeta],
-      ['TOTAL DIGITAL', resumen.totalDigital],
-      ['TOTAL INGRESOS:', resumen.totalIngresos],
-    ];
-
-    XLSX.utils.sheet_add_aoa(
-      worksheet,
-      resumenData.map(([label, value]) =>
-        Array(6).fill('').concat([label, value]),
-      ),
-      { origin: -1 },
-    );
-
-    // Crear y devolver el archivo
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Arqueo de Caja');
-    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
-
-    // Generar archivo Excel
-    const fileName = `arqueo-caja-${fechaInicio}_a_${fechaFin}.xlsx`;
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.setHeader('Content-Length', buffer.length.toString());
-    return res.end(buffer, 'binary');
-  }
-
   // ──────────────── COMPRAS ────────────────
 
   @Get('obtener-reporte-compras')
@@ -682,6 +578,110 @@ export class ContabilidadController {
     const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
 
     const fileName = `reporte-gastos-${fechaInicio}_a_${fechaFin}.xlsx`;
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Length', buffer.length.toString());
+    return res.end(buffer, 'binary');
+  }
+
+  @Get('obtener-arqueo')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  async obtenerArqueo(
+    @User() user: any,
+    @Query('fechaInicio') fechaInicio?: string,
+    @Query('fechaFin') fechaFin?: string,
+    @Query('sedeId') sedeId?: string,
+  ) {
+    if (!fechaInicio || !fechaFin)
+      throw new BadRequestException('fechaInicio y fechaFin son requeridos');
+    const data = await this.arqueoService.obtenerArqueoCaja(
+      user.empresaId,
+      fechaInicio,
+      fechaFin,
+      sedeId ? Number(sedeId) : undefined,
+    );
+    return data;
+  }
+
+  @Get('arqueo-exportar')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  async exportarArqueo(
+    @User() user: any,
+    @Query('fechaInicio') fechaInicio: string,
+    @Query('fechaFin') fechaFin: string,
+    @Res() res: Response,
+    @Query('sedeId') sedeId?: string,
+  ) {
+    if (!fechaInicio || !fechaFin)
+      throw new BadRequestException('fechaInicio y fechaFin son requeridos');
+    const { resumen, movimientosCaja, ingresosPorMedioPago } =
+      await this.arqueoService.obtenerArqueoCaja(
+        user.empresaId,
+        fechaInicio,
+        fechaFin,
+        sedeId ? Number(sedeId) : undefined,
+      );
+
+    // Preparar datos para Excel siguiendo formato del proyecto Node original
+    const datosExcel = movimientosCaja.map((mov) => ({
+      TIPO: mov.tipo,
+      DOCUMENTO: mov.documento,
+      CLIENTE: mov.cliente,
+      FECHA: new Date(mov.fecha).toISOString().split('T')[0],
+      CONCEPTO: mov.concepto,
+      'MEDIO PAGO': mov.medioPago,
+      MONTO: Number(mov.monto),
+      REFERENCIA: mov.referencia || '-',
+    }));
+
+    // Crear hoja de cálculo
+    const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+
+    // Ajustar anchos de columnas
+    worksheet['!cols'] = [
+      { wch: 12 }, // TIPO
+      { wch: 20 }, // DOCUMENTO
+      { wch: 30 }, // CLIENTE
+      { wch: 15 }, // FECHA
+      { wch: 25 }, // CONCEPTO
+      { wch: 15 }, // MEDIO PAGO
+      { wch: 12 }, // MONTO
+      { wch: 20 }, // REFERENCIA
+    ];
+
+    // Agregar filas vacías de separación
+    XLSX.utils.sheet_add_aoa(worksheet, [[''], ['']], { origin: -1 });
+
+    // Agregar resumen de arqueo
+    const resumenData = [
+      ['RESUMEN ARQUEO DE CAJA', ''],
+      ['TOTAL EFECTIVO', resumen.detalleEfectivo],
+      ['TOTAL YAPE', resumen.detalleYape],
+      ['TOTAL PLIN', resumen.detallePlin],
+      ['TOTAL TRANSFERENCIA', resumen.detalleTransferencia],
+      ['TOTAL TARJETA', resumen.detalleTarjeta],
+      ['TOTAL DIGITAL', resumen.totalDigital],
+      ['TOTAL INGRESOS:', resumen.totalIngresos],
+    ];
+
+    XLSX.utils.sheet_add_aoa(
+      worksheet,
+      resumenData.map(([label, value]) =>
+        Array(6).fill('').concat([label, value]),
+      ),
+      { origin: -1 },
+    );
+
+    // Crear y devolver el archivo
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Arqueo de Caja');
+    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+
+    // Generar archivo Excel
+    const fileName = `arqueo-caja-${fechaInicio}_a_${fechaFin}.xlsx`;
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -913,7 +913,6 @@ export class ContabilidadController {
     @Res() res: Response,
     @Query('mes') mes: string,
     @Query('anio') anio: string,
-    @Query('simple') simple?: string,
     @Query('empresarial') empresarial?: string,
   ) {
     const { mes: m, anio: a } = this.parseSireParams(mes, anio);
@@ -921,17 +920,21 @@ export class ContabilidadController {
       user.empresaId,
       m,
       a,
-      simple === 'true',
       empresarial === 'true',
       user.sedeId,
     );
-    const periodo = `${a}${String(m).padStart(2, '0')}`;
+    // SUNAT valida el NOMBRE del archivo, no solo su contenido (tabla 6 del
+    // anexo 1): debe ser LE+RUC+periodo+libro+oportunidad+indicadores.
+    const nombre = await this.sireService.nombreArchivoTxtSire(
+      user.empresaId,
+      'ventas',
+      m,
+      a,
+      buffer.length > 0,
+    );
     // El buffer viaja en ISO-8859-1 (ver sire.service.ts): SUNAT rechaza UTF-8.
     res.setHeader('Content-Type', 'text/plain; charset=iso-8859-1');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="SIRE_RVIE_${periodo}.txt"`,
-    );
+    res.setHeader('Content-Disposition', `attachment; filename="${nombre}"`);
     res.setHeader('Content-Length', buffer.length.toString());
     return res.end(buffer);
   }
@@ -943,7 +946,6 @@ export class ContabilidadController {
     @Res() res: Response,
     @Query('mes') mes: string,
     @Query('anio') anio: string,
-    @Query('simple') simple?: string,
     @Query('empresarial') empresarial?: string,
   ) {
     const { mes: m, anio: a } = this.parseSireParams(mes, anio);
@@ -951,7 +953,6 @@ export class ContabilidadController {
       user.empresaId,
       m,
       a,
-      simple === 'true',
       empresarial === 'true',
       user.sedeId,
     );
@@ -976,19 +977,17 @@ export class ContabilidadController {
     body: {
       mes: number;
       anio: number;
-      simple?: boolean;
       empresarial?: boolean;
       destinatario: string;
     },
   ) {
-    const { mes, anio, simple, empresarial, destinatario } = body;
+    const { mes, anio, empresarial, destinatario } = body;
     if (!destinatario)
       throw new BadRequestException('destinatario es requerido');
     await this.sireService.enviarPorCorreo({
       tipo: 'ventas',
       mes,
       anio,
-      simple: simple ?? false,
       empresarial: empresarial ?? false,
       empresaId: user.empresaId,
       destinatario,
@@ -1004,23 +1003,24 @@ export class ContabilidadController {
     @Res() res: Response,
     @Query('mes') mes: string,
     @Query('anio') anio: string,
-    @Query('simple') simple?: string,
   ) {
     const { mes: m, anio: a } = this.parseSireParams(mes, anio);
     const buffer = await this.sireService.generarTxtCompras(
       user.empresaId,
       m,
       a,
-      simple === 'true',
       user.sedeId,
     );
-    const periodo = `${a}${String(m).padStart(2, '0')}`;
+    const nombre = await this.sireService.nombreArchivoTxtSire(
+      user.empresaId,
+      'compras',
+      m,
+      a,
+      buffer.length > 0,
+    );
     // El buffer viaja en ISO-8859-1 (ver sire.service.ts): SUNAT rechaza UTF-8.
     res.setHeader('Content-Type', 'text/plain; charset=iso-8859-1');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="SIRE_RCE_${periodo}.txt"`,
-    );
+    res.setHeader('Content-Disposition', `attachment; filename="${nombre}"`);
     res.setHeader('Content-Length', buffer.length.toString());
     return res.end(buffer);
   }
@@ -1032,14 +1032,12 @@ export class ContabilidadController {
     @Res() res: Response,
     @Query('mes') mes: string,
     @Query('anio') anio: string,
-    @Query('simple') simple?: string,
   ) {
     const { mes: m, anio: a } = this.parseSireParams(mes, anio);
     const buffer = await this.sireService.generarExcelCompras(
       user.empresaId,
       m,
       a,
-      simple === 'true',
       user.sedeId,
     );
     const periodo = `${a}${String(m).padStart(2, '0')}`;
@@ -1060,16 +1058,15 @@ export class ContabilidadController {
   async sireComprasCorreo(
     @User() user: any,
     @Body()
-    body: { mes: number; anio: number; simple?: boolean; destinatario: string },
+    body: { mes: number; anio: number; destinatario: string },
   ) {
-    const { mes, anio, simple, destinatario } = body;
+    const { mes, anio, destinatario } = body;
     if (!destinatario)
       throw new BadRequestException('destinatario es requerido');
     await this.sireService.enviarPorCorreo({
       tipo: 'compras',
       mes,
       anio,
-      simple: simple ?? false,
       empresaId: user.empresaId,
       destinatario,
       sedeId: user.sedeId,

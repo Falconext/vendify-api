@@ -239,6 +239,11 @@ export class UpdateProductoDto {
   @IsString()
   descripcionLarga?: string | null;
 
+  /** URL del video del producto (TikTok, YouTube, Instagram, Facebook o mp4). */
+  @IsOptional()
+  @IsString()
+  videoUrl?: string | null;
+
   @IsOptional()
   atributosTecnicos?: Record<string, any> | null;
 
