@@ -186,6 +186,20 @@ export class ComprasService {
     return gravado;
   }
 
+  /**
+   * Si una línea lleva IGV. `item.gravado` (false) manda sobre la afectación
+   * del producto: lo pone la recepción de una orden emitida SIN IGV y el editor
+   * de compras al reabrirla. Sin eso, editar esa compra le volvía a sumar el
+   * 18% (OWENSOFT: S/300 pactados pasaban a S/354).
+   */
+  private gravadoDeLinea(
+    item: { productoId?: number | null; gravado?: boolean },
+    gravadoPorProducto: Map<number, boolean>,
+  ): boolean {
+    if (typeof item.gravado === 'boolean') return item.gravado;
+    return gravadoPorProducto.get(Number(item.productoId)) ?? true;
+  }
+
   private esAfectacionGravada(tipoAfectacionIGV?: string | null): boolean {
     const cod = String(tipoAfectacionIGV ?? '10').trim();
     return cod === '' || cod.startsWith('1');
@@ -383,8 +397,7 @@ export class ComprasService {
     for (const item of data.detalles) {
       // costoNeto = precio sin IGV, usado para actualizar costoPromedio en kardex
       // Si incluyeIgv=true el precio ingresado ya trae el IGV embebido → extraerlo
-      const gravado =
-        gravadoPorProducto.get(Number(item.productoId)) ?? true;
+      const gravado = this.gravadoDeLinea(item, gravadoPorProducto);
       const { costoNeto, sub, totalLinea } = this.montosLinea(item, gravado);
 
       subtotal += sub;
@@ -529,7 +542,7 @@ export class ComprasService {
           const costoNetoKardex = this.costoEnSoles(
             this.montosLinea(
               item,
-              gravadoPorProducto.get(Number(item.productoId)) ?? true,
+              this.gravadoDeLinea(item, gravadoPorProducto),
             ).costoNeto,
             factorSoles,
           );
@@ -1046,7 +1059,7 @@ export class ComprasService {
         0,
       );
       throw new BadRequestException(
-        `La compra tiene ${pagosVigentes.length} abono(s) por ${simbolo} ${totalPagos.toFixed(2)}. Anula primero los abonos desde el historial de pagos y luego anula la compra.`,
+        `La compra tiene ${pagosVigentes.length} abono(s) por ${simbolo} ${totalPagos.toFixed(2)}. Anula primero esos abonos desde el botón Historial de esta compra (en Compras) y luego anula la compra.`,
       );
     }
 
@@ -1224,8 +1237,7 @@ export class ComprasService {
       data.detalles,
     );
     for (const item of data.detalles) {
-      const gravado =
-        gravadoPorProducto.get(Number(item.productoId)) ?? true;
+      const gravado = this.gravadoDeLinea(item, gravadoPorProducto);
       const { costoNeto, sub, totalLinea } = this.montosLinea(item, gravado);
       subtotal += sub;
       totalLineas += totalLinea;
@@ -1352,7 +1364,7 @@ export class ComprasService {
         const costoNetoKardex = this.costoEnSoles(
           this.montosLinea(
             item,
-            gravadoPorProducto.get(Number(item.productoId)) ?? true,
+            this.gravadoDeLinea(item, gravadoPorProducto),
           ).costoNeto,
           factorSoles,
         );
