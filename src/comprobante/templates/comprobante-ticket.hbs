@@ -121,6 +121,7 @@
       <span class="c-cant">{{this.cantidad}}</span>
       <span class="c-desc">
         <span class="desc-multi">{{this.descripcion}}</span>{{#if this.gratis}}<span class="gratis" style="font-size:{{tpx ../tpx 'productos' 13}}px">[GRATIS]</span>{{/if}}
+        {{#each this.detalleLineas}}<span class="sub" style="font-size:{{tpx ../../tpx 'productos' 13}}px">{{this}}</span>{{/each}}
         {{#each this.lotes}}<span class="sub" style="font-size:{{tpx ../../tpx 'productos' 12}}px">Lote: {{this.lote}} Venc: {{this.fechaVencimiento}}</span>{{/each}}
       </span>
       <span class="c-pu">{{this.precioUnitario}}</span>

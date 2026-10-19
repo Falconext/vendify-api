@@ -1,6 +1,10 @@
 import { num, round3 } from '../common/utils/stock';
 import { lineasPagoMixto } from '../common/utils/pago-mixto';
 import {
+  lineasDetalleAdicional,
+  normalizarDetalleAdicional,
+} from './detalle-adicional';
+import {
   SunatValidezClient,
   SunatValidezResult,
 } from '../common/utils/sunat-validez.client';
@@ -472,6 +476,7 @@ export class ComprobanteService {
                 },
                 unidad: true,
                 descripcion: true,
+                detalleAdicional: true,
                 cantidad: true,
                 mtoValorUnitario: true,
                 mtoValorVenta: true,
@@ -828,6 +833,7 @@ export class ComprobanteService {
             },
             unidad: true,
             descripcion: true,
+            detalleAdicional: true,
             cantidad: true,
             mtoValorUnitario: true,
             mtoValorVenta: true,
@@ -2159,6 +2165,11 @@ export class ComprobanteService {
           productoId: null,
           unidad: unidadLibre || 'ZZ',
           descripcion: String(item.descripcion).trim(),
+          // Detalle multilínea bajo el título (cotización de servicios). Solo PDF;
+          // el XML de SUNAT usa `descripcion` (ver detalle-adicional.ts).
+          ...(normalizarDetalleAdicional(item.detalleAdicional)
+            ? { detalleAdicional: normalizarDetalleAdicional(item.detalleAdicional) }
+            : {}),
           cantidad,
           ...(numerosSerieLibre.length > 0
             ? { numerosSerie: numerosSerieLibre }
@@ -2278,6 +2289,9 @@ export class ComprobanteService {
         // Fraccionamiento: usar unidadVenta del ítem si viene (ej. TABLETA vs CAJA)
         unidad: item.unidadVenta || (prod as any).unidadMedida.codigo,
         descripcion,
+        ...(normalizarDetalleAdicional(item.detalleAdicional)
+          ? { detalleAdicional: normalizarDetalleAdicional(item.detalleAdicional) }
+          : {}),
         cantidad,
         mtoPrecioUnitario: esGratProd
           ? this.round2(valorUnitario)
@@ -5246,6 +5260,8 @@ export class ComprobanteService {
                 productoId: d.productoId,
                 unidad: d.unidad,
                 descripcion: d.descripcion,
+                // Sin esto, editar la cotización borraba el detalle multilínea.
+                detalleAdicional: d.detalleAdicional ?? null,
                 cantidad: d.cantidad,
                 mtoValorUnitario: d.mtoValorUnitario,
                 mtoValorVenta: d.mtoValorVenta,
@@ -6288,6 +6304,7 @@ export class ComprobanteService {
       (acc: number, d: any) => acc + Number(d.mtoDescuento || 0),
       0,
     );
+    const isDocumentoFiscalPdf = ['01', '03', '07', '08'].includes(full.tipoDoc);
     const productos = full.detalles.map((d: any, i: number) => {
       const cantidad = Number(d.cantidad || 0);
       const descLinea = Number(d.mtoDescuento || 0);
@@ -6301,6 +6318,10 @@ export class ComprobanteService {
         cantidad: formatCantidad(d.cantidad),
         unidadMedida: (d.unidad || 'NIU').toUpperCase(),
         descripcion: (d.descripcion || '').toUpperCase(),
+        // Detalle multilínea bajo el título, en letra normal. En factura/boleta/
+        // notas NO se imprime: el XML a SUNAT solo lleva `descripcion` y la
+        // representación impresa no debe decir más que el XML sobre el ítem.
+        detalleLineas: isDocumentoFiscalPdf ? [] : lineasDetalleAdicional(d.detalleAdicional),
         precioUnitario: precioLista.toFixed(2),
         total: Number((d.mtoPrecioUnitario || 0) * d.cantidad).toFixed(2),
         imagenUrl: buildLogoDataUrl(d.producto?.imagenUrl || d.imagenUrl),

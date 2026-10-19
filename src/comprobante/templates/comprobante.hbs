@@ -370,6 +370,7 @@
       <div class="c-um">{{this.unidadMedida}}</div>
       <div class="c-desc">
         <span class="desc-text">{{this.descripcion}}</span>
+        {{#each this.detalleLineas}}<div class="desc-detalle" style="text-transform: none; font-weight: normal;">{{this}}</div>{{/each}}
         {{#if this.lotes}}
         {{#each this.lotes}}
         <div class="lote-info">Lote: {{this.lote}} Venc: {{this.fechaVencimiento}}</div>
