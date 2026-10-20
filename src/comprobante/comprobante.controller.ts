@@ -309,6 +309,7 @@ export class ComprobanteController {
       tipoDoc: query.tipoDoc,
       estado: query.estado,
       estadoPago: query.estadoPago,
+      ids: query.ids,
       formato,
     });
 
@@ -387,6 +388,7 @@ export class ComprobanteController {
       tipoDoc: query.tipoDoc,
       estado: query.estado,
       estadoPago: query.estadoPago,
+      ids: query.ids,
       // Columnas visibles elegidas por el usuario en la tabla (CSV de keys). Si no
       // llega, se exportan las columnas por defecto.
       columnas: query.columnas,
@@ -545,6 +547,13 @@ export class ComprobanteController {
   ) {
     verificarPuedeAnularComprobante(user);
     return this.service.anularComprobante(comprobanteId, input?.motivo);
+  }
+
+  // Notas de venta → elegir varias del mismo cliente → Cobrar.
+  @Post('cobrar-varias')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  async cobrarVarias(@Body() input: any, @User() user: any) {
+    return this.service.cobrarVarias(user.empresaId, user.id, input);
   }
 
   @Patch(':comprobanteId/completar-pago')
