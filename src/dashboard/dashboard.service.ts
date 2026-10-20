@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { NOTA_CONVERTIDA, NOTA_SIN_CONVERTIR } from '../comprobante/convertidos';
 import { EstadoSunat, EstadoPago } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductoService } from '../producto/producto.service';
@@ -42,7 +43,7 @@ export class DashboardService {
         {
           NOT: {
             tipoDoc: { in: this.TIPOS_INFORMALES },
-            comprobantesDerivados: { some: {} },
+            ...NOTA_CONVERTIDA,
           },
         },
         {
@@ -294,6 +295,10 @@ export class DashboardService {
           comprobanteOrigen: {
             select: { pagos: { select: { monto: true, medioPago: true } } },
           },
+          // Facturada junto con otras notas: sus cobros también viven en ellas.
+          origenesExtra: {
+            select: { origen: { select: { pagos: { select: { monto: true, medioPago: true } } } } },
+          },
         },
       });
       let sumMixtoDistribuido = 0;
@@ -301,6 +306,7 @@ export class DashboardService {
         const pagos = [
           ...((c as any).pagos ?? []),
           ...((c as any).comprobanteOrigen?.pagos ?? []),
+          ...((c as any).origenesExtra ?? []).flatMap((o: any) => o.origen?.pagos ?? []),
         ];
         const total = montoEnPen(
           (c as any).mtoImpVenta,
@@ -1240,6 +1246,10 @@ export class DashboardService {
           tipoDoc: { notIn: ['NP', 'COT', '07'] },
           estadoEnvioSunat: { not: EstadoSunat.ANULADO },
           saldo: { gt: 0 },
+          // Ya convertido: la deuda viva es la del documento que salió de él.
+          // Mismo criterio que `cuentasPorCobrar`; si los dos no coinciden, el
+          // total del tablero no cuadra con la lista que se abre al tocarlo.
+          ...NOTA_SIN_CONVERTIR,
         },
       }),
       this.prisma.pedidoTienda.count({

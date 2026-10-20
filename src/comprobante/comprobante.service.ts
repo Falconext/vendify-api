@@ -10,6 +10,7 @@ import {
   lineasDetalleAdicional,
   normalizarDetalleAdicional,
 } from './detalle-adicional';
+import { NOTA_SIN_CONVERTIR } from './convertidos';
 import { repartirPago } from './cobro-varias';
 import {
   SunatValidezClient,
@@ -629,6 +630,16 @@ export class ComprobanteService {
             );
           }
         }
+        // Notas facturadas junto con otras (ComprobanteOrigenExtra).
+        const extras = await this.prisma.comprobanteOrigenExtra.findMany({
+          where: { origenId: { in: informalIds } },
+          select: { origenId: true, formal: { select: { serie: true, correlativo: true } } },
+        });
+        for (const x of extras) {
+          if (!convertidoMap.has(x.origenId)) {
+            convertidoMap.set(x.origenId, `${x.formal.serie}-${String(x.formal.correlativo).padStart(8, '0')}`);
+          }
+        }
       }
 
       // Anulaciones aún no confirmadas por SUNAT.
@@ -819,6 +830,12 @@ export class ComprobanteService {
       tipoDoc: { notIn: ['NP', 'COT', '07'] },
       estadoEnvioSunat: { not: EstadoSunat.ANULADO },
       saldo: { gt: 0 },
+      // Ya convertido: la deuda viva es la del documento que salió de él, no la
+      // suya. Una Orden de Trabajo con adelanto queda en PAGO_PARCIAL para
+      // siempre —su saldo se cobra al emitir la nota, no en la orden—, así que
+      // sin esto el cliente aparecía debiendo dos veces lo mismo: una en la OT
+      // y otra en la nota. Vale para cualquier conversión, no solo la de OT.
+      ...NOTA_SIN_CONVERTIR,
       ...(search
         ? {
             OR: [
@@ -1177,7 +1194,19 @@ export class ComprobanteService {
         where: { comprobanteId: id, estado: 'PAGADO' },
       })) > 0;
 
-    return { ...comp, detalles: detallesConLotes, comisionLiquidada };
+    // Si esta nota ya fue convertida a un comprobante formal, exponer cuál (para
+    // que la app avise al usuario y bloquee la edición proactivamente).
+    const derivadoConv = await this.formalQueContieneNota(id);
+    const convertidoA = derivadoConv
+      ? `${derivadoConv.serie}-${String(derivadoConv.correlativo).padStart(8, '0')}`
+      : null;
+
+    return {
+      ...comp,
+      detalles: detallesConLotes,
+      comisionLiquidada,
+      convertidoA,
+    };
   }
 
   async anularComprobante(comprobanteId: number, motivo?: string) {
@@ -1255,6 +1284,97 @@ export class ComprobanteService {
         ...(isInformal ? { estadoPago: 'ANULADO' as any, saldo: 0 } : {}),
       },
     });
+  }
+
+  /**
+   * Reglas para facturar varias notas en una sola boleta/factura (además de las
+   * de una conversión simple, que ya pasó la nota principal). Devuelve lo ya
+   * cobrado en las notas extra y si alguna ya generó comisión.
+   */
+  private async validarNotasParaFacturarJuntas(
+    empresaId: number,
+    principalId: number,
+    extraIds: number[],
+    principalYaDescontoStock: boolean,
+  ): Promise<{ cobrado: number; generoComision: boolean }> {
+    const TIPOS = ['NV', 'NP', 'TICKET'];
+    const notas = await this.prisma.comprobante.findMany({
+      where: { id: { in: [principalId, ...extraIds] }, empresaId },
+      select: {
+        id: true, tipoDoc: true, serie: true, correlativo: true, clienteId: true,
+        tipoMoneda: true, estadoEnvioSunat: true, estadoPago: true, mtoImpVenta: true,
+      },
+    });
+    const doc = (n: { serie: string; correlativo: number }) => `${n.serie}-${n.correlativo}`;
+    if (notas.length !== extraIds.length + 1) {
+      throw new BadRequestException('Alguna de las notas no existe o no pertenece a esta empresa');
+    }
+    const principal = notas.find((n) => n.id === principalId)!;
+    for (const n of notas) {
+      if (!TIPOS.includes(n.tipoDoc)) {
+        throw new BadRequestException(`${doc(n)}: solo se facturan juntas notas de venta, de pedido o tickets`);
+      }
+      if (n.estadoEnvioSunat === 'ANULADO') {
+        throw new BadRequestException(`${doc(n)} está anulada y no puede facturarse.`);
+      }
+      if (n.clienteId !== principal.clienteId) {
+        throw new BadRequestException('Las notas son de clientes distintos: una boleta o factura es para un solo cliente.');
+      }
+      if (String(n.tipoMoneda || 'PEN').toUpperCase() !== String(principal.tipoMoneda || 'PEN').toUpperCase()) {
+        throw new BadRequestException('Hay notas en soles y en dólares: factúralas por separado.');
+      }
+    }
+    let cobrado = 0;
+    let generoComision = false;
+    for (const n of notas.filter((x) => x.id !== principalId)) {
+      const ya = await this.formalQueContieneNota(n.id);
+      if (ya) {
+        throw new BadRequestException(
+          `${doc(n)} ya fue convertida a ${ya.serie}-${String(ya.correlativo).padStart(8, '0')}. ` +
+            'Emitir otro comprobante duplicaría la venta.',
+        );
+      }
+      const salidas = await this.prisma.movimientoKardex.count({
+        where: { comprobanteId: n.id, tipoMovimiento: 'SALIDA' },
+      });
+      if (salidas > 0 !== principalYaDescontoStock) {
+        throw new BadRequestException(
+          'Hay notas que ya descontaron stock y notas de pedido que no: factúralas por separado.',
+        );
+      }
+      const pagos = await this.prisma.pago.aggregate({
+        where: { comprobanteId: n.id },
+        _sum: { monto: true },
+      });
+      // Mismo criterio que la nota principal: las antiguas COMPLETADO sin filas de Pago.
+      cobrado += Math.max(
+        this.round2(Number(pagos._sum.monto || 0)),
+        n.estadoPago === 'COMPLETADO' ? this.round2(Number(n.mtoImpVenta || 0)) : 0,
+      );
+      if (!generoComision) {
+        generoComision = (await this.prisma.comisionVendedor.count({ where: { comprobanteId: n.id } })) > 0;
+      }
+    }
+    return { cobrado: this.round2(cobrado), generoComision };
+  }
+
+  /**
+   * El formal (boleta/factura) en que terminó una nota: el que la apunta en
+   * `comprobanteOrigenId`, o el que la facturó junto con otras.
+   */
+  private async formalQueContieneNota(
+    notaId: number,
+  ): Promise<{ serie: string; correlativo: number } | null> {
+    const directo = await this.prisma.comprobante.findFirst({
+      where: { comprobanteOrigenId: notaId },
+      select: { serie: true, correlativo: true },
+    });
+    if (directo) return directo;
+    const extra = await this.prisma.comprobanteOrigenExtra.findUnique({
+      where: { origenId: notaId },
+      select: { formal: { select: { serie: true, correlativo: true } } },
+    });
+    return extra?.formal ?? null;
   }
 
   /**
@@ -3303,6 +3423,7 @@ export class ComprobanteService {
       retencionMonto,
       retencionPorcentaje,
       comprobanteOrigenId,
+      comprobanteOrigenIds,
       paymentDetails,
       splitPayments,
       fechaVencimientoCredito,
@@ -3369,10 +3490,8 @@ export class ComprobanteService {
       // Ya convertido: emitir un segundo formal duplicaría la venta en SUNAT, en
       // los reportes y en las comisiones. `editarNotaVenta` ya bloqueaba por lo
       // mismo; la conversión no lo hacía.
-      const yaConvertido = await this.prisma.comprobante.findFirst({
-        where: { comprobanteOrigenId: Number(comprobanteOrigenId) },
-        select: { serie: true, correlativo: true },
-      });
+      // También si se facturó junto con otras notas en otro formal.
+      const yaConvertido = await this.formalQueContieneNota(Number(comprobanteOrigenId));
       if (yaConvertido) {
         throw new BadRequestException(
           `${origen.serie}-${origen.correlativo} ya fue convertido a ` +
@@ -3400,6 +3519,28 @@ export class ComprobanteService {
           ? this.round2(Number(origen.mtoImpVenta || 0))
           : 0,
       );
+    }
+
+    // Varias notas facturadas juntas. La primera ya se validó arriba como
+    // cualquier conversión; las demás pasan las mismas reglas y además tienen
+    // que ser del mismo cliente y moneda, y estar en el mismo estado de stock
+    // (todas descontaron o ninguna): así stock, caja y comisiones se resuelven
+    // con los mismos flags de una conversión simple.
+    const origenesExtraIds: number[] = esConversionDesdeInformal
+      ? [...new Set<number>(((comprobanteOrigenIds as unknown[]) ?? []).map(Number))].filter(
+          (n) => Number.isInteger(n) && n > 0 && n !== Number(comprobanteOrigenId),
+        )
+      : [];
+    let extraYaGeneroComision = false;
+    if (origenesExtraIds.length > 0) {
+      const extra = await this.validarNotasParaFacturarJuntas(
+        empresaId,
+        Number(comprobanteOrigenId),
+        origenesExtraIds,
+        origenYaDescontoStock,
+      );
+      montoYaCobradoEnOrigen = this.round2(montoYaCobradoEnOrigen + extra.cobrado);
+      extraYaGeneroComision = extra.generoComision;
     }
 
     // Map retencion fields to detraccion fields if present
@@ -3774,6 +3915,12 @@ export class ComprobanteService {
       });
     }
 
+    if (origenesExtraIds.length > 0) {
+      await this.prisma.comprobanteOrigenExtra.createMany({
+        data: origenesExtraIds.map((origenId) => ({ origenId, formalId: comprobante.id })),
+      });
+    }
+
     // Registrar movimientos de kardex SOLO si el origen aún no descontó stock.
     // Emisión directa o conversión de una NP que no descontó ⇒ se descuenta aquí.
     // Conversión de un informal que ya descontó (NV/TICKET/NP con descuento) ⇒ no.
@@ -3802,6 +3949,7 @@ export class ComprobanteService {
     let origenYaGeneroComision = false;
     if (esConversionDesdeInformal && comprobanteOrigenId != null) {
       origenYaGeneroComision =
+        extraYaGeneroComision ||
         (await this.prisma.comisionVendedor.count({
           where: { comprobanteId: Number(comprobanteOrigenId) },
         })) > 0;
@@ -5988,10 +6136,7 @@ export class ComprobanteService {
       );
 
     // No editar si ya fue convertida a un comprobante formal (boleta/factura).
-    const derivado = await this.prisma.comprobante.findFirst({
-      where: { comprobanteOrigenId: comprobanteId },
-      select: { serie: true, correlativo: true },
-    });
+    const derivado = await this.formalQueContieneNota(comprobanteId);
     if (derivado)
       throw new BadRequestException(
         `No se puede editar: esta nota de venta ya fue convertida a ${derivado.serie}-${String(
