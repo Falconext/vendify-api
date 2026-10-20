@@ -1366,6 +1366,8 @@ export class EmpresaService {
         updateData.leyAmazonia = Boolean(dto.leyAmazonia);
       if (dto.requiereCajaParaEmitir !== undefined)
         updateData.requiereCajaParaEmitir = dto.requiereCajaParaEmitir;
+      if (dto.cajaPrellenarMontosCierre !== undefined)
+        updateData.cajaPrellenarMontosCierre = dto.cajaPrellenarMontosCierre;
       // Catálogo por sede (Perfil → Configuración → Sedes y catálogo).
       if (dto.catalogoPorSede !== undefined)
         updateData.catalogoPorSede = dto.catalogoPorSede;
