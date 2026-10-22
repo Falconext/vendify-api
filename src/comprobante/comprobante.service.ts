@@ -1,3 +1,4 @@
+import { ventanaTurnoAbierto } from '../caja/turno-abierto';
 import { num, round3 } from '../common/utils/stock';
 import { lineasPagoMixto } from '../common/utils/pago-mixto';
 import {
@@ -3114,7 +3115,7 @@ export class ComprobanteService {
 
   /**
    * Caja obligatoria (empresa.requiereCajaParaEmitir): quien emite —
-   * incluido el admin — debe tener SU caja abierta hoy en su sede. Aplica a
+   * incluido el admin — debe tener SU caja abierta en su sede. Aplica a
    * todo comprobante EXCEPTO cotizaciones (COT, que no mueven stock ni caja)
    * y flujos sin usuario (tienda online / importaciones automáticas).
    * Misma semántica que CajaService.verificarCajaAbierta (query directa para
@@ -3134,18 +3135,13 @@ export class ComprobanteService {
     });
     if (!empresa?.requiereCajaParaEmitir) return;
 
-    const today = (fechaRef ?? new Date()).toLocaleDateString('en-CA', {
-      timeZone: 'America/Lima',
-    });
+    // El turno sigue abierto pasada la medianoche (ver caja/turno-abierto.ts).
     const ultimoMovimiento = await this.prisma.movimientoCaja.findFirst({
       where: {
         usuarioId,
         empresaId,
         ...(sedeId ? { sedeId } : {}),
-        fecha: {
-          gte: new Date(`${today}T00:00:00.000-05:00`),
-          lte: new Date(`${today}T23:59:59.999-05:00`),
-        },
+        fecha: ventanaTurnoAbierto(fechaRef),
         estado: 'ACTIVO',
         tipoMovimiento: { in: ['APERTURA', 'CIERRE'] },
       },
