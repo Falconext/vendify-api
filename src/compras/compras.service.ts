@@ -14,6 +14,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { parseFechaSoloDia } from '../common/utils/fecha';
 import { GeminiService } from '../gemini/gemini.service';
 import { S3Service } from '../s3/s3.service';
+import { COMPRA_OCUPA_NUMERO } from './numero-ocupado';
 
 @Injectable()
 export class ComprasService {
@@ -319,7 +320,12 @@ export class ComprasService {
     usuarioRol?: string,
   ) {
     const duplicado = await this.prisma.compra.findFirst({
-      where: { empresaId, serie: data.serie, numero: data.numero },
+      where: {
+        empresaId,
+        serie: data.serie,
+        numero: data.numero,
+        ...COMPRA_OCUPA_NUMERO,
+      },
       select: { id: true },
     });
     if (duplicado) {
@@ -1151,6 +1157,7 @@ export class ComprasService {
         serie: data.serie,
         numero: data.numero,
         id: { not: id },
+        ...COMPRA_OCUPA_NUMERO,
       },
       select: { id: true },
     });
