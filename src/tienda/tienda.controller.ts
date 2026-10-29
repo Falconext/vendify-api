@@ -16,6 +16,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { imageUploadOptions } from '../common/utils/multer.config';
 import { TiendaService } from './tienda.service';
+import { PedidoNotaVentaService } from './pedido-nota-venta.service';
 import { ConfigurarTiendaDto } from './dto/configurar-tienda.dto';
 import { ActualizarEstadoPedidoDto } from './dto/actualizar-pedido.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -25,7 +26,10 @@ import { Roles } from '../common/decorators/roles.decorator';
 @Controller('tienda')
 @UseGuards(JwtAuthGuard)
 export class TiendaController {
-  constructor(private readonly tiendaService: TiendaService) {}
+  constructor(
+    private readonly tiendaService: TiendaService,
+    private readonly pedidoNotaVenta: PedidoNotaVentaService,
+  ) {}
 
   // ==================== CONFIGURACIÓN ====================
 
@@ -136,6 +140,25 @@ export class TiendaController {
       +id,
       comprobanteId,
       req.user.id,
+    );
+  }
+
+  /**
+   * "Generar ya" desde Pedidos: la nota de venta del pedido con su despacho,
+   * sin pasar por el punto de venta. `adelanto` es lo que el cliente ya pagó.
+   */
+  @Post('pedidos/:id/nota-venta')
+  async generarNotaVenta(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { adelanto?: number; medioPago?: string },
+  ) {
+    return this.pedidoNotaVenta.generar(
+      req.user.empresaId,
+      +id,
+      { adelanto: Number(body?.adelanto ?? 0), medioPago: body?.medioPago },
+      req.user.id,
+      req.user.sedeId ?? undefined,
     );
   }
 
