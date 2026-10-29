@@ -259,6 +259,8 @@ export class VentasService {
           ...pedidoUsuarioFilter,
           estado: { not: 'CANCELADO' },
           saldoPendiente: { gt: 0 },
+          // Ya pasado a comprobante: la deuda viva es la de ese documento.
+          comprobanteId: null,
         },
         select: {
           id: true,
@@ -441,6 +443,8 @@ export class VentasService {
           ...sedeFilter,
           ...pedidoUsuarioFilter,
           creadoEn: { gte: inicioLima, lte: finLima },
+          // Ya pasado a comprobante: la venta es ese documento, no el pedido.
+          comprobanteId: null,
         },
         orderBy: { creadoEn: 'desc' },
         select: {
