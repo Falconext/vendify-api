@@ -7,6 +7,9 @@ import {
   IsInt,
   Min,
   IsNumber,
+  MaxLength,
+  IsArray,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -109,6 +112,12 @@ export class ConfigurarTiendaDto {
   @IsOptional()
   @IsBoolean()
   aceptaEnvio?: boolean;
+
+  /** Agencias que ofrece la tienda: SHALOM y/o OLVA. Vacío = solo domicilio. */
+  @IsOptional()
+  @IsArray()
+  @IsIn(['SHALOM', 'OLVA'], { each: true })
+  couriersTienda?: string[];
 
   /**
    * Aceptar pedidos de productos agotados. El negocio que trabaja por encargo

@@ -8,6 +8,8 @@ import { S3Module } from 'src/s3/s3.module';
 import { ModificadoresModule } from '../modificadores/modificadores.module';
 import { WhatsAppModule } from '../whatsapp/whatsapp.module';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
+import { ShalomModule } from '../shalom/shalom.module';
+import { OlvaModule } from '../olva/olva.module';
 import { RolesGuard } from '../common/guards/roles.guard';
 
 @Module({
@@ -18,6 +20,9 @@ import { RolesGuard } from '../common/guards/roles.guard';
     ModificadoresModule,
     WhatsAppModule,
     NotificacionesModule,
+    // Agencias de Shalom y Olva para el checkout (envio-agencia.ts).
+    ShalomModule,
+    OlvaModule,
   ],
   controllers: [TiendaController, TiendaPublicController],
   providers: [TiendaService, RolesGuard],

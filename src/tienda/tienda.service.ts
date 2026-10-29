@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   InternalServerErrorException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import axios from 'axios';
 import { EstadoProductoReview, Prisma } from '@prisma/client';
@@ -15,6 +16,15 @@ import { CrearPedidoDto } from './dto/crear-pedido.dto';
 import { ActualizarEstadoPedidoDto } from './dto/actualizar-pedido.dto';
 import { DisenoRubroService } from '../diseno-rubro/diseno-rubro.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
+import { ShalomService } from '../shalom/shalom.service';
+import { OlvaService } from '../olva/olva.service';
+import {
+  agenciasOlva,
+  agenciasShalom,
+  couriersValidos,
+  envioAgenciaDelPedido,
+  esCourierTienda,
+} from './envio-agencia';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import {
   esRubroComputo,
@@ -167,6 +177,10 @@ export class TiendaService {
     private readonly disenoService: DisenoRubroService,
     private readonly whatsapp: WhatsAppService,
     private readonly notificaciones: NotificacionesService,
+    // Opcionales: solo para listar agencias en la tienda; los tests que arman
+    // el servicio a mano no los necesitan.
+    @Optional() private readonly shalom?: ShalomService,
+    @Optional() private readonly olva?: OlvaService,
   ) {}
 
   private parseImagenesExtra(value: unknown): string[] {
@@ -404,6 +418,7 @@ export class TiendaService {
         aceptaEnvio: true,
         direccionRecojo: true,
         tiempoPreparacionMin: true,
+        couriersTienda: true,
         // Información Bancaria
         bancoNombre: true,
         numeroCuenta: true,
@@ -441,6 +456,7 @@ export class TiendaService {
         aceptaEnvio: true,
         direccionRecojo: true,
         tiempoPreparacionMin: true,
+        couriersTienda: true,
         // Información Bancaria
         bancoNombre: true,
         numeroCuenta: true,
@@ -903,6 +919,7 @@ export class TiendaService {
           tiendaVentaSinStock: true,
           direccionRecojo: true,
           tiempoPreparacionMin: true,
+          couriersTienda: true,
           direccion: true,
           distrito: true,
           provincia: true,
@@ -2250,6 +2267,7 @@ export class TiendaService {
         aceptaEnvio: true,
         direccionRecojo: true,
         tiempoPreparacionMin: true,
+        couriersTienda: true,
         direccion: true,
       },
     });
@@ -2259,6 +2277,100 @@ export class TiendaService {
     }
 
     return empresa;
+  }
+
+  /**
+   * Agencias de un courier para el checkout. Solo de los couriers que la
+   * tienda encendió: si no, la tienda ofrecería un envío que el negocio no
+   * hace.
+   */
+  async agenciasParaTienda(slug: string, courier: string) {
+    const empresa = await this.prisma.empresa.findUnique({
+      where: { slugTienda: slug },
+      select: { couriersTienda: true, aceptaEnvio: true },
+    });
+    if (!empresa) throw new NotFoundException('Tienda no encontrada');
+    const c = String(courier ?? '').toUpperCase();
+    if (!empresa.aceptaEnvio || !esCourierTienda(c) || !couriersValidos(empresa.couriersTienda).includes(c)) {
+      throw new BadRequestException('Esta tienda no envía por esa agencia.');
+    }
+    if (c === 'SHALOM') {
+      const r = await this.shalom?.getAgencias();
+      return agenciasShalom(r?.data ?? []);
+    }
+    const r = await this.olva?.getAgencias();
+    return agenciasOlva(r?.data ?? []);
+  }
+
+  /**
+   * El pedido quedó convertido en un comprobante (nota de venta, boleta o
+   * factura) desde el punto de venta. Sin este vínculo el pedido seguía
+   * "por documentar" y se podía cobrar dos veces; con él, el estado del
+   * despacho de ese comprobante se refleja en el pedido.
+   */
+  async vincularComprobante(empresaId: number, pedidoId: number, comprobanteId: number, usuarioId?: number) {
+    const [pedido, comprobante] = await Promise.all([
+      this.prisma.pedidoTienda.findFirst({
+        where: { id: pedidoId, empresaId },
+        select: { id: true, estado: true, comprobanteId: true, total: true, montoPagado: true },
+      }),
+      this.prisma.comprobante.findFirst({
+        where: { id: comprobanteId, empresaId },
+        select: { id: true, serie: true, correlativo: true, mtoImpVenta: true, saldo: true },
+      }),
+    ]);
+    if (!pedido) throw new NotFoundException('Pedido no encontrado');
+    if (!comprobante) throw new NotFoundException('Comprobante no encontrado');
+    if (pedido.comprobanteId && pedido.comprobanteId !== comprobanteId) {
+      throw new BadRequestException('Este pedido ya tiene un comprobante.');
+    }
+    // Un comprobante sale de un solo pedido: vincularlo a otro haría que dos
+    // pedidos figuren cobrados con la misma venta.
+    const otro = await this.prisma.pedidoTienda.findFirst({
+      where: { empresaId, comprobanteId, NOT: { id: pedidoId } },
+      select: { codigoSeguimiento: true },
+    });
+    if (otro) {
+      throw new BadRequestException(
+        `Ese comprobante ya es del pedido ${otro.codigoSeguimiento}.`,
+      );
+    }
+    const confirmar = pedido.estado === 'PENDIENTE';
+    // Lo cobrado en el comprobante cuenta como pagado en el pedido: si la nota
+    // se emitió al contado, el pedido no puede seguir "Por pagar". Nunca baja
+    // lo que ya figuraba pagado (un adelanto por la tienda, por ejemplo).
+    const total = Number(pedido.total);
+    const cobradoEnComprobante = Math.max(
+      Number(comprobante.mtoImpVenta ?? 0) - Number(comprobante.saldo ?? 0),
+      0,
+    );
+    const montoPagado = Math.min(
+      Math.max(Number(pedido.montoPagado ?? 0), cobradoEnComprobante),
+      total,
+    );
+    const [actualizado] = await this.prisma.$transaction([
+      this.prisma.pedidoTienda.update({
+        where: { id: pedidoId },
+        data: {
+          comprobanteId,
+          montoPagado,
+          saldoPendiente: Math.max(total - montoPagado, 0),
+          ...(confirmar
+            ? { estado: 'CONFIRMADO', fechaConfirmacion: new Date(), usuarioConfirma: usuarioId ?? null }
+            : {}),
+        },
+      }),
+      this.prisma.historialEstadoPedido.create({
+        data: {
+          pedidoId,
+          estadoAnterior: pedido.estado,
+          estadoNuevo: confirmar ? 'CONFIRMADO' : pedido.estado,
+          usuarioId: usuarioId ?? null,
+          notas: `Comprobante ${comprobante.serie}-${comprobante.correlativo}`,
+        },
+      }),
+    ]);
+    return actualizado;
   }
 
   // ==================== PEDIDOS ====================
@@ -2275,6 +2387,7 @@ export class TiendaService {
         // Si el negocio trabaja por encargo, el pedido entra aunque no haya
         // stock. Sin este campo el guard de abajo lo rechaza por su cuenta.
         tiendaVentaSinStock: true,
+        couriersTienda: true,
       },
     });
 
@@ -2289,6 +2402,16 @@ export class TiendaService {
     }
     if (tipoEntrega === 'ENVIO' && !empresa.aceptaEnvio) {
       throw new BadRequestException('Esta tienda no acepta pedidos con envío');
+    }
+
+    // Recoge en una agencia de Shalom u Olva: la agencia es su dirección de
+    // entrega, y su DNI es lo que la agencia le pide (ver envio-agencia.ts).
+    const envioAgencia = envioAgenciaDelPedido(
+      { ...dto, tipoEntrega },
+      couriersValidos(empresa.couriersTienda),
+    );
+    if (envioAgencia && !dto.clienteDireccion?.trim()) {
+      dto.clienteDireccion = envioAgencia.agenciaEnvio;
     }
 
     if (tipoEntrega === 'ENVIO' && !dto.clienteDireccion) {
@@ -2511,7 +2634,15 @@ export class TiendaService {
         saldoPendiente,
         estadoEntrega: 'PENDIENTE',
         estadoEnvio: estadoEnvioInicial,
-        agenciaEnvio: agenciaEnvioInicial,
+        agenciaEnvio: envioAgencia?.agenciaEnvio ?? agenciaEnvioInicial,
+        ...(envioAgencia
+          ? {
+              envioCourier: envioAgencia.envioCourier,
+              envioAgenciaId: envioAgencia.envioAgenciaId,
+              envioAgenciaNombre: envioAgencia.envioAgenciaNombre,
+              clienteDocumento: envioAgencia.clienteDocumento,
+            }
+          : {}),
         vendedorNombre: 'Tienda online',
         observaciones: dto.observaciones,
         referenciaTransf: referenciaTarjeta || dto.referenciaTransf,
@@ -3189,6 +3320,7 @@ export class TiendaService {
         aceptaEnvio: true,
         direccionRecojo: true,
         tiempoPreparacionMin: true,
+        couriersTienda: true,
       },
     });
 
@@ -3211,6 +3343,7 @@ export class TiendaService {
         aceptaEnvio: true,
         direccionRecojo: true,
         tiempoPreparacionMin: true,
+        couriersTienda: true,
       },
     });
   }
