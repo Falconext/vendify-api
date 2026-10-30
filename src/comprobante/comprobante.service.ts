@@ -488,8 +488,12 @@ export class ComprobanteService {
             },
             detalles: {
               select: {
+                // Sin la afectación de la línea el POS convertía con la de la
+                // empresa: con Ley de Amazonía lo gravado salía exonerado, y
+                // sin ella lo exonerado salía con IGV (FRUTA PURA, 30-10).
+                tipAfeIgv: true,
                 producto: {
-                  select: { id: true, descripcion: true, imagenUrl: true },
+                  select: { id: true, descripcion: true, imagenUrl: true, tipoAfectacionIGV: true },
                 },
                 unidad: true,
                 descripcion: true,
@@ -845,8 +849,9 @@ export class ComprobanteService {
         },
         detalles: {
           select: {
+            tipAfeIgv: true,
             producto: {
-              select: { id: true, descripcion: true, imagenUrl: true },
+              select: { id: true, descripcion: true, imagenUrl: true, tipoAfectacionIGV: true },
             },
             unidad: true,
             descripcion: true,
