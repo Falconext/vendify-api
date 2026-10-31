@@ -1,4 +1,5 @@
 import { ventanaTurnoAbierto } from '../caja/turno-abierto';
+import { resolverDespachoAgrupado, selectDespachoAgrupado } from '../envio-despacho/despacho-agrupado';
 import { num, round3 } from '../common/utils/stock';
 import { lineasPagoMixto } from '../common/utils/pago-mixto';
 import {
@@ -10,6 +11,9 @@ import {
   lineasDetalleAdicional,
   normalizarDetalleAdicional,
 } from './detalle-adicional';
+import { NOTA_SIN_CONVERTIR } from './convertidos';
+import { repartirPago } from './cobro-varias';
+import { excesosSobreSaldo, lineasPorConvertir, totalDeLineas } from './saldo-por-convertir';
 import {
   SunatValidezClient,
   SunatValidezResult,
@@ -78,6 +82,20 @@ import {
   totalesVentasPorProducto,
 } from './ventas-por-producto';
 import { debeRevisarDobleSubmit } from '../integraciones/idempotencia/anti-doble-submit';
+
+const CAMPOS_DESPACHO_LISTA = {
+  id: true,
+  comprobanteId: true,
+  estado: true,
+  transportista: true,
+  tipoEnvio: true,
+  agenciaDestino: true,
+  direccionDestino: true,
+  celularDest: true,
+  nroPaquetes: true,
+  turnoEnvio: true,
+  creadoEn: true,
+} as const;
 
 @Injectable()
 export class ComprobanteService {
@@ -516,21 +534,9 @@ export class ComprobanteService {
             tipoOperacion: { select: { codigo: true, descripcion: true } },
             usuario: { select: { id: true, nombre: true } },
             sede: { select: { id: true, nombre: true, direccion: true } },
-            envioDespacho: {
-              select: {
-                id: true,
-                comprobanteId: true,
-                estado: true,
-                transportista: true,
-                tipoEnvio: true,
-                agenciaDestino: true,
-                direccionDestino: true,
-                celularDest: true,
-                nroPaquetes: true,
-                turnoEnvio: true,
-                creadoEn: true,
-              },
-            },
+            envioDespacho: { select: CAMPOS_DESPACHO_LISTA },
+            // Va en el envío de otra nota (un solo paquete): ver despacho-agrupado.ts.
+            despachoAgrupado: selectDespachoAgrupado(CAMPOS_DESPACHO_LISTA),
             // Notas ya pedidas al proveedor (Notas de venta → Orden de compra).
             ordenesCompra: {
               where: { ordenCompra: { estado: { not: 'ANULADA' } } },
@@ -612,12 +618,27 @@ export class ComprobanteService {
         )
         .map((it) => it.id);
       const convertidoMap = new Map<number, string>();
+      // Formales de cada nota, para saber si quedó algo sin convertir.
+      const derivadosPorNota = new Map<number, { mtoImpVenta: number; detalles: any[] }[]>();
+      const consolidadas = new Set<number>();
       if (informalIds.length > 0) {
         const derivados = await this.prisma.comprobante.findMany({
           where: { comprobanteOrigenId: { in: informalIds } },
-          select: { comprobanteOrigenId: true, serie: true, correlativo: true },
+          orderBy: { id: 'asc' },
+          select: {
+            comprobanteOrigenId: true,
+            serie: true,
+            correlativo: true,
+            mtoImpVenta: true,
+            detalles: { select: { productoId: true, descripcion: true, cantidad: true } },
+          },
         });
         for (const d of derivados) {
+          if (d.comprobanteOrigenId != null) {
+            const lista = derivadosPorNota.get(d.comprobanteOrigenId) ?? [];
+            lista.push({ mtoImpVenta: Number(d.mtoImpVenta || 0), detalles: d.detalles });
+            derivadosPorNota.set(d.comprobanteOrigenId, lista);
+          }
           if (
             d.comprobanteOrigenId != null &&
             !convertidoMap.has(d.comprobanteOrigenId)
@@ -626,6 +647,17 @@ export class ComprobanteService {
               d.comprobanteOrigenId,
               `${d.serie}-${String(d.correlativo).padStart(8, '0')}`,
             );
+          }
+        }
+        // Notas facturadas junto con otras (ComprobanteOrigenExtra).
+        const extras = await this.prisma.comprobanteOrigenExtra.findMany({
+          where: { origenId: { in: informalIds } },
+          select: { origenId: true, formal: { select: { serie: true, correlativo: true } } },
+        });
+        for (const x of extras) {
+          consolidadas.add(x.origenId);
+          if (!convertidoMap.has(x.origenId)) {
+            convertidoMap.set(x.origenId, `${x.formal.serie}-${String(x.formal.correlativo).padStart(8, '0')}`);
           }
         }
       }
@@ -724,11 +756,36 @@ export class ComprobanteService {
               };
             }),
           );
+          resolverDespachoAgrupado(it as any);
+          // Convertida solo en parte: lo que falta, para ofrecer "Convertir
+          // saldo" (ver saldo-por-convertir.ts). Misma regla que valida la
+          // conversión.
+          let porConvertir: { detalles: any[]; total: number; yaCobrado: number } | null = null;
+          const formales = derivadosPorNota.get(it.id);
+          if (formales?.length && !consolidadas.has(it.id)) {
+            const pendientes = lineasPorConvertir(detalles, formales.flatMap((f) => f.detalles));
+            if (pendientes.length > 0) {
+              const cobrado = Math.max(
+                0,
+                Number(it.mtoImpVenta || 0) - Number((it as any).saldo || 0),
+              );
+              const yaEmitido = formales.reduce((a, f) => a + f.mtoImpVenta, 0);
+              const total = totalDeLineas(pendientes);
+              // Nota cobrada entera: el saldo también (mismo criterio que la conversión).
+              const notaPagada = Number((it as any).saldo || 0) <= 0.01;
+              porConvertir = {
+                detalles: pendientes,
+                total,
+                yaCobrado: notaPagada ? total : this.round2(Math.max(0, cobrado - yaEmitido)),
+              };
+            }
+          }
           return {
             ...it,
             detalles,
             comprobante,
             convertidoA: convertidoMap.get(it.id) ?? null,
+            porConvertir,
             anulacionEnTramite: anulacionEnTramite.has(it.id),
             anulacionEstado: anulacionNoConfirmada.has(it.id)
               ? 'NO_CONFIRMADA'
@@ -818,6 +875,12 @@ export class ComprobanteService {
       tipoDoc: { notIn: ['NP', 'COT', '07'] },
       estadoEnvioSunat: { not: EstadoSunat.ANULADO },
       saldo: { gt: 0 },
+      // Ya convertido: la deuda viva es la del documento que salió de él, no la
+      // suya. Una Orden de Trabajo con adelanto queda en PAGO_PARCIAL para
+      // siempre —su saldo se cobra al emitir la nota, no en la orden—, así que
+      // sin esto el cliente aparecía debiendo dos veces lo mismo: una en la OT
+      // y otra en la nota. Vale para cualquier conversión, no solo la de OT.
+      ...NOTA_SIN_CONVERTIR,
       ...(search
         ? {
             OR: [
@@ -1176,7 +1239,19 @@ export class ComprobanteService {
         where: { comprobanteId: id, estado: 'PAGADO' },
       })) > 0;
 
-    return { ...comp, detalles: detallesConLotes, comisionLiquidada };
+    // Si esta nota ya fue convertida a un comprobante formal, exponer cuál (para
+    // que la app avise al usuario y bloquee la edición proactivamente).
+    const derivadoConv = await this.formalQueContieneNota(id);
+    const convertidoA = derivadoConv
+      ? `${derivadoConv.serie}-${String(derivadoConv.correlativo).padStart(8, '0')}`
+      : null;
+
+    return {
+      ...comp,
+      detalles: detallesConLotes,
+      comisionLiquidada,
+      convertidoA,
+    };
   }
 
   async anularComprobante(comprobanteId: number, motivo?: string) {
@@ -1254,6 +1329,232 @@ export class ComprobanteService {
         ...(isInformal ? { estadoPago: 'ANULADO' as any, saldo: 0 } : {}),
       },
     });
+  }
+
+  /**
+   * Reglas para facturar varias notas en una sola boleta/factura (además de las
+   * de una conversión simple, que ya pasó la nota principal). Devuelve lo ya
+   * cobrado en las notas extra y si alguna ya generó comisión.
+   */
+  private async validarNotasParaFacturarJuntas(
+    empresaId: number,
+    principalId: number,
+    extraIds: number[],
+    principalYaDescontoStock: boolean,
+  ): Promise<{ cobrado: number; generoComision: boolean }> {
+    const TIPOS = ['NV', 'NP', 'TICKET'];
+    const notas = await this.prisma.comprobante.findMany({
+      where: { id: { in: [principalId, ...extraIds] }, empresaId },
+      select: {
+        id: true, tipoDoc: true, serie: true, correlativo: true, clienteId: true,
+        tipoMoneda: true, estadoEnvioSunat: true, estadoPago: true, mtoImpVenta: true,
+      },
+    });
+    const doc = (n: { serie: string; correlativo: number }) => `${n.serie}-${n.correlativo}`;
+    if (notas.length !== extraIds.length + 1) {
+      throw new BadRequestException('Alguna de las notas no existe o no pertenece a esta empresa');
+    }
+    const principal = notas.find((n) => n.id === principalId)!;
+    for (const n of notas) {
+      if (!TIPOS.includes(n.tipoDoc)) {
+        throw new BadRequestException(`${doc(n)}: solo se facturan juntas notas de venta, de pedido o tickets`);
+      }
+      if (n.estadoEnvioSunat === 'ANULADO') {
+        throw new BadRequestException(`${doc(n)} está anulada y no puede facturarse.`);
+      }
+      if (n.clienteId !== principal.clienteId) {
+        throw new BadRequestException('Las notas son de clientes distintos: una boleta o factura es para un solo cliente.');
+      }
+      if (String(n.tipoMoneda || 'PEN').toUpperCase() !== String(principal.tipoMoneda || 'PEN').toUpperCase()) {
+        throw new BadRequestException('Hay notas en soles y en dólares: factúralas por separado.');
+      }
+    }
+    let cobrado = 0;
+    let generoComision = false;
+    for (const n of notas.filter((x) => x.id !== principalId)) {
+      const ya = await this.formalQueContieneNota(n.id);
+      if (ya) {
+        throw new BadRequestException(
+          `${doc(n)} ya fue convertida a ${ya.serie}-${String(ya.correlativo).padStart(8, '0')}. ` +
+            'Emitir otro comprobante duplicaría la venta.',
+        );
+      }
+      const salidas = await this.prisma.movimientoKardex.count({
+        where: { comprobanteId: n.id, tipoMovimiento: 'SALIDA' },
+      });
+      if (salidas > 0 !== principalYaDescontoStock) {
+        throw new BadRequestException(
+          'Hay notas que ya descontaron stock y notas de pedido que no: factúralas por separado.',
+        );
+      }
+      const pagos = await this.prisma.pago.aggregate({
+        where: { comprobanteId: n.id },
+        _sum: { monto: true },
+      });
+      // Mismo criterio que la nota principal: las antiguas COMPLETADO sin filas de Pago.
+      cobrado += Math.max(
+        this.round2(Number(pagos._sum.monto || 0)),
+        n.estadoPago === 'COMPLETADO' ? this.round2(Number(n.mtoImpVenta || 0)) : 0,
+      );
+      if (!generoComision) {
+        generoComision = (await this.prisma.comisionVendedor.count({ where: { comprobanteId: n.id } })) > 0;
+      }
+    }
+    return { cobrado: this.round2(cobrado), generoComision };
+  }
+
+  /**
+   * El formal (boleta/factura) en que terminó una nota: el que la apunta en
+   * `comprobanteOrigenId`, o el que la facturó junto con otras.
+   */
+  private async formalQueContieneNota(
+    notaId: number,
+  ): Promise<{ serie: string; correlativo: number } | null> {
+    // Un formal anulado (nota de crédito por anulación) ya no contiene la
+    // venta: la nota se puede volver a convertir. Sin esto no había cómo
+    // corregir una boleta emitida con un dato errado (FRUTA PURA, 30-10).
+    const directo = await this.prisma.comprobante.findFirst({
+      where: { comprobanteOrigenId: notaId, estadoEnvioSunat: { not: EstadoSunat.ANULADO } },
+      select: { serie: true, correlativo: true },
+    });
+    if (directo) return directo;
+    const extra = await this.prisma.comprobanteOrigenExtra.findUnique({
+      where: { origenId: notaId },
+      select: { formal: { select: { serie: true, correlativo: true, estadoEnvioSunat: true } } },
+    });
+    return extra?.formal && extra.formal.estadoEnvioSunat !== EstadoSunat.ANULADO
+      ? { serie: extra.formal.serie, correlativo: extra.formal.correlativo }
+      : null;
+  }
+
+  /**
+   * Lo que falta convertir de una nota que ya tiene formales (ver
+   * saldo-por-convertir.ts). Null si no hay nada pendiente o si la nota se
+   * facturó junto con otras: esa vía siempre lleva la nota completa.
+   * `yaEmitido` es lo que suman los formales que ya salieron de ella, para que
+   * la conversión del saldo use solo lo cobrado que todavía no se aplicó.
+   */
+  private async saldoPorConvertir(notaId: number): Promise<{
+    pendientes: any[];
+    total: number;
+    yaEmitido: number;
+    formales: string[];
+  } | null> {
+    const consolidada = await this.prisma.comprobanteOrigenExtra.findUnique({
+      where: { origenId: notaId },
+      select: { origenId: true },
+    });
+    if (consolidada) return null;
+    const [nota, formales] = await Promise.all([
+      this.prisma.detalleComprobante.findMany({
+        where: { comprobanteId: notaId },
+        orderBy: { id: 'asc' },
+      }),
+      this.prisma.comprobante.findMany({
+        where: { comprobanteOrigenId: notaId, estadoEnvioSunat: { not: EstadoSunat.ANULADO } },
+        orderBy: { id: 'asc' },
+        select: {
+          serie: true,
+          correlativo: true,
+          mtoImpVenta: true,
+          detalles: { select: { productoId: true, descripcion: true, cantidad: true } },
+        },
+      }),
+    ]);
+    if (formales.length === 0) return null;
+    const pendientes = lineasPorConvertir(
+      nota,
+      formales.flatMap((f) => f.detalles),
+    );
+    if (pendientes.length === 0) return null;
+    return {
+      pendientes,
+      total: totalDeLineas(pendientes),
+      yaEmitido: this.round2(formales.reduce((a, f) => a + Number(f.mtoImpVenta || 0), 0)),
+      formales: formales.map((f) => `${f.serie}-${String(f.correlativo).padStart(8, '0')}`),
+    };
+  }
+
+  /**
+   * Cobrar varias notas de un mismo cliente de una vez (Notas de venta →
+   * elegir → Cobrar). El monto se reparte de la más antigua a la más nueva y
+   * cada parte se registra con el mismo `completarPagoOT` de un cobro suelto:
+   * caja, cuentas y estados quedan exactamente igual que si se cobraran una
+   * por una. Todo se valida antes del primer pago.
+   */
+  async cobrarVarias(
+    empresaId: number,
+    usuarioId: number,
+    input: {
+      ids: number[];
+      monto: number;
+      medioPago?: string;
+      referencia?: string;
+      observacion?: string;
+      cuentaBancariaId?: number | null;
+    },
+  ) {
+    const ids = [...new Set((input?.ids ?? []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+    if (!ids.length) throw new BadRequestException('Elige al menos una nota');
+    const notas = await this.prisma.comprobante.findMany({
+      where: { id: { in: ids }, empresaId },
+      select: {
+        id: true, tipoDoc: true, serie: true, correlativo: true, clienteId: true,
+        tipoMoneda: true, saldo: true, fechaEmision: true, estadoEnvioSunat: true,
+      },
+    });
+    if (notas.length !== ids.length) throw new NotFoundException('Alguna de las notas no existe');
+    const informales = ['TICKET', 'NV', 'RH', 'CP', 'NP', 'OT'];
+    const doc = (n: { serie: string; correlativo: number }) => `${n.serie}-${n.correlativo}`;
+    const invalida = notas.find((n) => !informales.includes(n.tipoDoc) || n.estadoEnvioSunat === 'ANULADO');
+    if (invalida) throw new BadRequestException(`${doc(invalida)} no se puede cobrar (anulada o no es nota)`);
+    if (new Set(notas.map((n) => n.clienteId)).size > 1) {
+      throw new BadRequestException('Las notas son de clientes distintos: cobra las de un cliente a la vez');
+    }
+    if (new Set(notas.map((n) => String(n.tipoMoneda || 'PEN').toUpperCase())).size > 1) {
+      throw new BadRequestException('Hay notas en soles y en dólares: cóbralas por separado');
+    }
+    let reparto: { id: number; monto: number }[];
+    try {
+      reparto = repartirPago(
+        notas.map((n) => ({ id: n.id, saldo: Number(n.saldo ?? 0), fechaEmision: n.fechaEmision })),
+        Number(input?.monto),
+      );
+    } catch (e: any) {
+      throw new BadRequestException(e?.message || 'Monto inválido');
+    }
+
+    const aplicados: { id: number; documento: string; monto: number }[] = [];
+    for (const parte of reparto) {
+      const nota = notas.find((n) => n.id === parte.id)!;
+      try {
+        await this.completarPagoOT(
+          parte.id,
+          {
+            montoPagado: parte.monto,
+            medioPago: input?.medioPago,
+            referencia: input?.referencia,
+            observacion: input?.observacion,
+            cuentaBancariaId: input?.cuentaBancariaId ?? undefined,
+          },
+          usuarioId,
+          empresaId,
+        );
+        aplicados.push({ id: parte.id, documento: doc(nota), monto: parte.monto });
+      } catch (e: any) {
+        // Lo ya cobrado queda cobrado: se informa dónde se cortó.
+        throw new BadRequestException(
+          `Se cobró ${aplicados.map((a) => a.documento).join(', ') || 'nada'}; ` +
+            `falló ${doc(nota)}: ${e?.message || 'error'}`,
+        );
+      }
+    }
+    const total = Number(notas.reduce((s, n) => s + Number(n.saldo ?? 0), 0).toFixed(2));
+    return {
+      aplicados,
+      cobrado: Number(aplicados.reduce((s, a) => s + a.monto, 0).toFixed(2)),
+      saldoRestante: Number((total - Number(input.monto)).toFixed(2)),
+    };
   }
 
   async completarPagoOT(
@@ -3176,6 +3477,10 @@ export class ComprobanteService {
       // Solo aplica en modo importado (default true). Ver ImportarComprobanteDto.
       afectarStock?: boolean;
       afectarCaja?: boolean;
+      // Anulación y reemisión de un comprobante ya vendido (ver
+      // regularizar-afectacion.service): no es una venta nueva, así que no
+      // pide caja abierta ni vuelve a validar límites de precio.
+      regularizacion?: boolean;
     },
   ) {
     const importado = opts?.importado === true;
@@ -3188,7 +3493,7 @@ export class ComprobanteService {
     }
     // Caja obligatoria (si la empresa lo configuró). Las importaciones de
     // comprobantes ya emitidos no son una venta en curso: quedan exentas.
-    if (!importado) {
+    if (!importado && !opts?.regularizacion) {
       await this.exigirCajaAbiertaSiConfigurado(empresaId, usuarioId, sedeId);
     }
     const afectarStockImport = opts?.afectarStock !== false; // default true
@@ -3220,6 +3525,7 @@ export class ComprobanteService {
       retencionMonto,
       retencionPorcentaje,
       comprobanteOrigenId,
+      comprobanteOrigenIds,
       paymentDetails,
       splitPayments,
       fechaVencimientoCredito,
@@ -3250,6 +3556,8 @@ export class ComprobanteService {
     // ¿Cuánta plata del origen YA entró a caja? La conversión no cobra de nuevo:
     // solo emite el documento formal de una venta ya cobrada.
     let montoYaCobradoEnOrigen = 0;
+    // Si la nota ya se convirtió en parte: lo que le falta.
+    let saldoNota: Awaited<ReturnType<ComprobanteService['saldoPorConvertir']>> = null;
 
     // Validar que el comprobante origen pertenezca a esta empresa (seguridad)
     if (esConversionDesdeInformal) {
@@ -3286,11 +3594,24 @@ export class ComprobanteService {
       // Ya convertido: emitir un segundo formal duplicaría la venta en SUNAT, en
       // los reportes y en las comisiones. `editarNotaVenta` ya bloqueaba por lo
       // mismo; la conversión no lo hacía.
-      const yaConvertido = await this.prisma.comprobante.findFirst({
-        where: { comprobanteOrigenId: Number(comprobanteOrigenId) },
-        select: { serie: true, correlativo: true },
-      });
+      // También si se facturó junto con otras notas en otro formal.
+      // Convertida solo en parte: puede salir otro formal, pero únicamente con
+      // lo que falta (ver saldo-por-convertir.ts).
+      const yaConvertido = await this.formalQueContieneNota(Number(comprobanteOrigenId));
       if (yaConvertido) {
+        saldoNota = await this.saldoPorConvertir(Number(comprobanteOrigenId));
+      }
+      if (yaConvertido && saldoNota) {
+        const nuevas = (detalles as any[]) ?? [];
+        const excesos = excesosSobreSaldo(saldoNota.pendientes, nuevas);
+        if (excesos.length > 0) {
+          throw new BadRequestException(
+            `${origen.serie}-${origen.correlativo} ya se convirtió en parte ` +
+              `(${saldoNota.formales.join(', ')}). Solo se puede emitir lo que falta: ` +
+              `${excesos.join('; ')}.`,
+          );
+        }
+      } else if (yaConvertido) {
         throw new BadRequestException(
           `${origen.serie}-${origen.correlativo} ya fue convertido a ` +
             `${yaConvertido.serie}-${String(yaConvertido.correlativo).padStart(8, '0')}. ` +
@@ -3317,6 +3638,44 @@ export class ComprobanteService {
           ? this.round2(Number(origen.mtoImpVenta || 0))
           : 0,
       );
+      // Lo cobrado en la nota ya se aplicó en parte a los formales anteriores:
+      // al saldo le toca solo lo que sobra, o se daría por pagado de más.
+      // Nota cobrada entera: cualquier parte está pagada. Restar daba un
+      // centavo de diferencia por el redondeo de cada línea.
+      if (saldoNota) {
+        const notaPagada =
+          montoYaCobradoEnOrigen >= this.round2(Number(origen.mtoImpVenta || 0)) - 0.01;
+        montoYaCobradoEnOrigen = notaPagada
+          ? this.round2(Number(origen.mtoImpVenta || 0))
+          : this.round2(Math.max(0, montoYaCobradoEnOrigen - saldoNota.yaEmitido));
+      }
+    }
+
+    // Varias notas facturadas juntas. La primera ya se validó arriba como
+    // cualquier conversión; las demás pasan las mismas reglas y además tienen
+    // que ser del mismo cliente y moneda, y estar en el mismo estado de stock
+    // (todas descontaron o ninguna): así stock, caja y comisiones se resuelven
+    // con los mismos flags de una conversión simple.
+    const origenesExtraIds: number[] = esConversionDesdeInformal
+      ? [...new Set<number>(((comprobanteOrigenIds as unknown[]) ?? []).map(Number))].filter(
+          (n) => Number.isInteger(n) && n > 0 && n !== Number(comprobanteOrigenId),
+        )
+      : [];
+    let extraYaGeneroComision = false;
+    if (saldoNota && origenesExtraIds.length > 0) {
+      throw new BadRequestException(
+        'El saldo de una nota convertida en parte se emite solo, no junto con otras notas.',
+      );
+    }
+    if (origenesExtraIds.length > 0) {
+      const extra = await this.validarNotasParaFacturarJuntas(
+        empresaId,
+        Number(comprobanteOrigenId),
+        origenesExtraIds,
+        origenYaDescontoStock,
+      );
+      montoYaCobradoEnOrigen = this.round2(montoYaCobradoEnOrigen + extra.cobrado);
+      extraYaGeneroComision = extra.generoComision;
     }
 
     // Map retencion fields to detraccion fields if present
@@ -3691,6 +4050,12 @@ export class ComprobanteService {
       });
     }
 
+    if (origenesExtraIds.length > 0) {
+      await this.prisma.comprobanteOrigenExtra.createMany({
+        data: origenesExtraIds.map((origenId) => ({ origenId, formalId: comprobante.id })),
+      });
+    }
+
     // Registrar movimientos de kardex SOLO si el origen aún no descontó stock.
     // Emisión directa o conversión de una NP que no descontó ⇒ se descuenta aquí.
     // Conversión de un informal que ya descontó (NV/TICKET/NP con descuento) ⇒ no.
@@ -3719,6 +4084,7 @@ export class ComprobanteService {
     let origenYaGeneroComision = false;
     if (esConversionDesdeInformal && comprobanteOrigenId != null) {
       origenYaGeneroComision =
+        extraYaGeneroComision ||
         (await this.prisma.comisionVendedor.count({
           where: { comprobanteId: Number(comprobanteOrigenId) },
         })) > 0;
@@ -5905,10 +6271,7 @@ export class ComprobanteService {
       );
 
     // No editar si ya fue convertida a un comprobante formal (boleta/factura).
-    const derivado = await this.prisma.comprobante.findFirst({
-      where: { comprobanteOrigenId: comprobanteId },
-      select: { serie: true, correlativo: true },
-    });
+    const derivado = await this.formalQueContieneNota(comprobanteId);
     if (derivado)
       throw new BadRequestException(
         `No se puede editar: esta nota de venta ya fue convertida a ${derivado.serie}-${String(
@@ -7677,6 +8040,8 @@ export class ComprobanteService {
     tipoDoc?: string;
     estado?: string;
     estadoPago?: string;
+    /** CSV de ids: solo esos comprobantes (notas elegidas en la lista). */
+    ids?: string;
   }): Promise<any> {
     const {
       empresaId,
@@ -7738,12 +8103,21 @@ export class ComprobanteService {
         ? (normalizedEstado as EstadoSunat)
         : undefined;
 
+    // Notas elegidas: pueden venir de varias páginas o fechas, así que el
+    // rango no aplica; sede, vendedor y tipos siguen acotando (permisos).
+    const ids = String(params.ids ?? '')
+      .split(',')
+      .map((v) => Number(v))
+      .filter((n) => Number.isInteger(n) && n > 0)
+      .slice(0, 500);
+
     return {
       empresaId,
       ...sedeFilter,
       ...(usuarioId ? { usuarioId } : {}),
       tipoDoc: { in: tipoDoc ? [tipoDoc] : tiposPermitidos },
-      ...(fechaInicio || fechaFin
+      ...(ids.length ? { id: { in: ids } } : {}),
+      ...(!ids.length && (fechaInicio || fechaFin)
         ? {
             fechaEmision: {
               ...(adjustedFechaInicio ? { gte: adjustedFechaInicio } : {}),
@@ -7770,6 +8144,7 @@ export class ComprobanteService {
     tipoDoc?: string;
     estado?: string;
     estadoPago?: string;
+    ids?: string;
     formato: 'zip' | 'pdf';
   }): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
     const { fechaInicio, fechaFin, formato } = params;
@@ -7941,6 +8316,7 @@ export class ComprobanteService {
     tipoDoc?: string;
     estado?: string;
     estadoPago?: string;
+    ids?: string;
     columnas?: string;
     formato: 'excel' | 'pdf';
   }): Promise<{ buffer: Buffer; filename: string; contentType: string }> {

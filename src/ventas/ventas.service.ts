@@ -1,3 +1,5 @@
+import { resolverDespachoAgrupado, selectDespachoAgrupado } from '../envio-despacho/despacho-agrupado';
+import { formalDeNota } from '../comprobante/convertidos';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EstadoSunat } from '@prisma/client';
@@ -245,6 +247,7 @@ export class VentasService {
           adelanto: true,
           pagos: { select: { monto: true } },
           comprobantesDerivados: { select: { id: true } },
+          consolidadoEn: { select: { formalId: true } },
           tipoMoneda: true,
           tipoCambio: true,
         },
@@ -266,7 +269,7 @@ export class VentasService {
 
     const comprobantesPendientes = comprobantes
       .filter((c) => !TIPOS_NO_VENTA_FINAL.has(c.tipoDoc))
-      .filter((c) => (c.comprobantesDerivados ?? []).length === 0)
+      .filter((c) => (c.comprobantesDerivados ?? []).length === 0 && !c.consolidadoEn)
       .map((c) => calcularSaldoRealComprobante(c))
       .filter((saldo) => saldo > 0.01);
 
@@ -304,6 +307,26 @@ export class VentasService {
     sedeId?: number;
     usuarioId?: number;
   }) {
+    // Campos del despacho que muestra la fila; los mismos para el despacho
+    // compartido de una nota que va en el paquete de otra.
+    const CAMPOS_DESPACHO_PANEL = {
+              estado: true,
+              tipoEnvio: true,
+              agenciaDestino: true,
+              celularDest: true,
+              nroPaquetes: true,
+              turnoEnvio: true,
+              // Día de entrega programado: la columna "Fecha de envío" del
+              // panel lo lee de acá. Se agregó al panel de despachos pero no
+              // a este select, así que la columna salía siempre en guion
+              // aunque el usuario hubiera cargado la fecha.
+              fechaEstimada: true,
+              transportista: true,
+              nroOrden: true,
+              claveOrden: true,
+              repartidorId: true,
+              repartidor: { select: { nombre: true } },
+            } as const;
     const { empresaId, fecha, sedeId, usuarioId } = params;
 
     const inicioLima = new Date(`${fecha}T00:00:00-05:00`);
@@ -374,26 +397,9 @@ export class VentasService {
           usuario: { select: { nombre: true } },
           sede: { select: { nombre: true } },
           productoSeries: { select: { numeroSerie: true } },
-          envioDespacho: {
-            select: {
-              estado: true,
-              tipoEnvio: true,
-              agenciaDestino: true,
-              celularDest: true,
-              nroPaquetes: true,
-              turnoEnvio: true,
-              // Día de entrega programado: la columna "Fecha de envío" del
-              // panel lo lee de acá. Se había agregado al panel de despachos
-              // pero no a este select, así que la columna salía siempre en
-              // guion aunque el usuario hubiera cargado la fecha.
-              fechaEstimada: true,
-              transportista: true,
-              nroOrden: true,
-              claveOrden: true,
-              repartidorId: true,
-              repartidor: { select: { nombre: true } },
-            },
-          },
+          envioDespacho: { select: CAMPOS_DESPACHO_PANEL },
+          // Va en el envío de otra nota: se muestra ese despacho (no "sin envío").
+          despachoAgrupado: selectDespachoAgrupado(CAMPOS_DESPACHO_PANEL),
           pagos: {
             select: {
               medioPago: true,
@@ -409,6 +415,9 @@ export class VentasService {
           // Para detectar si este comprobante informal ya fue convertido
           comprobantesDerivados: {
             select: { id: true, tipoDoc: true, serie: true, correlativo: true },
+          },
+          consolidadoEn: {
+            select: { formal: { select: { id: true, tipoDoc: true, serie: true, correlativo: true } } },
           },
           // Para saber si este comprobante formal viene de un informal
           comprobanteOrigenId: true,
@@ -497,6 +506,7 @@ export class VentasService {
     }
 
     const comprobantesNorm = comprobantesRaw.map((c) => {
+      resolverDespachoAgrupado(c as any);
       const esSunat = TIPOS_SUNAT.includes(c.tipoDoc);
       const pagos = (c.pagos ?? []) as {
         medioPago: string;
@@ -506,7 +516,7 @@ export class VentasService {
         vendedorNombre?: string | null;
         comprobanteUrl?: string | null;
       }[];
-      const derivado = (c.comprobantesDerivados ?? [])[0] ?? null;
+      const derivado = formalDeNota(c);
       const epRaw = (c.estadoPago as string) ?? '';
       // Compute saldo real: if DB saldo is correctly set, use it;
       // otherwise derive from estadoPago + pagos + adelanto (handles old NPs
@@ -554,6 +564,9 @@ export class VentasService {
         estadoDespacho: c.envioDespacho
           ? normalizarDespachoEstado(c.envioDespacho.estado)
           : 'NO_APLICA',
+        // Va en el paquete de otra nota: su envío se edita desde esa nota.
+        despachoEnComprobanteId: (c.envioDespacho as any)?.comprobanteId ?? null,
+        envioAgrupadoEn: (c.envioDespacho as any)?.agrupadoEn ?? null,
         repartidorId: c.envioDespacho?.repartidorId ?? null,
         repartidor: c.envioDespacho?.repartidor?.nombre ?? 'No aplica',
         tipoEnvio: c.envioDespacho?.tipoEnvio ?? '—',
