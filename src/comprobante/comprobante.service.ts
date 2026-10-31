@@ -1608,6 +1608,7 @@ export class ComprobanteService {
     tipDocAfectado: string | null,
     empresaId: number,
     maxIntentos = 20,
+    claveIdempotencia?: string,
   ) {
     // Tope anti-abuso para cuentas DEMO: no exceder el máximo de comprobantes
     // (de cualquier tipo). En producción no aplica.
@@ -1616,7 +1617,9 @@ export class ComprobanteService {
     // Anti-doble-submit: si en los últimos segundos ya se registró un comprobante
     // idéntico (mismo cliente, sede, usuario, tipo y monto), es casi seguro un
     // doble-clic / reintento de red. Bloqueamos antes de duplicar la venta.
-    await this.assertNoDobleSubmitReciente(data, empresaId, tipoDoc);
+    // Con Idempotency-Key (panel) no hace falta adivinar: el interceptor ya
+    // garantiza que la misma venta entra una sola vez.
+    await this.assertNoDobleSubmitReciente({ ...data, claveIdempotencia }, empresaId, tipoDoc);
 
     let intento = 0;
     while (intento < maxIntentos) {
@@ -3655,6 +3658,8 @@ export class ComprobanteService {
           formalTipo,
           tipDocAfectado ?? null,
           empresaId,
+          20,
+          input?.claveIdempotencia,
         );
 
     // En importación, el cobro solo se registra en caja si afectarCaja !== false.
@@ -5303,6 +5308,8 @@ export class ComprobanteService {
           tipoDoc,
           null,
           empresaId,
+          20,
+          input?.claveIdempotencia,
         );
 
     if (montoPagadoInicial > 0 && registrarEnCaja) {

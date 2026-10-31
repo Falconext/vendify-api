@@ -137,6 +137,11 @@ class AnticipoDto {
 }
 
 export class CrearComprobanteDto {
+  /** Lo pone el IdempotenciaPanelInterceptor desde la cabecera Idempotency-Key. */
+  @IsOptional()
+  @IsString()
+  claveIdempotencia?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
