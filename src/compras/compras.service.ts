@@ -1,3 +1,4 @@
+import { pagosIniciales } from './pagos-iniciales';
 import {
   Injectable,
   BadRequestException,
@@ -13,6 +14,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { parseFechaSoloDia } from '../common/utils/fecha';
 import { GeminiService } from '../gemini/gemini.service';
 import { S3Service } from '../s3/s3.service';
+import { COMPRA_OCUPA_NUMERO } from './numero-ocupado';
 
 @Injectable()
 export class ComprasService {
@@ -200,7 +202,7 @@ export class ComprasService {
     return gravadoPorProducto.get(Number(item.productoId)) ?? true;
   }
 
-  private esAfectacionGravada(tipoAfectacionIGV?: string | null): boolean {
+  esAfectacionGravada(tipoAfectacionIGV?: string | null): boolean {
     const cod = String(tipoAfectacionIGV ?? '10').trim();
     return cod === '' || cod.startsWith('1');
   }
@@ -318,7 +320,12 @@ export class ComprasService {
     usuarioRol?: string,
   ) {
     const duplicado = await this.prisma.compra.findFirst({
-      where: { empresaId, serie: data.serie, numero: data.numero },
+      where: {
+        empresaId,
+        serie: data.serie,
+        numero: data.numero,
+        ...COMPRA_OCUPA_NUMERO,
+      },
       select: { id: true },
     });
     if (duplicado) {
@@ -445,14 +452,11 @@ export class ComprasService {
         ? data.esGasto
         : data.detalles.length > 0 && data.detalles.every((d) => !d.productoId);
 
-    // El pago inicial nunca supera el total (un cliente que calculó el total
-    // con IGV sobre exonerados mandaría de más).
-    const montoPagadoInicial = esPendiente
-      ? 0
-      : Math.min(
-          total,
-          Math.max(0, this.roundMoney(Number(data.montoPagadoInicial) || 0)),
-        );
+    // Uno o varios pagos (pago mixto al contado). Ver pagos-iniciales.ts.
+    const pagosDeEntrada = pagosIniciales(data, total, esPendiente);
+    const montoPagadoInicial = this.roundMoney(
+      pagosDeEntrada.reduce((a, p) => a + p.monto, 0),
+    );
     const saldoInicial = Math.max(
       0,
       this.roundMoney(total - montoPagadoInicial),
@@ -461,16 +465,15 @@ export class ComprasService {
       total,
       saldoInicial,
     );
-    // Pago inicial de un documento en soles desde cuenta en dólares: TC del día
-    // para que la cuenta lo vea en US$ (en el resto de casos queda el de la compra).
-    const tcPagoInicial =
-      montoPagadoInicial > 0 && moneda === 'PEN' && data.cuentaBancariaIdInicial
-        ? await this.tipoCambioParaCuenta(
-            data.cuentaBancariaIdInicial,
-            'PEN',
-            undefined,
-          )
-        : tipoCambio;
+    // Pago de un documento en soles desde cuenta en dólares: TC del día para
+    // que la cuenta lo vea en US$ (en el resto de casos queda el de la compra).
+    const tcDePago = await Promise.all(
+      pagosDeEntrada.map((p) =>
+        moneda === 'PEN' && p.cuentaBancariaId
+          ? this.tipoCambioParaCuenta(p.cuentaBancariaId, 'PEN', undefined)
+          : Promise.resolve(tipoCambio),
+      ),
+    );
 
     // Create Purchase Transaction
     const compra = await this.prisma.$transaction(async (tx) => {
@@ -510,26 +513,25 @@ export class ComprasService {
             create: detallesData,
           },
           sedeId: sedeId, // Guardar la sede a nivel de la cabecera de la compra
-          pagos:
-            montoPagadoInicial > 0
-              ? {
-                  create: {
-                    empresaId,
-                    usuarioId,
-                    monto: this.dec(montoPagadoInicial),
-                    // El pago inicial va al mismo TC de la compra: sin diferencia de cambio.
-                    moneda,
-                    tipoCambio: this.dec(tcPagoInicial, 4),
-                    montoSoles: this.dec(montoPagadoInicial * factorSoles),
-                    diferenciaCambio: '0.00',
-                    metodoPago: data.metodoPagoInicial || 'EFECTIVO',
-                    // Pago por banco: N° de operación + cuenta bancaria usada.
-                    referencia: data.referenciaInicial || undefined,
-                    cuentaBancariaId: data.cuentaBancariaIdInicial || undefined,
-                    fecha: new Date(),
-                  },
-                }
-              : undefined,
+          pagos: pagosDeEntrada.length
+            ? {
+                create: pagosDeEntrada.map((p, i) => ({
+                  empresaId,
+                  usuarioId,
+                  monto: this.dec(p.monto),
+                  // El pago inicial va al mismo TC de la compra: sin diferencia de cambio.
+                  moneda,
+                  tipoCambio: this.dec(tcDePago[i], 4),
+                  montoSoles: this.dec(p.monto * factorSoles),
+                  diferenciaCambio: '0.00',
+                  metodoPago: p.metodo,
+                  // Pago por banco: N° de operación + cuenta bancaria usada.
+                  referencia: p.referencia,
+                  cuentaBancariaId: p.cuentaBancariaId,
+                  fecha: new Date(),
+                })),
+              }
+            : undefined,
         },
       });
     });
@@ -1155,6 +1157,7 @@ export class ComprasService {
         serie: data.serie,
         numero: data.numero,
         id: { not: id },
+        ...COMPRA_OCUPA_NUMERO,
       },
       select: { id: true },
     });

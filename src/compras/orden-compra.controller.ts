@@ -18,6 +18,7 @@ import { OrdenCompraService } from './orden-compra.service';
 import {
   ActualizarOrdenCompraDto,
   CrearOrdenCompraDto,
+  DesdeVentasDto,
   RecibirOrdenCompraDto,
 } from './dto/orden-compra.dto';
 
@@ -32,6 +33,23 @@ export class OrdenCompraController {
       req.user.empresaId,
       req.user.id,
       body,
+      req.user.sedeId,
+    );
+  }
+
+  // Antes de ':id' para que Nest no lo tome como un id.
+  @Post('desde-ventas')
+  async desdeVentas(@Request() req, @Body() body: DesdeVentasDto) {
+    return this.service.desdeVentas(req.user.empresaId, body.comprobanteIds, req.user.sedeId);
+  }
+
+  // Antes de ':id'. ?marcaId=&dias=30 → productos de la marca con sugerido.
+  @Get('sugerido-por-marca')
+  async sugeridoPorMarca(@Request() req, @Query('marcaId') marcaId: string, @Query('dias') dias?: string) {
+    return this.service.sugeridoPorMarca(
+      req.user.empresaId,
+      Number(marcaId),
+      dias ? Number(dias) : 30,
       req.user.sedeId,
     );
   }

@@ -13,7 +13,18 @@ import {
   pedidosQueEsperan,
   productosRecibidos,
   type PedidoListo,
+  documentoDe,
 } from './pedidos-por-entregar';
+import {
+  consolidarVentas,
+  type ComponenteKit,
+  type ProductoParaComprar,
+} from './consolidar-ventas';
+import {
+  cantidadSugerida,
+  etiquetaVariante,
+  type FilaPedidoMarca,
+} from './pedido-por-marca';
 import {
   ActualizarOrdenCompraDto,
   CrearOrdenCompraDto,
@@ -21,6 +32,9 @@ import {
 } from './dto/orden-compra.dto';
 
 const IGV_RATE = 0.18;
+
+/** Notas informales que se pueden juntar en una orden (preventa). */
+const TIPOS_PREVENTA = ['NV', 'NP', 'TICKET'];
 
 /**
  * Órdenes de Compra: el pedido formal al proveedor ANTES de la compra.
@@ -107,6 +121,8 @@ export class OrdenCompraService {
       igvIncluido,
     );
 
+    const origenIds = await this.origenesValidos(empresaId, dto.comprobanteOrigenIds);
+
     const ultimo = await this.prisma.ordenCompra.aggregate({
       where: { empresaId },
       _max: { numero: true },
@@ -141,9 +157,237 @@ export class OrdenCompraService {
             ),
           })),
         },
+        ...(origenIds.length
+          ? { origenes: { create: origenIds.map((comprobanteId) => ({ comprobanteId })) } }
+          : {}),
       },
       include: { detalles: true, proveedor: true },
     });
+  }
+
+  /** Solo notas de la misma empresa: un id ajeno no se enlaza. */
+  private async origenesValidos(empresaId: number, ids?: number[]): Promise<number[]> {
+    const unicos = [...new Set((ids ?? []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+    if (!unicos.length) return [];
+    const propias = await this.prisma.comprobante.findMany({
+      where: { id: { in: unicos }, empresaId },
+      select: { id: true },
+    });
+    return propias.map((c) => c.id);
+  }
+
+  /**
+   * Notas de venta → una orden de compra. Suma lo vendido en las notas
+   * elegidas (kits abiertos en componentes, paquetes en unidades) y devuelve
+   * las líneas para precargar la orden, con el costo y el stock de la sede.
+   * No crea nada: la orden se guarda recién cuando el usuario elige el
+   * proveedor y confirma.
+   */
+  /**
+   * Todos los productos de una marca (cada variante en su fila) con stock de la
+   * sede, mínimo, lo vendido en los últimos `dias` y una cantidad sugerida.
+   * También propone el proveedor de la última orden con productos de la marca.
+   * No guarda nada: el front arma la orden con lo que el usuario confirme.
+   */
+  async sugeridoPorMarca(empresaId: number, marcaId: number, dias = 30, sedeId?: number) {
+    if (!Number.isInteger(marcaId) || marcaId <= 0) throw new BadRequestException('Elige una marca');
+    const marca = await this.prisma.marca.findFirst({
+      where: { id: marcaId, empresaId },
+      select: { id: true, nombre: true },
+    });
+    if (!marca) throw new NotFoundException('Marca no encontrada');
+    const periodo = Math.min(Math.max(Math.trunc(Number(dias) || 30), 1), 365);
+
+    const seleccion = {
+      id: true,
+      descripcion: true,
+      stock: true,
+      stockMinimo: true,
+      costoPromedio: true,
+      tipoAfectacionIGV: true,
+      valoresAtributos: true,
+    } as const;
+    const padres = await this.prisma.producto.findMany({
+      where: { empresaId, marcaId, estado: 'ACTIVO', productoPadreId: null },
+      select: {
+        ...seleccion,
+        variantes: { where: { estado: 'ACTIVO' }, select: seleccion, orderBy: { id: 'asc' } },
+      },
+      orderBy: { descripcion: 'asc' },
+    });
+    // Un modelo con variantes se pide por variante (cada tono), no el modelo.
+    const productos = padres.flatMap((p) =>
+      p.variantes.length
+        ? p.variantes.map((v) => ({ ...v, descripcion: p.descripcion }))
+        : [{ ...p, valoresAtributos: null }],
+    );
+    const ids = productos.map((p) => p.id);
+    if (!ids.length) return { marca, dias: periodo, proveedorSugerido: null, items: [] };
+
+    const stocksSede = sedeId
+      ? await this.prisma.productoStock.findMany({
+          where: { sedeId, productoId: { in: ids } },
+          select: { productoId: true, stock: true, stockMinimo: true },
+        })
+      : [];
+    const porSede = new Map(stocksSede.map((s) => [s.productoId, s]));
+
+    // Lo vendido es lo que salió del almacén por un comprobante no anulado:
+    // así una nota de venta convertida en boleta no se cuenta dos veces.
+    const desde = new Date(Date.now() - periodo * 86400000);
+    const salidas = await this.prisma.movimientoKardex.groupBy({
+      by: ['productoId'],
+      where: {
+        empresaId,
+        productoId: { in: ids },
+        tipoMovimiento: 'SALIDA',
+        comprobanteId: { not: null },
+        comprobante: { estadoEnvioSunat: { not: 'ANULADO' } },
+        fecha: { gte: desde },
+        ...(sedeId ? { sedeId } : {}),
+      },
+      _sum: { cantidad: true },
+    });
+    const vendidos = new Map(salidas.map((s) => [s.productoId, Number(s._sum.cantidad ?? 0)]));
+
+    const items: FilaPedidoMarca[] = productos.map((p) => {
+      const sede = porSede.get(p.id);
+      const stock = Number(sede ? sede.stock : p.stock) || 0;
+      const stockMinimo = Number(sede?.stockMinimo || p.stockMinimo || 0);
+      const vendido = vendidos.get(p.id) ?? 0;
+      return {
+        productoId: p.id,
+        descripcion: p.descripcion,
+        variante: etiquetaVariante(p.valoresAtributos),
+        stock,
+        stockMinimo,
+        vendidos: vendido,
+        costo: Number(p.costoPromedio ?? 0),
+        tipoAfectacionIGV: p.tipoAfectacionIGV ?? null,
+        sugerido: cantidadSugerida(stock, stockMinimo, vendido),
+      };
+    });
+
+    const ultima = await this.prisma.ordenCompra.findFirst({
+      where: {
+        empresaId,
+        estado: { not: 'ANULADA' },
+        detalles: { some: { productoId: { in: ids } } },
+      },
+      orderBy: { id: 'desc' },
+      select: { proveedor: { select: { id: true, nombre: true, nroDoc: true } } },
+    });
+
+    return { marca, dias: periodo, proveedorSugerido: ultima?.proveedor ?? null, items };
+  }
+
+  async desdeVentas(empresaId: number, comprobanteIds: number[], sedeId?: number) {
+    const ventas = await this.prisma.comprobante.findMany({
+      where: { id: { in: comprobanteIds }, empresaId },
+      select: {
+        id: true,
+        tipoDoc: true,
+        serie: true,
+        correlativo: true,
+        estadoEnvioSunat: true,
+        cliente: { select: { nombre: true } },
+        detalles: {
+          select: { productoId: true, descripcion: true, cantidad: true, unidadesPorPaquete: true },
+        },
+        ordenesCompra: {
+          where: { ordenCompra: { estado: { not: 'ANULADA' } } },
+          select: { ordenCompra: { select: { id: true, numero: true } } },
+        },
+      },
+      orderBy: { id: 'asc' },
+    });
+    if (!ventas.length) throw new NotFoundException('No se encontraron las notas elegidas');
+
+    const usables = ventas.filter(
+      (v) => TIPOS_PREVENTA.includes(v.tipoDoc) && v.estadoEnvioSunat !== 'ANULADO',
+    );
+    const descartadas = ventas
+      .filter((v) => !usables.includes(v))
+      .map((v) => ({
+        documento: documentoDe(v),
+        motivo: v.estadoEnvioSunat === 'ANULADO' ? 'Anulada' : 'No es nota de venta ni de pedido',
+      }));
+    if (!usables.length) {
+      throw new BadRequestException('Ninguna de las notas elegidas se puede pedir (anuladas o de otro tipo)');
+    }
+
+    // En Vendify la línea de la venta no guarda el kit (comboId): se pide
+    // cada producto tal como se vendió.
+    const combos: { comboId: number; productoId: number; cantidad: number }[] = [];
+    const kits = new Map<number, ComponenteKit[]>();
+    for (const c of combos) {
+      kits.set(c.comboId, [...(kits.get(c.comboId) ?? []), { productoId: c.productoId, cantidad: c.cantidad }]);
+    }
+
+    const productoIds = [
+      ...new Set([
+        ...usables.flatMap((v) => v.detalles.map((d) => Number(d.productoId)).filter((n) => n > 0)),
+        ...combos.map((c) => c.productoId),
+      ]),
+    ];
+    const filas = productoIds.length
+      ? await this.prisma.producto.findMany({
+          where: { id: { in: productoIds }, empresaId },
+          select: {
+            id: true,
+            codigo: true,
+            descripcion: true,
+            costoPromedio: true,
+            tipoAfectacionIGV: true,
+            stock: true,
+            atributosTecnicos: true,
+            // Las cajas del producto, para poder pedir "5 cajas de 6" en la orden.
+            codigosBarras: {
+              where: { unidadesPorPaquete: { gt: 1 } },
+              select: { codigo: true, alias: true, unidadesPorPaquete: true },
+            },
+            ...(sedeId ? { stocks: { where: { sedeId }, select: { stock: true } } } : {}),
+          },
+        })
+      : [];
+    const productos = new Map<number, ProductoParaComprar>();
+    for (const p of filas as any[]) {
+      productos.set(p.id, {
+        id: p.id,
+        codigo: p.codigo,
+        descripcion: p.descripcion,
+        costo: Number(Number(p.costoPromedio ?? 0).toFixed(2)),
+        gravado: this.comprasService.esAfectacionGravada(p.tipoAfectacionIGV),
+        stock: Number(sedeId ? (p.stocks?.[0]?.stock ?? 0) : p.stock) || 0,
+        seCompra: String(p.atributosTecnicos?.tipoProducto || '').toUpperCase() !== 'SERVICIO',
+      });
+    }
+    const paquetes = new Map((filas as any[]).map((p) => [p.id, p.codigosBarras ?? []]));
+
+    const { lineas, omitidas } = consolidarVentas(
+      usables.map((v) => ({
+        id: v.id,
+        documento: documentoDe(v),
+        cliente: v.cliente?.nombre ?? null,
+        detalles: v.detalles,
+      })),
+      productos,
+      kits,
+    );
+
+    return {
+      comprobanteIds: usables.map((v) => v.id),
+      notas: usables.map((v) => ({
+        id: v.id,
+        documento: documentoDe(v),
+        cliente: v.cliente?.nombre ?? null,
+        // Ya pedida en otra orden vigente: se avisa para no comprar dos veces.
+        ordenes: v.ordenesCompra.map((o) => OrdenCompraService.formatNumero(o.ordenCompra.numero)),
+      })),
+      descartadas,
+      omitidas,
+      lineas: lineas.map((l) => ({ ...l, paquetes: l.productoId ? paquetes.get(l.productoId) ?? [] : [] })),
+    };
   }
 
   async listar(
@@ -193,7 +437,7 @@ export class OrdenCompraService {
           usuario: { select: { nombre: true } },
           sede: { select: { nombre: true } },
           compra: { select: { id: true, serie: true, numero: true } },
-          _count: { select: { detalles: true } },
+          _count: { select: { detalles: true, origenes: true } },
         },
       }),
       this.prisma.ordenCompra.count({ where }),
@@ -228,6 +472,9 @@ export class OrdenCompraService {
         usuario: { select: { nombre: true } },
         sede: { select: { nombre: true } },
         compra: { select: { id: true, serie: true, numero: true } },
+        origenes: {
+          select: { comprobante: { select: { id: true, serie: true, correlativo: true } } },
+        },
       },
     });
     if (!orden) throw new NotFoundException('Orden de compra no encontrada');
