@@ -82,6 +82,7 @@ import {
   totalesVentasPorProducto,
 } from './ventas-por-producto';
 import { debeRevisarDobleSubmit } from '../integraciones/idempotencia/anti-doble-submit';
+import { afectacionDeLinea } from '../producto/afectacion-igv';
 
 const CAMPOS_DESPACHO_LISTA = {
   id: true,
@@ -2545,6 +2546,12 @@ export class ComprobanteService {
       esExportacion =
         codigo.startsWith('02') || codigo === '0102' || codigo === '0113';
     }
+    // Ley de Amazonía: decide la afectación por defecto y el candado de
+    // `afectacionDeLinea` (ver producto/afectacion-igv.ts).
+    const empresaAfectacion = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { leyAmazonia: true },
+    });
     // Separar ítems con producto de ítems de servicio libre (sin productoId, ej. costo de envío)
     const productDetalles = detalles.filter((d) => d.productoId != null);
     const serviceDetalles = detalles.filter((d) => d.productoId == null);
@@ -2646,9 +2653,11 @@ export class ComprobanteService {
         // Afectación del ítem libre: si la operación es exportación → 40; si no, respeta
         // lo enviado (p.ej. una línea de anticipo/adelanto exonerado o de exportación) y
         // por defecto gravado (10). Esto permite emitir "ANTICIPO DEL PEDIDO" sin IGV.
+        // Sin afectación pedida (envío de la tienda o de la IA de Ventas, kit),
+        // el default de la empresa: exonerado con Ley de Amazonía.
         const tipAfeIgvLibre = esExportacion
           ? 40
-          : parseInt(String(item.tipoAfectacionIGV ?? '10'), 10);
+          : parseInt(afectacionDeLinea(item.tipoAfectacionIGV, null, empresaAfectacion, true), 10);
         // Mismo criterio que las líneas de producto (más abajo): el valor
         // unitario sin IGV NO se redondea a 2 decimales antes de multiplicar.
         // Redondearlo (27.12 en vez de 27.1186) hacía que 50 × S/ 32.00 saliera
@@ -2764,7 +2773,10 @@ export class ComprobanteService {
           : Number((prod as any).precioUnitario);
       const tipAfeIgv = esExportacion
         ? 40
-        : parseInt((prod as any).tipoAfectacionIGV ?? '10', 10);
+        : parseInt(
+            afectacionDeLinea(item.tipoAfectacionIGV, (prod as any).tipoAfectacionIGV, empresaAfectacion),
+            10,
+          );
 
       let valorUnitario: number;
       let igvMonto: number;
@@ -5019,15 +5031,21 @@ export class ComprobanteService {
 
     // --- Motivo 04 = Descuento global
     if (motivoNota.codigo === '04') {
-      const totalDesc = Math.min(
-        montoDescuentoGlobal ?? 0,
-        mtoOperGravadas + totalIGV,
-      );
+      // Un documento sin líneas gravadas (Ley de Amazonía, exonerado,
+      // inafecto) se descuenta sin IGV y con su propia afectación: antes la
+      // nota salía gravada al 18% sobre una venta que nunca tuvo IGV.
+      const afeSinIgv = afectado.detalles.some((d) => Number(d.tipAfeIgv) === 10)
+        ? null
+        : (afectado.detalles.map((d) => Number(d.tipAfeIgv)).find((a) => [20, 30, 40].includes(a)) ?? null);
+      const topeDescuento = afeSinIgv
+        ? Number(afectado.mtoImpVenta)
+        : mtoOperGravadas + totalIGV;
+      const totalDesc = Math.min(montoDescuentoGlobal ?? 0, topeDescuento);
       if (totalDesc <= 0) {
         throw new BadRequestException('Debe indicar monto de descuento');
       }
 
-      const igvPct = 0.18;
+      const igvPct = afeSinIgv ? 0 : 0.18;
       const baseFinal = parseFloat((totalDesc / (1 + igvPct)).toFixed(2));
       const igvFinal = parseFloat((totalDesc - baseFinal).toFixed(2));
       const totalInc = parseFloat((baseFinal + igvFinal).toFixed(2));
@@ -5049,13 +5067,13 @@ export class ComprobanteService {
         mtoBaseIgv: baseFinal,
         porcentajeIgv: igvPct * 100,
         igv: igvFinal,
-        tipAfeIgv: 10,
+        tipAfeIgv: afeSinIgv ?? 10,
         totalImpuestos: igvFinal,
         mtoPrecioUnitario: totalInc,
         mtoValorVenta: baseFinal,
       });
 
-      mtoOperGravadas = baseFinal;
+      mtoOperGravadas = afeSinIgv ? 0 : baseFinal;
       totalIGV = igvFinal;
     }
 
@@ -5082,14 +5100,17 @@ export class ComprobanteService {
 
         const qty = item.cantidad;
         const newInclUnit = this.round2(item.nuevoValorUnitario);
-        const igvPct = Number(orig.porcentajeIgv) || 18;
+        // Una línea exonerada/inafecta guarda porcentajeIgv 0: con `|| 18`
+        // el descuento le inventaba IGV y la sumaba a gravadas.
+        const lineaGravada = Number(orig.tipAfeIgv) === 10;
+        const igvPct = lineaGravada ? Number(orig.porcentajeIgv) || 18 : 0;
         // Redondear a 2 decimales antes de acumular: sin esto la base sale con >2 decimales
         // (ej. 84.74576...) y SUNAT rechaza el TaxableAmount (Tributo 1000 error 2999).
         const valorUnitario = this.round2(newInclUnit / (1 + igvPct / 100));
         const mtoValorVenta = this.round2(valorUnitario * qty);
         const igvMonto = this.round2(newInclUnit * qty - mtoValorVenta);
 
-        mtoOperGravadas = this.round2(mtoOperGravadas + mtoValorVenta);
+        if (lineaGravada) mtoOperGravadas = this.round2(mtoOperGravadas + mtoValorVenta);
         totalIGV = this.round2(totalIGV + igvMonto);
 
         detalleFinal.push({
@@ -5149,8 +5170,11 @@ export class ComprobanteService {
         });
       }
 
-      // Recalcular totales de cabecera
+      // Recalcular totales de cabecera. Gravadas = solo las líneas gravadas:
+      // las exoneradas/inafectas se suman aparte más abajo y contarlas acá
+      // las duplicaba y las declaraba gravadas.
       const totalBase = detalleFinal
+        .filter((d) => Number(d.tipAfeIgv) === 10)
         .map((d) => d.mtoBaseIgv)
         .reduce((sum, x) => sum + x, 0);
       const totalIgv = detalleFinal
@@ -6208,7 +6232,9 @@ export class ComprobanteService {
               igv: 0,
               totalImpuestos: 0,
               mtoPrecioUnitario: precioUnitario,
-              tipAfeIgv: 10,
+              // La del producto: con `10` fijo, convertir la OT a boleta la
+              // emitía gravada aunque el producto fuera exonerado.
+              tipAfeIgv: Number((producto as any).tipoAfectacionIGV ?? 10),
             },
           ],
         },
