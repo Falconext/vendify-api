@@ -76,6 +76,8 @@ import {
   agregarVentasPorProducto,
   totalesVentasPorProducto,
 } from './ventas-por-producto';
+import { debeRevisarDobleSubmit } from '../integraciones/idempotencia/anti-doble-submit';
+
 @Injectable()
 export class ComprobanteService {
   private readonly logger = new Logger(ComprobanteService.name);
@@ -1549,11 +1551,19 @@ export class ComprobanteService {
     empresaId: number,
     tipoDoc: string,
   ) {
-    // Las operaciones que vienen del sync offline ya son idempotentes por uuid
-    // (OperacionSync) y pueden traer legítimamente dos ventas iguales seguidas.
-    if (data?.origenSyncUuid) return;
+    // El heurístico corre solo cuando no hay una garantía mejor: el sync
+    // offline es idempotente por uuid, y el panel por `Idempotency-Key`. En los
+    // dos casos adivinar al lado de una certeza solo puede equivocarse.
+    if (
+      !debeRevisarDobleSubmit({
+        origenSyncUuid: data?.origenSyncUuid,
+        claveIdempotencia: data?.claveIdempotencia,
+        clienteId: Number(data?.clienteId),
+      })
+    ) {
+      return;
+    }
     const clienteId = Number(data?.clienteId);
-    if (!clienteId) return;
     const totalNuevo =
       Number(data?.subTotal ?? 0) + Number(data?.totalImpuestos ?? 0);
     const desde = new Date(
