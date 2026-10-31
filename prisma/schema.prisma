@@ -390,6 +390,7 @@ model Empresa {
   operacionesSync         OperacionSync[]
   dispositivosMoviles     DispositivoMovil[]
   reglasComision          ReglaComision[]
+  idempotenciaApi         IdempotenciaApi[]
 
   @@index([providerToken])
   @@index([slugTienda])
@@ -3172,4 +3173,32 @@ model OperacionSync {
 
   @@index([empresaId, dispositivoId, recibidoEn])
   @@index([empresaId, estado])
+}
+
+/// Claves de idempotencia de la API pública. Una fila por (empresa, clave):
+/// mientras viva, repetir la clave con el mismo cuerpo devuelve la respuesta
+/// guardada en vez de volver a ejecutar. Es lo que impide que un reintento de
+/// red emita dos facturas, las dos válidas ante SUNAT.
+///
+/// `respuesta` nula = la primera llamada sigue en curso; un segundo intento
+/// recibe 409 en vez de ejecutarse en paralelo. El índice único compuesto es
+/// la pieza de seguridad: hace que dos requests simultáneos con la misma
+/// clave colisionen en la base y solo uno ejecute.
+model IdempotenciaApi {
+  id         Int      @id @default(autoincrement())
+  empresaId  Int
+  clave      String
+  metodo     String
+  ruta       String
+  /// SHA-256 del cuerpo canonizado (claves ordenadas).
+  huella     String
+  estadoHttp Int?
+  respuesta  Json?
+  creadoEn   DateTime @default(now())
+  expiraEn   DateTime
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([empresaId, clave])
+  @@index([expiraEn])
 }

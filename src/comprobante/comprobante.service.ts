@@ -76,6 +76,8 @@ import {
   agregarVentasPorProducto,
   totalesVentasPorProducto,
 } from './ventas-por-producto';
+import { debeRevisarDobleSubmit } from '../integraciones/idempotencia/anti-doble-submit';
+
 @Injectable()
 export class ComprobanteService {
   private readonly logger = new Logger(ComprobanteService.name);
@@ -1549,11 +1551,19 @@ export class ComprobanteService {
     empresaId: number,
     tipoDoc: string,
   ) {
-    // Las operaciones que vienen del sync offline ya son idempotentes por uuid
-    // (OperacionSync) y pueden traer legítimamente dos ventas iguales seguidas.
-    if (data?.origenSyncUuid) return;
+    // El heurístico corre solo cuando no hay una garantía mejor: el sync
+    // offline es idempotente por uuid, y el panel por `Idempotency-Key`. En los
+    // dos casos adivinar al lado de una certeza solo puede equivocarse.
+    if (
+      !debeRevisarDobleSubmit({
+        origenSyncUuid: data?.origenSyncUuid,
+        claveIdempotencia: data?.claveIdempotencia,
+        clienteId: Number(data?.clienteId),
+      })
+    ) {
+      return;
+    }
     const clienteId = Number(data?.clienteId);
-    if (!clienteId) return;
     const totalNuevo =
       Number(data?.subTotal ?? 0) + Number(data?.totalImpuestos ?? 0);
     const desde = new Date(
@@ -1598,6 +1608,7 @@ export class ComprobanteService {
     tipDocAfectado: string | null,
     empresaId: number,
     maxIntentos = 20,
+    claveIdempotencia?: string,
   ) {
     // Tope anti-abuso para cuentas DEMO: no exceder el máximo de comprobantes
     // (de cualquier tipo). En producción no aplica.
@@ -1606,7 +1617,9 @@ export class ComprobanteService {
     // Anti-doble-submit: si en los últimos segundos ya se registró un comprobante
     // idéntico (mismo cliente, sede, usuario, tipo y monto), es casi seguro un
     // doble-clic / reintento de red. Bloqueamos antes de duplicar la venta.
-    await this.assertNoDobleSubmitReciente(data, empresaId, tipoDoc);
+    // Con Idempotency-Key (panel) no hace falta adivinar: el interceptor ya
+    // garantiza que la misma venta entra una sola vez.
+    await this.assertNoDobleSubmitReciente({ ...data, claveIdempotencia }, empresaId, tipoDoc);
 
     let intento = 0;
     while (intento < maxIntentos) {
@@ -3645,6 +3658,8 @@ export class ComprobanteService {
           formalTipo,
           tipDocAfectado ?? null,
           empresaId,
+          20,
+          input?.claveIdempotencia,
         );
 
     // En importación, el cobro solo se registra en caja si afectarCaja !== false.
@@ -5293,6 +5308,8 @@ export class ComprobanteService {
           tipoDoc,
           null,
           empresaId,
+          20,
+          input?.claveIdempotencia,
         );
 
     if (montoPagadoInicial > 0 && registrarEnCaja) {

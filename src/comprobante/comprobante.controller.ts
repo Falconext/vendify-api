@@ -42,6 +42,7 @@ import {
 } from '../common/utils/multer.config';
 import { numeroALetras } from './utils/numero-a-letras';
 import { verificarPuedeAnularComprobante } from './puede-anular-comprobante.util';
+import { IdempotenciaPanelInterceptor } from '../integraciones/idempotencia/idempotencia-panel.interceptor';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('comprobante')
@@ -622,6 +623,7 @@ export class ComprobanteController {
 
   // Crear endpoints (stubs: la lógica completa de emitir + enviar SUNAT se implementa en una segunda fase)
   @Post('boleta')
+  @UseInterceptors(IdempotenciaPanelInterceptor)
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearBoleta(@User() user: any, @Body() dto: CrearComprobanteDto) {
     let comp;
@@ -698,6 +700,7 @@ export class ComprobanteController {
     }
   }
   @Post('factura')
+  @UseInterceptors(IdempotenciaPanelInterceptor)
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearFactura(@User() user: any, @Body() dto: CrearComprobanteDto) {
     let comp;
@@ -771,6 +774,7 @@ export class ComprobanteController {
     }
   }
   @Post('nota-credito')
+  @UseInterceptors(IdempotenciaPanelInterceptor)
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearNotaCredito(@User() user: any, @Body() dto: CrearComprobanteDto) {
     try {
@@ -806,6 +810,7 @@ export class ComprobanteController {
     };
   }
   @Post('nota-debito')
+  @UseInterceptors(IdempotenciaPanelInterceptor)
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearNotaDebito(@User() user: any, @Body() dto: CrearComprobanteDto) {
     try {
@@ -827,6 +832,7 @@ export class ComprobanteController {
     }
   }
   @Post('informal')
+  @UseInterceptors(IdempotenciaPanelInterceptor)
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearComprobanteInformal(
     @User() user: any,

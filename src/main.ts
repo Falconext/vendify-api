@@ -88,7 +88,10 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'DELETE', 'PATCH', 'PUT', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
+    // Idempotency-Key: el POS la manda en cada venta (boleta, factura, NC, ND
+    // y NV) para que un reintento no la registre dos veces. Sin ella en esta
+    // lista el navegador corta la petición en el preflight y no se emite nada.
+    allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Idempotency-Key'],
   });
 
   // Configurar límites de payload y middleware de seguridad
