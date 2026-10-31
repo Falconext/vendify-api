@@ -513,6 +513,9 @@ export class ComprobanteService {
                 // empresa: con Ley de Amazonía lo gravado salía exonerado, y
                 // sin ella lo exonerado salía con IGV (FRUTA PURA, 30-10).
                 tipAfeIgv: true,
+                // productoId: al convertir una Nota de Venta el POS rearma las
+                // líneas desde aquí.
+                productoId: true,
                 producto: {
                   select: { id: true, descripcion: true, imagenUrl: true, tipoAfectacionIGV: true },
                 },
