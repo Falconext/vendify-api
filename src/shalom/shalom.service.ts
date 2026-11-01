@@ -116,6 +116,21 @@ function primeroNoVacio(...valores: Array<string | null | undefined>): string {
 }
 
 /**
+ * El documento solo sirve si es uno de verdad: DNI (8 dígitos), RUC (11) o
+ * carné/pasaporte (9 a 12 letras y números). Las ventas por WhatsApp crean el
+ * cliente con documento "0" o "10000000" (CLIENTES VARIOS), y mandarlo a
+ * Shalom devolvía un error interno que se leía "Shalom no está disponible"
+ * (JAIMITO EL CARTERO, demo.ropa, 21-10).
+ */
+export function documentoParaGuia(v: string | null | undefined): string {
+  const t = String(v ?? '').trim().toUpperCase();
+  if (/^\d{8}$/.test(t)) return /^(\d)\1{7}$/.test(t) || /^10{7}$/.test(t) ? '' : t;
+  if (/^\d{11}$/.test(t)) return t;
+  if (/^[A-Z0-9]{9,12}$/.test(t) && /\d/.test(t)) return t;
+  return '';
+}
+
+/**
  * Servicio Shalom de falconext-mype. Todas las empresas usan el proveedor
  * api.shalom-api.lat (`ShalomLatService`), autenticado con una API key global:
  * tracking, agencias, comprobante, etiqueta y cotización NO requieren cuenta
@@ -195,6 +210,10 @@ export class ShalomService {
    * `shalomAgenciaDestinoId` (el ter_id que se guardó al crear la guía).
    */
   async datosRotulo(comprobanteId: number, empresaId: number) {
+    const empresa = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { shalomClaveEnRotulo: true },
+    });
     const envio = await this.prisma.envioDespacho.findFirst({
       where: { comprobanteId, comprobante: { empresaId } },
       select: {
@@ -238,8 +257,11 @@ export class ShalomService {
     return {
       nroOrden: envio.nroOrden,
       claveOrden: envio.claveOrden,
-      // Para la etiqueta 80×50: clave de retiro (solo Shalom), celular y referencia.
-      claveEnvio: /SHALOM/.test(String(envio.transportista ?? '')) ? envio.claveEnvio : null,
+      // La clave de retiro solo si la empresa lo pidió: el rótulo va por fuera
+      // del paquete, junto al DNI, y así cualquiera que lo vea tiene los dos
+      // datos del retiro (24-10). La clave se le manda al cliente por WhatsApp.
+      claveEnvio:
+        empresa?.shalomClaveEnRotulo && /SHALOM/.test(String(envio.transportista ?? '')) ? envio.claveEnvio : null,
       celular: primeroNoVacio(envio.celularDest, envio.comprobante?.cliente?.telefono),
       transportista: envio.transportista,
       referencia: envio.comprobante ? `${envio.comprobante.serie}-${String(envio.comprobante.correlativo).padStart(8, '0')}` : '',
@@ -566,6 +588,7 @@ export class ShalomService {
         shalomAgenciaOrigenNombre: true,
         shalomAutoGuiaActivo: true,
         shalomClavesRetiro: true,
+        shalomClaveEnRotulo: true,
         shalomTamanoDefault: true,
         plan: { select: { nombre: true, features: { select: { featureKey: true, enabled: true } } } },
       },
@@ -588,6 +611,7 @@ export class ShalomService {
       // La venta genera la guía sola (opt-in por empresa).
       autoGuiaActivo: empresa.shalomAutoGuiaActivo,
       clavesRetiro: empresa.shalomClavesRetiro ?? '',
+      claveEnRotulo: empresa.shalomClaveEnRotulo,
       tamanoDefault: empresa.shalomTamanoDefault ?? 'XS',
     };
   }
@@ -608,6 +632,7 @@ export class ShalomService {
       agenciaOrigenNombre: null,
       autoGuiaActivo: false,
       clavesRetiro: '',
+      claveEnRotulo: false,
       tamanoDefault: 'XS',
     };
   }
@@ -741,6 +766,7 @@ export class ShalomService {
       | 'securityCode'
       | 'autoGuiaActivo'
       | 'clavesRetiro'
+      | 'claveEnRotulo'
       | 'tamanoDefault'
     >,
   ) {
@@ -779,6 +805,9 @@ export class ShalomService {
           : {}),
         ...(dto.autoGuiaActivo !== undefined
           ? { shalomAutoGuiaActivo: Boolean(dto.autoGuiaActivo) }
+          : {}),
+        ...(dto.claveEnRotulo !== undefined
+          ? { shalomClaveEnRotulo: Boolean(dto.claveEnRotulo) }
           : {}),
       },
     });
@@ -971,16 +1000,21 @@ export class ShalomService {
     // El despacho guarda los campos del destinatario como cadena vacía cuando no
     // se llenan, así que `??` no sirve para encadenar: hay que saltar los vacíos.
     const dni = primeroNoVacio(
-      dto.dni,
-      envio.dniDestinatario,
-      cliente?.nroDoc,
+      documentoParaGuia(dto.dni),
+      documentoParaGuia(envio.dniDestinatario),
+      documentoParaGuia(cliente?.nroDoc),
     );
     const nombre = primeroNoVacio(
       dto.nombre,
       envio.nombreDestinatario,
       cliente?.nombre,
     );
-    if (!dni || !nombre) {
+    if (!dni) {
+      throw new BadRequestException(
+        'Falta el DNI del destinatario (el cliente no tiene un documento válido): escríbelo en el despacho.',
+      );
+    }
+    if (!nombre) {
       throw new BadRequestException(
         'Falta el nombre o el documento del destinatario para generar la guía.',
       );
@@ -996,12 +1030,21 @@ export class ShalomService {
       envio.celularDest,
       cliente?.telefono,
     );
-    const phone = Number(String(telefono).replace(/\D/g, ''));
-    if (!phone) {
+    let digitos = String(telefono).replace(/\D/g, '');
+    if (digitos.length === 11 && digitos.startsWith('51')) digitos = digitos.slice(2);
+    if (!digitos) {
       throw new BadRequestException(
         'Falta el celular del destinatario para generar la guía.',
       );
     }
+    // Shalom registra la guía con cualquier número (aceptó "12345" en el QA del
+    // 21-10) y con uno así el destinatario no recibe los avisos de llegada.
+    if (!/^9\d{8}$/.test(digitos)) {
+      throw new BadRequestException(
+        `El celular del destinatario (${telefono}) no es válido: debe tener 9 dígitos y empezar con 9.`,
+      );
+    }
+    const phone = Number(digitos);
 
     // Tamaño del paquete: id fijo del selector > id del catálogo por cuenta
     // (despachos antiguos) > tamaño por defecto de la empresa > XS.
@@ -1059,6 +1102,12 @@ export class ShalomService {
       dto.clave ?? (envio.nroOrden ? null : envio.claveEnvio),
     );
 
+    // La declaración jurada solo la acepta Shalom cuando la cuenta Shalom Pro
+    // que envía es de una persona natural; a una empresa (TIENDA MINERA SAC,
+    // 21-10) le rechaza la guía con "La declaración jurada solo es para
+    // persona natural". En su API es opcional, así que si la rechaza se
+    // registra sin ella.
+    let declarar = true;
     const registrar = (claveRetiro: string) =>
       this.lat.createOrder({
         instanceId: empresa.shalomInstanceId!,
@@ -1072,12 +1121,25 @@ export class ShalomService {
         content: tamano.content,
         clave: claveRetiro,
         cantidad: Number(envio.nroPaquetes) > 0 ? Number(envio.nroPaquetes) : 1,
-        declaracion_jurada: declararContenido(envio.tipoMercaderia, envio.contenidoPaquete),
+        ...(declarar
+          ? { declaracion_jurada: declararContenido(envio.tipoMercaderia, envio.contenidoPaquete) }
+          : {}),
         ...(Number(envio.pesoKg) > 0 ? { peso: String(Number(envio.pesoKg)) } : {}),
       });
     let claveUsada = clave;
     let claveReemplazada: { solicitada: string; usada: string; motivo: string } | null = null;
     let respuesta = await registrar(claveUsada);
+    if (
+      respuesta?.success === false &&
+      /declaraci[oó]n jurada/i.test(String(respuesta?.message ?? '')) &&
+      /persona natural/i.test(String(respuesta?.message ?? ''))
+    ) {
+      this.logger.warn(
+        `Shalom no acepta declaración jurada para la cuenta de la empresa ${empresa.id} (comprobante ${comprobanteId}); se registra sin ella.`,
+      );
+      declarar = false;
+      respuesta = await registrar(claveUsada);
+    }
     // Red de seguridad: la clave del día / configurada se repite entre guías
     // (así trabaja el negocio en el panel de Shalom). Si aun así Shalom la
     // rechazara por la clave, se reintenta UNA vez con una aleatoria en vez de

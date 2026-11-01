@@ -9,7 +9,7 @@ import {
   Min,
   Max,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class ItemPedidoDto {
   @IsNumber()
@@ -62,6 +62,10 @@ export class CrearPedidoDto {
   @IsString()
   clienteTelefono: string;
 
+  // El correo es opcional, pero el checkout lo manda como "" cuando el
+  // comprador no lo escribe, y @IsOptional solo deja pasar null/undefined:
+  // el pedido se rechazaba con "clienteEmail must be an email" (29-10).
+  @Transform(({ value }) => (typeof value === 'string' && !value.trim() ? undefined : value))
   @IsEmail()
   @IsOptional()
   clienteEmail?: string;
@@ -94,6 +98,8 @@ export class CrearPedidoDto {
   @IsOptional()
   culqiToken?: string;
 
+  // Mismo caso: sin tarjeta el checkout lo manda como "".
+  @Transform(({ value }) => (typeof value === 'string' && !value.trim() ? undefined : value))
   @IsEmail()
   @IsOptional()
   culqiEmail?: string;
@@ -105,6 +111,25 @@ export class CrearPedidoDto {
   @IsString()
   @IsOptional()
   agenciaEnvio?: string;
+
+  /** Envío por agencia elegido en la tienda: SHALOM u OLVA. Ver envio-agencia.ts. */
+  @IsString()
+  @IsOptional()
+  envioCourier?: string;
+
+  /** Id de la agencia destino (ter_id de Shalom, código de Olva). */
+  @IsString()
+  @IsOptional()
+  envioAgenciaId?: string;
+
+  @IsString()
+  @IsOptional()
+  envioAgenciaNombre?: string;
+
+  /** DNI/CE/RUC del comprador: la agencia lo pide al entregar. */
+  @IsString()
+  @IsOptional()
+  clienteDocumento?: string;
 
   @IsNumber()
   @Min(0)

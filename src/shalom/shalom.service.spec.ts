@@ -1,4 +1,4 @@
-import { ShalomService } from './shalom.service';
+import { ShalomService, documentoParaGuia } from './shalom.service';
 
 /**
  * QA del servicio Shalom: toda falconext-mype usa el proveedor api.shalom-api.lat
@@ -222,6 +222,59 @@ describe('ShalomService (proveedor único api.shalom-api.lat)', () => {
     expect(lat.createOrder).not.toHaveBeenCalled();
   });
 
+  it('un cliente con documento "0" no llega a Shalom: avisa que falta el DNI', async () => {
+    const { svc, prisma, lat } = build();
+    lat.getAgencias.mockResolvedValue({
+      success: true,
+      data: [agencia('7', 'Lima Centro'), agencia('582', 'Cusco Centro')],
+      total: 2,
+    });
+    prisma.empresa.findUnique.mockResolvedValue(empresaCorporativa());
+    prisma.envioDespacho.findFirst.mockResolvedValue({
+      id: 56,
+      nroOrden: null,
+      claveOrden: null,
+      agenciaDestino: 'Cusco Centro - CUSCO - CUSCO',
+      celularDest: '958738281',
+      dniDestinatario: '',
+      nombreDestinatario: '',
+      comprobante: { id: 9, serie: 'NV01', correlativo: 71, cliente: { nombre: 'JAIMITO EL CARTERO', nroDoc: '0' }, detalles: [] },
+    });
+    await expect(svc.crearGuiaDesdeDespacho(9, 100)).rejects.toThrow(/Falta el DNI del destinatario/);
+    expect(lat.createOrder).not.toHaveBeenCalled();
+  });
+
+  it('un celular que no es de 9 dígitos no llega a Shalom', async () => {
+    const { svc, prisma, lat } = build();
+    lat.getAgencias.mockResolvedValue({
+      success: true,
+      data: [agencia('7', 'Lima Centro'), agencia('582', 'Cusco Centro')],
+      total: 2,
+    });
+    prisma.empresa.findUnique.mockResolvedValue(empresaCorporativa());
+    prisma.envioDespacho.findFirst.mockResolvedValue({
+      id: 57,
+      nroOrden: null,
+      claveOrden: null,
+      agenciaDestino: 'Cusco Centro - CUSCO - CUSCO',
+      celularDest: '12345',
+      dniDestinatario: '47065472',
+      nombreDestinatario: 'ORTEGA ROLDAN, DIEGO JESUS',
+      comprobante: { id: 9, serie: 'B0D1', correlativo: 169, cliente: null, detalles: [] },
+    });
+    await expect(svc.crearGuiaDesdeDespacho(9, 100)).rejects.toThrow(/no es válido: debe tener 9 dígitos/);
+    expect(lat.createOrder).not.toHaveBeenCalled();
+  });
+
+  it('documentoParaGuia: solo DNI, RUC o carné reales', () => {
+    expect(documentoParaGuia('47065472')).toBe('47065472');
+    expect(documentoParaGuia(' 20616250010 ')).toBe('20616250010');
+    expect(documentoParaGuia('001234567')).toBe('001234567');
+    for (const malo of ['0', '', null, '10000000', '00000000', '11111111', '1234', 'SIN DOC']) {
+      expect(documentoParaGuia(malo as any)).toBe('');
+    }
+  });
+
   it('desconectar elimina la instancia en el proveedor para liberar el cupo', async () => {
     const { svc, prisma, lat } = build();
     prisma.empresa.findUnique.mockResolvedValue(empresaCorporativa());
@@ -302,6 +355,45 @@ describe('ShalomService (proveedor único api.shalom-api.lat)', () => {
     await expect(svc.crearGuiaDesdeDespacho(9, 100)).rejects.toThrow(/Seleccione un producto/);
     // Lo crítico: no debe quedar marcado como generado.
     expect(prisma.envioDespacho.update).not.toHaveBeenCalled();
+  });
+
+  describe('declaración jurada con cuenta Shalom de empresa', () => {
+    // TIENDA MINERA SAC (21-10): su cuenta Shalom Pro es de una empresa y
+    // Shalom rechaza la guía si lleva declaración jurada.
+    function armar() {
+      const { svc, prisma, lat } = build();
+      lat.getAgencias.mockResolvedValue({ success: true, data: [agencia('7', 'Lima Centro'), agencia('582', 'Cusco Centro')], total: 2 });
+      prisma.empresa.findUnique.mockResolvedValue({ ...empresaCorporativa(), shalomClavesRetiro: '8080' });
+      prisma.envioDespacho.findFirst.mockResolvedValue({
+        id: 55, nroOrden: null, claveOrden: null, claveEnvio: '', agenciaDestino: 'Cusco Centro', shalomAgenciaDestinoId: '582',
+        celularDest: '960501397', nroPaquetes: 1, dniDestinatario: '41829994', nombreDestinatario: 'ALVARADO ARELLANO, DAVID JOHAV',
+        tipoMercaderia: 'Caja',
+        comprobante: { id: 9, serie: 'B0A1', correlativo: 9, cliente: null, detalles: [] },
+      });
+      prisma.envioDespacho.update.mockResolvedValue({ id: 55, nroOrden: '77', claveOrden: 'ABCD' });
+      return { svc, prisma, lat };
+    }
+
+    it('si Shalom la rechaza, registra la guía sin ella y con la misma clave', async () => {
+      const { svc, lat } = armar();
+      lat.createOrder
+        .mockResolvedValueOnce({ success: false, message: 'La declaración jurada solo es para persona natural.' })
+        .mockResolvedValueOnce({ success: true, data: { orderNumber: '77', orderCode: 'ABCD' } });
+      const r = await svc.crearGuiaDesdeDespacho(9, 1, { clave: '8080' });
+      expect(lat.createOrder).toHaveBeenCalledTimes(2);
+      expect(lat.createOrder.mock.calls[0][0].declaracion_jurada).toBe('Artículos de uso personal');
+      expect(lat.createOrder.mock.calls[1][0]).not.toHaveProperty('declaracion_jurada');
+      expect(lat.createOrder.mock.calls[1][0].clave).toBe(lat.createOrder.mock.calls[0][0].clave);
+      expect(r.nroOrden).toBe('77');
+    });
+
+    it('a una cuenta de persona natural se le sigue mandando', async () => {
+      const { svc, lat } = armar();
+      lat.createOrder.mockResolvedValue({ success: true, data: { orderNumber: '77', orderCode: 'ABCD' } });
+      await svc.crearGuiaDesdeDespacho(9, 1, { clave: '8080' });
+      expect(lat.createOrder).toHaveBeenCalledTimes(1);
+      expect(lat.createOrder.mock.calls[0][0].declaracion_jurada).toBe('Artículos de uso personal');
+    });
   });
 
   describe('claves de retiro', () => {
@@ -449,5 +541,32 @@ describe('ShalomService (proveedor único api.shalom-api.lat)', () => {
       await svc.crearGuiaDesdeDespacho(9, 1, {});
       expect(lat.createOrder.mock.calls[1][0].content).toBe('PAQUETE XS');
     });
+  });
+});
+
+describe('rótulo: la clave de retiro solo si la empresa lo pide (24-10)', () => {
+  const { ShalomService: Svc } = require('./shalom.service');
+  const envio = {
+    nroOrden: '101070619', claveOrden: 'J7MH', claveEnvio: '8448', celularDest: '987780983', transportista: 'SHALOM_PRO',
+    nombreDestinatario: 'ORTEGA ROLDAN, DIEGO JESUS', dniDestinatario: '47065472', tipoEnvio: 'AGENCIA',
+    agenciaDestino: 'CERRO DE PASCO', direccionDestino: '', shalomAgenciaDestinoId: null,
+    comprobante: { serie: 'B0A1', correlativo: 61, cliente: { nombre: 'DIEGO', nroDoc: '47065472', telefono: '987780983' } },
+  };
+  const armar = (claveEnRotulo: boolean, transportista = 'SHALOM_PRO') => {
+    const prisma = {
+      empresa: { findUnique: jest.fn().mockResolvedValue({ shalomClaveEnRotulo: claveEnRotulo }) },
+      envioDespacho: { findFirst: jest.fn().mockResolvedValue({ ...envio, transportista }) },
+    };
+    return new Svc(prisma as any, { getAgencias: jest.fn().mockResolvedValue({ data: [] }) } as any);
+  };
+
+  it('por defecto no sale', async () => {
+    expect((await armar(false).datosRotulo(1, 2)).claveEnvio).toBeNull();
+  });
+  it('sale si la empresa lo activó', async () => {
+    expect((await armar(true).datosRotulo(1, 2)).claveEnvio).toBe('8448');
+  });
+  it('nunca para otro courier', async () => {
+    expect((await armar(true, 'OLVA').datosRotulo(1, 2)).claveEnvio).toBeNull();
   });
 });
