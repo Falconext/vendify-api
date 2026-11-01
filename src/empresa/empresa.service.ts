@@ -27,6 +27,7 @@ import {
   getDiasRestantesLima,
 } from '../common/utils/fecha-lima';
 import { diaCalendarioLima } from '../common/utils/fecha';
+import { filtroBusquedaEmpresa } from './busqueda-empresa';
 
 function parseDDMMYYYY(input: string): Date {
   if (!input || input.trim() === '') {
@@ -968,19 +969,14 @@ export class EmpresaService {
       where.producto = productoFiltro;
     }
 
-    if (search) {
+    if (filtroBusquedaEmpresa(search)) {
       where = {
         AND: [
           ...(estado !== 'TODOS' ? [{ estado }] : []),
           ...(tipoEmpresa ? [{ tipoEmpresa }] : []),
           ...(brandFiltro ? [{ brand: brandFiltro }] : []),
           ...(productoFiltro ? [{ producto: productoFiltro }] : []),
-          {
-            OR: [
-              { ruc: { contains: search } },
-              { razonSocial: { contains: search } },
-            ],
-          },
+          filtroBusquedaEmpresa(search),
         ],
       };
     }
@@ -1690,9 +1686,7 @@ export class EmpresaService {
       ...(tipoEmpresa ? [{ tipoEmpresa }] : []),
       ...(brandFiltro ? [{ brand: brandFiltro }] : []),
       ...(productoFiltro ? [{ producto: productoFiltro }] : []),
-      ...(search
-        ? [{ OR: [{ ruc: { contains: search } }, { razonSocial: { contains: search } }] }]
-        : []),
+      ...(filtroBusquedaEmpresa(search) ? [filtroBusquedaEmpresa(search)] : []),
     ];
     const where = filtros.length ? { AND: filtros } : {};
 
