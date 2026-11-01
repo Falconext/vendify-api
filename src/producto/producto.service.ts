@@ -48,7 +48,7 @@ import { estadosAListar } from './vendibilidad';
 import { etiquetaDeMotivo } from './motivo-ajuste-stock';
 
 import { colorDe, tallaDe, varianteDe } from './atributos-variante';
-import { afectacionDeCelda } from './afectacion-igv';
+import { afectacionDeCelda, afectacionPorDefecto } from './afectacion-igv';
 import {
   ESTADO_EN_CAMINO,
   agruparEnCamino,
@@ -2462,7 +2462,11 @@ export class ProductoService {
     } else {
       // Resto de rubros: Open Food Facts primero, FDA como fallback
       const offProduct = await this.buscarEnOpenFoodFacts(codigoBarras);
-      if (offProduct) return { ...offProduct, isGlobal: true };
+      // Prefill del alta: la afectación de la empresa, no gravado fijo (Ley de Amazonía).
+      if (offProduct) {
+        const empresa = await this.prisma.empresa.findUnique({ where: { id: empresaId }, select: { leyAmazonia: true } });
+        return { ...offProduct, tipoAfectacionIGV: afectacionPorDefecto(empresa), isGlobal: true };
+      }
 
       const fdaProduct = await this.buscarEnOpenFDA(codigoBarras);
       if (fdaProduct) return { ...fdaProduct, isGlobal: true };
