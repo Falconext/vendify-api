@@ -8,6 +8,12 @@ import {
   EGRESO_CAJA_SELECT,
 } from '../common/utils/egresos-caja.util';
 import { montoCompraEnSoles, pagoCompraEnSoles } from '../common/utils/moneda-compra';
+import {
+  filtroExcluirConvertidos,
+  ingresoLineaSinIgv,
+  costoSegunCriterio,
+  normalizarCriterio,
+} from './igv-ventas';
 
 @Injectable()
 export class FinanzasService {
@@ -347,6 +353,8 @@ export class FinanzasService {
       // no son ventas reales y no deben contar en ingresos/rentabilidad.
       tipoDoc: { notIn: ['COT', '07'] },
       fechaEmision: { gte: inicioRango, lte: finRango },
+      // Una nota de venta convertida no suma: suma su boleta.
+      ...filtroExcluirConvertidos,
     };
     if (sedeId) {
       comprobanteWhere.sedeId = sedeId;
@@ -364,10 +372,28 @@ export class FinanzasService {
             descripcion: true,
             costoPromedio: true,
             costoFijo: true,
+            tipoAfectacionIGV: true,
+          },
+        },
+        // El tipo decide si se descuenta IGV; la moneda, si hay que convertir.
+        comprobante: {
+          select: {
+            id: true,
+            tipoDoc: true,
+            tipoMoneda: true,
+            tipoCambio: true,
+            mtoDescuentoGlobal: true,
           },
         },
       },
     });
+
+    // Mismo criterio de IGV que el Análisis Financiero: venta y costo en una sola base.
+    const empresaIgv = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { criterioIgvVentas: true },
+    });
+    const criterioIgv = normalizarCriterio(empresaIgv?.criterioIgvVentas);
 
     // Gasto de publicidad real hasta hoy por producto en el rango
     const finReal = hoy < finRango ? hoy : finRango;
@@ -420,11 +446,59 @@ export class FinanzasService {
     };
     const porProducto = new Map<number, ProdEntry>();
 
+    // Total por comprobante, para repartir su descuento global entre las líneas.
+    const brutoPorComprobante = new Map<number, number>();
+    for (const d of detalles) {
+      const prev = brutoPorComprobante.get(d.comprobanteId) ?? 0;
+      brutoPorComprobante.set(
+        d.comprobanteId,
+        prev +
+          ingresoLineaSinIgv(
+            String((d as any).comprobante?.tipoDoc ?? ''),
+            {
+              cantidad: Number(d.cantidad),
+              mtoPrecioUnitario: Number(d.mtoPrecioUnitario),
+              mtoValorVenta: (d as any).mtoValorVenta,
+              tipAfeIgv: (d as any).tipAfeIgv,
+            },
+            criterioIgv,
+          ),
+      );
+    }
+
     for (const d of detalles) {
       const cant = Number(d.cantidad);
-      const ingreso = Number(d.mtoPrecioUnitario) * cant;
+      const comp = (d as any).comprobante;
+      const bruto = ingresoLineaSinIgv(
+        String(comp?.tipoDoc ?? ''),
+        {
+          cantidad: cant,
+          mtoPrecioUnitario: Number(d.mtoPrecioUnitario),
+          mtoValorVenta: (d as any).mtoValorVenta,
+          tipAfeIgv: (d as any).tipAfeIgv,
+        },
+        criterioIgv,
+      );
+      const totalDoc = brutoPorComprobante.get(d.comprobanteId) ?? 0;
+      const descuentoGlobal = Number(comp?.mtoDescuentoGlobal ?? 0);
+      const suParte =
+        descuentoGlobal > 0 && totalDoc > 0
+          ? (descuentoGlobal * bruto) / totalDoc
+          : 0;
+      // En soles: una venta en dólares se convierte con el TC del documento.
+      const ingreso = montoEnPen(
+        bruto - suParte,
+        comp?.tipoMoneda,
+        comp?.tipoCambio,
+      );
+      // En la misma base que el ingreso (ver costoSegunCriterio).
       const costo = d.producto
-        ? Number(d.producto.costoPromedio ?? 0) * cant
+        ? costoSegunCriterio(
+            Number(d.producto.costoPromedio ?? 0),
+            String(comp?.tipoDoc ?? ''),
+            criterioIgv,
+            (d.producto as any).tipoAfectacionIGV,
+          ) * cant
         : 0;
       const cf = d.producto
         ? Number((d.producto as any).costoFijo ?? 0) * cant

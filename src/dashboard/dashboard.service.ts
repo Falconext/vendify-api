@@ -10,6 +10,7 @@ import { montoCompraEnSoles } from '../common/utils/moneda-compra';
 import { costoDeSede } from '../kardex/costo-sede';
 import {
   ingresoLineaSinIgv,
+  costoSegunCriterio,
   normalizarCriterio,
   type CriterioIgvVentas,
 } from '../finanzas/igv-ventas';
@@ -169,7 +170,7 @@ export class DashboardService {
         mtoPrecioUnitario: true,
         tipAfeIgv: true,
         productoId: true,
-        producto: { select: { costoPromedio: true } },
+        producto: { select: { costoPromedio: true, tipoAfectacionIGV: true } },
         comprobante: {
           select: {
             tipoMoneda: true,
@@ -230,9 +231,15 @@ export class DashboardService {
       // costo real son las unidades físicas = cantidad × unidadesPorPaquete,
       // no la cantidad facturada (p.ej. 1 caja).
       const uPaquete = Number(d.unidadesPorPaquete) || 1;
-      const costoUnitario = costoDeSede(
-        costoSedePorClave.get(`${d.productoId}:${d.comprobante.sedeId}`),
-        d.producto?.costoPromedio,
+      // En la misma base que la venta (ver costoSegunCriterio).
+      const costoUnitario = costoSegunCriterio(
+        costoDeSede(
+          costoSedePorClave.get(`${d.productoId}:${d.comprobante.sedeId}`),
+          d.producto?.costoPromedio,
+        ),
+        String(d.comprobante.tipoDoc ?? ''),
+        criterio,
+        d.producto?.tipoAfectacionIGV,
       );
       costo += costoUnitario * Number(d.cantidad ?? 0) * uPaquete;
     }
