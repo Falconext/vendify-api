@@ -416,6 +416,7 @@ model Empresa {
   /// conservan al menos 2 años y no se borran con la empresa.
   librosReclamaciones        LibroReclamacion[]
   libroReclamacionContadores LibroReclamacionContador[]
+  agendaEventos              AgendaEvento[]
 
   @@index([providerToken])
   @@index([slugTienda])
@@ -466,6 +467,8 @@ model Usuario {
   preferenciasTabla               PreferenciaTabla[]
   refreshTokens                   RefreshToken[]
   reclamacionesRespondidas        LibroReclamacion[]                 @relation("LibroReclamacionRespondidoPor")
+  agendaEventosCreados            AgendaEvento[]                     @relation("AgendaEventoCreador")
+  agendaEventosAsignados          AgendaEvento[]                     @relation("AgendaEventoResponsable")
   empresa                         Empresa?                @relation(fields: [empresaId], references: [id])
   whatsappEnvios                  WhatsAppEnvio[]
   guiasRemision                   GuiaRemision[]
@@ -3447,4 +3450,90 @@ model LibroReclamacionContador {
   ultimo    Int     @default(0)
 
   @@id([empresaId, anio])
+}
+
+// ─── Agenda (Mi negocio → Agenda) ──────────────────────────────────────────
+// Reuniones, tareas, pagos y recordatorios del negocio. Las repeticiones NO se
+// materializan: se guarda el evento base y se expanden al consultar un rango.
+// Lo único que se guarda por ocurrencia es si se completó y si ya se avisó.
+
+enum AgendaTipo {
+  REUNION
+  TAREA
+  PAGO
+  RECORDATORIO
+}
+
+enum AgendaPrioridad {
+  BAJA
+  MEDIA
+  ALTA
+}
+
+enum AgendaVisibilidad {
+  PERSONAL
+  EQUIPO
+}
+
+enum AgendaRepeticion {
+  NINGUNA
+  DIARIA
+  SEMANAL
+  MENSUAL
+}
+
+model AgendaEvento {
+  id              Int                          @id @default(autoincrement())
+  empresaId       Int
+  creadorId       Int
+  responsableId   Int?
+  titulo          String                       @db.VarChar(120)
+  descripcion     String?
+  lugar           String?                      @db.VarChar(300)
+  tipo            AgendaTipo
+  prioridad       AgendaPrioridad              @default(MEDIA)
+  visibilidad     AgendaVisibilidad            @default(PERSONAL)
+  inicio          DateTime
+  fin             DateTime?
+  todoElDia       Boolean                      @default(false)
+  repeticion      AgendaRepeticion             @default(NINGUNA)
+  /// Inclusive: la última ocurrencia es la del día (Lima) de esta fecha.
+  repetirHasta    DateTime?
+  /// Minutos antes del inicio: 15, 60 o 1440. Null = sin aviso.
+  recordatorioMin Int?
+  creadoEn        DateTime                     @default(now())
+  actualizadoEn   DateTime                     @updatedAt
+  empresa         Empresa                      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  creador         Usuario                      @relation("AgendaEventoCreador", fields: [creadorId], references: [id], onDelete: Cascade)
+  responsable     Usuario?                     @relation("AgendaEventoResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+  completados     AgendaOcurrenciaCompletada[]
+  recordatorios   AgendaRecordatorioEnviado[]
+
+  @@index([empresaId, inicio])
+  @@index([empresaId, repeticion])
+  @@index([recordatorioMin, inicio])
+}
+
+/// Ocurrencia marcada como hecha. `ocurrencia` = inicio de esa ocurrencia.
+model AgendaOcurrenciaCompletada {
+  id              Int          @id @default(autoincrement())
+  eventoId        Int
+  ocurrencia      DateTime
+  completadoPorId Int?
+  completadoEn    DateTime     @default(now())
+  evento          AgendaEvento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  @@unique([eventoId, ocurrencia])
+}
+
+/// Recordatorio ya avisado: el unique hace idempotente el cron entre instancias.
+model AgendaRecordatorioEnviado {
+  id         Int          @id @default(autoincrement())
+  eventoId   Int
+  ocurrencia DateTime
+  usuarioId  Int
+  enviadoEn  DateTime     @default(now())
+  evento     AgendaEvento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  @@unique([eventoId, ocurrencia])
 }

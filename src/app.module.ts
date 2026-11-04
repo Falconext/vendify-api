@@ -58,6 +58,7 @@ import { VehiculoModule } from './vehiculo/vehiculo.module';
 import { ContratoVehicularModule } from './contrato-vehicular/contrato-vehicular.module';
 import { TipoCambioModule } from './tipo-cambio/tipo-cambio.module';
 import { LibroReclamacionesModule } from './libro-reclamaciones/libro-reclamaciones.module';
+import { AgendaModule } from './agenda/agenda.module';
 
 @Module({
   imports: [
@@ -118,6 +119,7 @@ import { LibroReclamacionesModule } from './libro-reclamaciones/libro-reclamacio
     ContratoVehicularModule,
     TipoCambioModule,
     LibroReclamacionesModule,
+    AgendaModule,
   ],
   controllers: [AppController],
   providers: [AppService],
