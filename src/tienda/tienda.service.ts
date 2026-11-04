@@ -31,6 +31,12 @@ import {
   obtenerPlantillaComputo,
 } from '../producto/ficha-tecnica-computo';
 
+import {
+  SELECT_CATEGORIAS_EXTRA,
+  aplanarCategoriasExtra,
+  condicionesCategoriaPorNombre,
+} from '../producto/categorias-extra.util';
+
 const ESTADOS_ENVIO_NOTIFICABLES = new Set([
   'EN_CAMINO',
   'EN_REPARTO',
@@ -1027,17 +1033,28 @@ export class TiendaService {
             imagenUrl: true,
           },
         },
+        // Una categoría que el producto tiene solo como adicional también
+        // debe salir en el menú de la tienda.
+        categoriasExtra: {
+          select: {
+            categoria: { select: { id: true, nombre: true, imagenUrl: true } },
+          },
+        },
       },
     });
 
     const categoriasMap = new Map<string, any>();
 
     productos.forEach((p) => {
-      if (p.categoria?.nombre) {
-        if (!categoriasMap.has(p.categoria.nombre)) {
-          categoriasMap.set(p.categoria.nombre, {
-            nombre: p.categoria.nombre,
-            imagenUrl: p.categoria.imagenUrl,
+      const categorias = [
+        p.categoria,
+        ...(p.categoriasExtra ?? []).map((e) => e.categoria),
+      ];
+      for (const categoria of categorias) {
+        if (categoria?.nombre && !categoriasMap.has(categoria.nombre)) {
+          categoriasMap.set(categoria.nombre, {
+            nombre: categoria.nombre,
+            imagenUrl: categoria.imagenUrl,
           });
         }
       }
@@ -1236,6 +1253,7 @@ export class TiendaService {
             );
             return {
               ...product,
+              categoriasExtra: aplanarCategoriasExtra(product.categoriasExtra),
               ...(ratingByProduct.get(product.id) || {
                 ratingAvg: 0,
                 ratingCount: 0,
@@ -1283,6 +1301,7 @@ export class TiendaService {
         atributosTecnicos: true,
         opcionesAtributos: true,
         categoria: { select: { id: true, nombre: true } },
+        categoriasExtra: SELECT_CATEGORIAS_EXTRA,
         unidadMedida: { select: { codigo: true, nombre: true } },
         marca: { select: { id: true, nombre: true } },
         variantes: {
@@ -1370,12 +1389,8 @@ export class TiendaService {
           .map((c) => c.trim())
           .filter(Boolean);
         if (cats.length > 0) {
-          // Build OR conditions for each category name
-          const categoryConditions = cats.map((catName) => ({
-            categoria: {
-              nombre: { equals: catName, mode: 'insensitive' as const },
-            },
-          }));
+          // Principal o adicional, por nombre y sin distinguir mayúsculas.
+          const categoryConditions = condicionesCategoriaPorNombre(cats);
 
           // If there's already an OR condition (from search), we need to AND them
           if (wherePublicados.OR) {
@@ -1506,11 +1521,7 @@ export class TiendaService {
           .map((c) => c.trim())
           .filter(Boolean);
         if (cats.length > 0) {
-          const categoryConditions = cats.map((catName) => ({
-            categoria: {
-              nombre: { equals: catName, mode: 'insensitive' as const },
-            },
-          }));
+          const categoryConditions = condicionesCategoriaPorNombre(cats);
           if (whereActivos.OR) {
             const existingOR = whereActivos.OR;
             delete whereActivos.OR;
@@ -1672,6 +1683,7 @@ export class TiendaService {
           nombre: true,
         },
       },
+      categoriasExtra: SELECT_CATEGORIAS_EXTRA,
       marca: {
         select: {
           id: true,
@@ -1801,6 +1813,7 @@ export class TiendaService {
     return {
       ...producto,
       codigosBarras: undefined,
+      categoriasExtra: aplanarCategoriasExtra(producto.categoriasExtra),
       imagenUrl: await signIfS3((producto as any).imagenUrl),
       imagenesExtra: imagenesExtraFirmadas as any,
       atributosTecnicos: atributosTecnicosFirmados,
