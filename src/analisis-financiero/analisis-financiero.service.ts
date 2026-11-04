@@ -2531,6 +2531,7 @@ export class AnalisisFinancieroService {
       destino: 'En agencia destino',
       entregado: 'Entregado',
       PREPARANDO: 'Preparando',
+      CONFIRMADO: 'Confirmado',
       EN_CAMINO: 'En camino',
       EN_AGENCIA: 'En agencia',
       EN_DESTINO: 'En destino',

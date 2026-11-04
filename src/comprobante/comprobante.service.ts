@@ -8464,6 +8464,7 @@ export class ComprobanteService {
     };
     const DESPACHO_LABEL: Record<string, string> = {
       PREPARANDO: 'Preparando',
+      CONFIRMADO: 'Confirmado',
       EN_CAMINO: 'En camino',
       EN_DESTINO: 'En destino',
       ENTREGADO: 'Entregado',

@@ -13,11 +13,23 @@ import {
   ExportarRepartoQueryDto,
 } from './dto/envio-despacho.dto';
 import * as XLSX from 'xlsx';
+import {
+  consolidarProductos,
+  filaEva,
+  filaGeneral,
+  filaShalom,
+  type FormatoOperacion,
+  type OperacionEnvio,
+} from './operaciones-logisticas';
+import { destinoDelEnvio, textoSegunDestino } from './destino-envio';
 import { DespachoConfigDto } from './dto/despacho-config.dto';
 import { RepartidorService } from '../repartidor/repartidor.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { planPermiteShalomPro } from '../shalom/shalom.util';
 import { parseFechaSoloDia } from '../common/utils/fecha';
+
+/** Mensaje que saldría al cliente, armado sin enviarlo (vista previa). */
+type MensajeArmado = { telefono: string; texto: string };
 
 const ESTADOS_NOTIFICABLES = new Set([
   EstadoDespacho.EN_CAMINO,
@@ -73,6 +85,11 @@ const DESPACHO_TO_PEDIDO_ESTADO: Record<
   { estadoEntrega: string; estadoEnvio: string }
 > = {
   [EstadoDespacho.PREPARANDO]: {
+    estadoEntrega: 'CONFIRMADO',
+    estadoEnvio: 'POR_COORDINAR',
+  },
+  // Rótulo impreso, alistándose: para la tienda sigue sin salir.
+  [EstadoDespacho.CONFIRMADO]: {
     estadoEntrega: 'CONFIRMADO',
     estadoEnvio: 'POR_COORDINAR',
   },
@@ -280,11 +297,53 @@ export class EnvioDespachoService {
     return { despachoId: despacho.id, notas: notas.map(doc) };
   }
 
+  /**
+   * Rótulos impresos → "Confirmado": para no confundirlos con los pedidos nuevos
+   * ni imprimirlos otra vez. Solo pasan los que siguen en Preparando: uno que ya
+   * salió no retrocede. Va por `update`, así queda en el historial quién lo
+   * imprimió. No avisa al cliente.
+   */
+  async marcarRotulosImpresos(
+    empresaId: number,
+    comprobanteIds: number[],
+    usuarioId?: number,
+  ) {
+    const ids = [
+      ...new Set(
+        (comprobanteIds ?? [])
+          .map(Number)
+          .filter((n) => Number.isInteger(n) && n > 0),
+      ),
+    ];
+    if (!ids.length) return { confirmados: 0 };
+    const preparando = await this.prisma.envioDespacho.findMany({
+      where: {
+        comprobanteId: { in: ids },
+        estado: EstadoDespacho.PREPARANDO,
+        comprobante: { empresaId },
+      },
+      select: { comprobanteId: true },
+    });
+    for (const e of preparando) {
+      await this.update(
+        e.comprobanteId,
+        empresaId,
+        { estado: EstadoDespacho.CONFIRMADO } as UpdateEnvioDespachoDto,
+        usuarioId,
+        // Solo al historial: `observaciones` son las indicaciones de entrega.
+        'Rótulo impreso',
+      );
+    }
+    return { confirmados: preparando.length };
+  }
+
   async update(
     comprobanteId: number,
     empresaId: number,
     dto: UpdateEnvioDespachoDto,
     usuarioId?: number,
+    /** Nota para el historial cuando el cambio no trae observaciones propias. */
+    notaHistorial?: string,
   ) {
     const comprobante = await this.validateComprobante(
       comprobanteId,
@@ -308,7 +367,7 @@ export class EnvioDespachoService {
         {
           estado: dto.estado,
           fecha: new Date().toISOString(),
-          nota: dto.observaciones ?? null,
+          nota: dto.observaciones ?? notaHistorial ?? null,
           ...(usuarioId && { usuarioId, usuarioNombre }),
         },
       ];
@@ -362,6 +421,7 @@ export class EnvioDespachoService {
 
     if (
       estadoCambia &&
+      dto.notificar !== false &&
       ESTADOS_NOTIFICABLES.has(dto.estado as EstadoDespacho)
     ) {
       this.notificarCambioEstado(
@@ -426,6 +486,9 @@ export class EnvioDespachoService {
       empresaId,
       mensajeEnCamino: MENSAJES_DEFAULT.EN_CAMINO,
       mensajeEntregado: MENSAJES_DEFAULT.ENTREGADO,
+      // Opcionales: sin texto, provincia recibe el mismo aviso que Lima.
+      mensajeEnCaminoAgencia: null,
+      mensajeEntregadoAgencia: null,
       notificarEnCamino: true,
       notificarEntregado: true,
     };
@@ -729,8 +792,10 @@ export class EnvioDespachoService {
     empresaId: number,
     estado: EstadoDespacho,
     repartidorNombre: string | null,
+    /** Si viene, no se envía nada: se deja acá el mensaje que saldría (vista previa). */
+    armado?: MensajeArmado[],
   ): Promise<void> {
-    const [comprobante, empresa, config] = await Promise.all([
+    const [comprobante, empresa, config, envio] = await Promise.all([
       this.prisma.comprobante.findFirst({
         where: { id: comprobanteId },
         select: {
@@ -744,31 +809,38 @@ export class EnvioDespachoService {
         select: { razonSocial: true },
       }),
       this.prisma.despachoMensajeTemplate.findUnique({ where: { empresaId } }),
+      this.prisma.envioDespacho.findFirst({
+        where: { comprobanteId },
+        select: {
+          tipoEnvio: true,
+          transportista: true,
+          agenciaDestino: true,
+          claveEnvio: true,
+        },
+      }),
     ]);
 
     const telefono = comprobante?.cliente?.telefono;
     if (!telefono) return;
+    const avisar = async (texto: string) => {
+      if (armado) armado.push({ telefono, texto });
+      else await this.whatsapp.enviarTexto(telefono, texto);
+    };
 
     const esEnCamino = estado === EstadoDespacho.EN_CAMINO;
     const esEnAgencia = estado === EstadoDespacho.EN_AGENCIA;
     const pedidoRef = `${comprobante.serie}-${String(comprobante.correlativo).padStart(8, '0')}`;
 
     const nombre = comprobante?.cliente?.nombre ?? 'Cliente';
+    const agencia = envio?.agenciaDestino || 'la agencia';
 
     if (esEnAgencia) {
       const saldo = Number((comprobante as any)?.saldo ?? 0);
-      const agencia =
-        (
-          await this.prisma.envioDespacho.findFirst({
-            where: { comprobanteId },
-            select: { agenciaDestino: true },
-          })
-        )?.agenciaDestino ?? 'la agencia';
       const msg =
         saldo > 0
           ? `Hola ${nombre}! 📦 Tu pedido ${pedidoRef} llegó a ${agencia}. Para retirarlo confirma el pago restante de S/ ${saldo.toFixed(2)}. Te avisamos cuando esté listo. — ${empresa?.razonSocial ?? ''}`
           : `Hola ${nombre}! 📦 Tu pedido ${pedidoRef} ya está en ${agencia} y puedes recogerlo. — ${empresa?.razonSocial ?? ''}`;
-      await this.whatsapp.enviarTexto(telefono, msg);
+      await avisar(msg);
       return;
     }
 
@@ -777,17 +849,111 @@ export class EnvioDespachoService {
       : (config?.notificarEntregado ?? true);
     if (!habilitado) return;
 
-    const plantilla = esEnCamino
+    // Lima (motorizado) y provincia (agencia) pueden tener textos distintos;
+    // si el de provincia no está escrito, sale el general.
+    const destino = destinoDelEnvio(envio);
+    const general = esEnCamino
       ? (config?.mensajeEnCamino ?? MENSAJES_DEFAULT.EN_CAMINO)
       : (config?.mensajeEntregado ?? MENSAJES_DEFAULT.ENTREGADO);
+    const plantilla = textoSegunDestino(
+      destino,
+      general,
+      esEnCamino
+        ? config?.mensajeEnCaminoAgencia
+        : config?.mensajeEntregadoAgencia,
+    ) as string;
 
     const mensaje = plantilla
       .replace(/\{\{nombre\}\}/g, nombre)
       .replace(/\{\{pedido\}\}/g, pedidoRef)
       .replace(/\{\{repartidor\}\}/g, repartidorNombre ?? 'Sin asignar')
-      .replace(/\{\{empresa\}\}/g, empresa?.razonSocial ?? '');
+      .replace(/\{\{empresa\}\}/g, empresa?.razonSocial ?? '')
+      .replace(/\{\{agencia\}\}/g, agencia)
+      .replace(/\{\{clave\}\}/g, envio?.claveEnvio ?? '');
 
-    await this.whatsapp.enviarTexto(telefono, mensaje);
+    await avisar(mensaje);
+  }
+
+  /**
+   * El mensaje que saldría al pasar a `estado`, para que el negocio lo vea y
+   * lo edite antes de mandarlo (Panel de Ventas). `texto: null` = no hay a
+   * quién avisarle (cliente sin celular).
+   */
+  async mensajeParaEstado(
+    comprobanteId: number,
+    empresaId: number,
+    estado: string,
+  ) {
+    await this.validateComprobante(comprobanteId, empresaId);
+    // En el panel "En destino" es el "ya llegó, puede recoger": mismo texto que
+    // el de la agencia.
+    const base =
+      estado === EstadoDespacho.EN_DESTINO
+        ? EstadoDespacho.EN_AGENCIA
+        : (estado as EstadoDespacho);
+    if (ESTADOS_NOTIFICABLES.has(base)) {
+      const envio = await this.prisma.envioDespacho.findUnique({
+        where: { comprobanteId },
+        select: { repartidor: { select: { nombre: true } } },
+      });
+      const armado: MensajeArmado[] = [];
+      await this.notificarCambioEstado(
+        comprobanteId,
+        empresaId,
+        base,
+        envio?.repartidor?.nombre ?? null,
+        armado,
+      );
+      if (armado[0]) return armado[0];
+    }
+    // Los demás estados (o uno con el aviso apagado) no tienen mensaje propio:
+    // se propone uno simple que el negocio puede editar o no mandar.
+    const comp = await this.prisma.comprobante.findFirst({
+      where: { id: comprobanteId },
+      select: {
+        serie: true,
+        correlativo: true,
+        cliente: { select: { nombre: true, telefono: true } },
+      },
+    });
+    const telefono = comp?.cliente?.telefono;
+    if (!comp || !telefono) return { telefono: null, texto: null };
+    const pedido = `${comp.serie}-${String(comp.correlativo).padStart(8, '0')}`;
+    const etiqueta: Record<string, string> = {
+      PREPARANDO: 'en preparación 📦',
+      CONFIRMADO: 'en preparación 📦',
+      EN_CAMINO: 'en camino 🚚',
+      EN_AGENCIA: 'en la agencia 📦',
+      EN_DESTINO: 'en destino 📍',
+      ENTREGADO: 'entregado ✅',
+      DEVUELTO: 'devuelto',
+    };
+    return {
+      telefono,
+      texto:
+        `Hola ${comp.cliente?.nombre ?? ''}, tu pedido ${pedido} está ${etiqueta[estado] ?? estado.toLowerCase()}.`.replace(
+          /\s+,/,
+          ',',
+        ),
+    };
+  }
+
+  /** Manda el mensaje que el negocio revisó o editó, por el WhatsApp del sistema. */
+  async enviarMensajeCliente(
+    comprobanteId: number,
+    empresaId: number,
+    telefono: string,
+    texto: string,
+  ) {
+    await this.validateComprobante(comprobanteId, empresaId);
+    if (!telefono?.trim() || !texto?.trim()) {
+      throw new BadRequestException('Falta el celular o el mensaje.');
+    }
+    const r = await this.whatsapp.enviarTexto(telefono, texto.trim());
+    if (!r.success) {
+      throw new BadRequestException(r.error || 'No se pudo enviar el mensaje.');
+    }
+    return { enviado: true };
   }
 
   async actualizarSaldo(
@@ -1227,6 +1393,7 @@ export class EnvioDespachoService {
   };
   private static readonly ESTADO_LABEL: Record<string, string> = {
     PREPARANDO: 'Preparando',
+    CONFIRMADO: 'Confirmado',
     EN_CAMINO: 'En camino',
     EN_AGENCIA: 'En agencia',
     EN_DESTINO: 'En destino',
@@ -1688,5 +1855,224 @@ export class EnvioDespachoService {
       repartidor: data.repartidor?.nombre ?? null,
       repartidorData: data.repartidor ?? null,
     };
+  }
+  // ─── Operaciones logísticas: picking, packing y plantillas de courier ────
+
+  private static readonly COURIER_OPERACION: Record<string, string> = {
+    SHALOM_PRO: 'Shalom',
+    SHALOM_COD: 'Shalom COD',
+    OLVA: 'Olva',
+    PROPIOS: 'Reparto propio',
+  };
+
+  /**
+   * Los envíos elegidos en el Panel de Ventas, con lo que piden el picking, el
+   * packing y cada plantilla. Respeta el orden en que llegaron (el del panel).
+   */
+  private async enviosParaOperaciones(empresaId: number, comprobanteIds: number[]) {
+    const ids = [...new Set((comprobanteIds ?? []).map(Number))]
+      .filter((n) => Number.isInteger(n) && n > 0)
+      .slice(0, 500);
+    if (!ids.length) throw new BadRequestException('Elige al menos un envío.');
+    const envios = await this.prisma.envioDespacho.findMany({
+      where: { comprobanteId: { in: ids }, comprobante: { empresaId } },
+      include: {
+        repartidor: { select: { id: true, nombre: true } },
+        comprobante: {
+          select: {
+            id: true,
+            tipoDoc: true,
+            serie: true,
+            correlativo: true,
+            fechaEmision: true,
+            mtoImpVenta: true,
+            saldo: true,
+            estadoPago: true,
+            tipoMoneda: true,
+            tipoCambio: true,
+            sede: { select: { id: true, nombre: true } },
+            cliente: { select: { nombre: true, nroDoc: true, telefono: true, direccion: true } },
+            detalles: {
+              select: { cantidad: true, descripcion: true, unidad: true, productoId: true },
+              orderBy: { id: 'asc' },
+            },
+          },
+        },
+      },
+    });
+    const productoIds = [
+      ...new Set(
+        envios.flatMap((e) => e.comprobante.detalles.map((d) => d.productoId).filter((v): v is number => !!v)),
+      ),
+    ];
+    const productos = productoIds.length
+      ? await this.prisma.producto.findMany({
+          where: { id: { in: productoIds }, empresaId },
+          select: { id: true, codigo: true, imagenUrl: true },
+        })
+      : [];
+    const porId = new Map(productos.map((p) => [p.id, p]));
+    const orden = new Map(ids.map((id, i) => [id, i]));
+    envios.sort((a, b) => (orden.get(a.comprobanteId) ?? 0) - (orden.get(b.comprobanteId) ?? 0));
+
+    return envios.map((e) => {
+      const fila = this.filaReparto(e);
+      const c = e.comprobante;
+      const carga = String(fila.courier.CARGA || '');
+      const transportista = String(e.transportista || '').toUpperCase();
+      const op: OperacionEnvio = {
+        comprobanteId: c.id,
+        referencia: `${c.serie}-${String(c.correlativo).padStart(8, '0')}`,
+        fechaEmision: c.fechaEmision ? new Date(c.fechaEmision).toISOString() : '',
+        fechaEnvio: String(fila.courier['FECHA DE ENTREGA (DIA/MES/AÑO)'] || ''),
+        estado: EnvioDespachoService.ESTADO_LABEL[e.estado] || String(e.estado),
+        courier: transportista,
+        courierLabel: EnvioDespachoService.COURIER_OPERACION[transportista] || String(e.transportista || 'Sin courier'),
+        tipoEnvio: String(e.tipoEnvio || ''),
+        nombre: String(fila.courier['NOMBRE DEL DESTINATARIO'] || ''),
+        dni: String(e.dniDestinatario || c.cliente?.nroDoc || '').replace(/\D/g, ''),
+        telefono: String(fila.courier['TELEFONO DESTINATARIO 9 DIGITOS'] || ''),
+        agencia: String(e.agenciaDestino || '').trim(),
+        distrito: String(e.distrito || '').trim(),
+        direccion: String(e.direccionDestino || c.cliente?.direccion || '').trim(),
+        coordenadas: String(e.coordenadas || '').trim(),
+        montoCobrar: Number(fila.interno['MONTO A COBRAR'] ?? 0),
+        totalVenta: Number(fila.interno['TOTAL VENTA'] ?? 0),
+        formaPago: e.formaPagoCobro && e.formaPagoCobro !== 'NO_COBRAR' ? String(e.formaPagoCobro) : '',
+        tipoVenta: String(e.tipoVentaReparto || ''),
+        empaquetador: String(e.empaquetador || '').trim(),
+        repartidor: String(e.repartidor?.nombre || ''),
+        observaciones: String(e.observaciones || '').trim(),
+        turno: String(e.turnoEnvio || ''),
+        nroPaquetes: Number(e.nroPaquetes ?? 1) || 1,
+        tamano: String(e.shalomTamano || ''),
+        revisarProducto: !!e.revisarProducto,
+        sede: String(c.sede?.nombre || ''),
+        faltan: carga.startsWith('FALTAN DATOS:')
+          ? carga.replace('FALTAN DATOS:', '').split(',').map((v) => v.trim()).filter(Boolean)
+          : [],
+        items: c.detalles.map((d) => {
+          const p = d.productoId ? porId.get(d.productoId) : undefined;
+          return {
+            codigo: String(p?.codigo || ''),
+            descripcion: String(d.descripcion || '').trim(),
+            cantidad: Number(d.cantidad || 0),
+            unidad: String(d.unidad || ''),
+            imagenUrl: p?.imagenUrl || null,
+          };
+        }),
+      };
+      return { op, dinsides: fila.courier };
+    });
+  }
+
+  async operacionesDetalle(empresaId: number, comprobanteIds: number[]) {
+    const [envios, empresa] = await Promise.all([
+      this.enviosParaOperaciones(empresaId, comprobanteIds),
+      this.prisma.empresa.findUnique({
+        where: { id: empresaId },
+        select: { razonSocial: true, nombreComercial: true, logo: true },
+      }),
+    ]);
+    return {
+      empresa: {
+        nombre: empresa?.nombreComercial || empresa?.razonSocial || '',
+        logo: empresa?.logo || null,
+      },
+      envios: envios.map((e) => e.op),
+    };
+  }
+
+  /**
+   * Excel de los envíos elegidos: la plantilla de carga masiva de cada courier
+   * (Shalom, Dinsides, Eva) con sus columnas exactas, o el general para llevar
+   * el registro fuera del sistema.
+   */
+  async exportarOperaciones(empresaId: number, comprobanteIds: number[], formato: FormatoOperacion) {
+    const todos = await this.enviosParaOperaciones(empresaId, comprobanteIds);
+    const esAgencia = (c: string) => c.includes('SHALOM') || c.includes('OLVA');
+    // Cada plantilla lleva solo los envíos de ese courier: un Shalom en la
+    // plantilla del motorizado (o al revés) se cargaría en el portal equivocado.
+    const elegidos =
+      formato === 'SHALOM'
+        ? todos.filter((e) => e.op.courier.includes('SHALOM'))
+        : formato === 'GENERAL'
+          ? todos
+          : todos.filter((e) => !esAgencia(e.op.courier));
+    if (!elegidos.length) {
+      throw new BadRequestException(
+        formato === 'SHALOM'
+          ? 'No hay envíos por Shalom entre los elegidos.'
+          : 'No hay envíos de reparto (sin Shalom/Olva) entre los elegidos.',
+      );
+    }
+    const ops = elegidos.map((e) => e.op);
+    const wb = XLSX.utils.book_new();
+    const hoja = (filas: Record<string, unknown>[], nombre: string, anchos: number[]) => {
+      const ws = XLSX.utils.json_to_sheet(filas);
+      ws['!cols'] = anchos.map((wch) => ({ wch }));
+      if (ws['!ref']) ws['!autofilter'] = { ref: ws['!ref'] };
+      XLSX.utils.book_append_sheet(wb, ws, nombre);
+    };
+
+    if (formato === 'DINSIDES') {
+      hoja(elegidos.map((e) => e.dinsides), 'PEDIDOS', [14, 34, 30, 18, 24, 40, 24, 18, 40, 18, 16, 30, 14]);
+    } else if (formato === 'EVA') {
+      hoja(ops.map(filaEva), 'FORMULARIO', [14, 32, 18, 24, 36, 28, 26, 26, 14, 32, 40, 12, 10, 14]);
+    } else if (formato === 'SHALOM') {
+      const empresa = await this.prisma.empresa.findUnique({
+        where: { id: empresaId },
+        select: { shalomAgenciaOrigenNombre: true },
+      });
+      hoja(ops.map((o) => filaShalom(o, empresa?.shalomAgenciaOrigenNombre || '')), 'Worksheet', [16, 14, 14, 14, 10, 24, 34, 14, 6, 6, 6, 6, 10]);
+    } else {
+      hoja(ops.map(filaGeneral), 'ENVÍOS', [16, 12, 12, 14, 30, 10, 12, 24, 34, 44, 9, 10, 11, 11, 13, 16, 16, 9, 16, 30, 26]);
+      hoja(
+        consolidarProductos(ops).map((p) => ({
+          CÓDIGO: p.codigo,
+          PRODUCTO: p.descripcion,
+          'TOTAL A SACAR': p.total,
+          PEDIDOS: p.pedidos.join(', '),
+        })),
+        'PICKING',
+        [12, 44, 14, 60],
+      );
+      const porCourier = new Map<string, { envios: number; cobrar: number }>();
+      for (const o of ops) {
+        const g = porCourier.get(o.courierLabel) ?? { envios: 0, cobrar: 0 };
+        g.envios += 1;
+        g.cobrar += o.montoCobrar;
+        porCourier.set(o.courierLabel, g);
+      }
+      const ws = XLSX.utils.aoa_to_sheet([
+        ['RESUMEN DE ENVÍOS'],
+        [],
+        ['Envíos', ops.length],
+        ['Unidades', ops.reduce((s, o) => s + o.items.reduce((t, i) => t + i.cantidad, 0), 0)],
+        ['Por cobrar (S/)', this.round2(ops.reduce((s, o) => s + o.montoCobrar, 0))],
+        ['Con datos incompletos', ops.filter((o) => o.faltan.length).length],
+        [],
+        ['COURIER', 'ENVÍOS', 'POR COBRAR (S/)'],
+        ...[...porCourier.entries()].map(([k, v]) => [k, v.envios, this.round2(v.cobrar)]),
+      ]);
+      ws['!cols'] = [{ wch: 24 }, { wch: 12 }, { wch: 16 }];
+      XLSX.utils.book_append_sheet(wb, ws, 'RESUMEN');
+    }
+
+    // Lo que el portal del courier va a rechazar, para corregirlo antes de subir.
+    const incompletos = ops.filter((o) => o.faltan.length);
+    if (formato !== 'GENERAL' && formato !== 'DINSIDES' && incompletos.length) {
+      hoja(
+        incompletos.map((o) => ({ PEDIDO: o.referencia, DESTINATARIO: o.nombre, FALTA: o.faltan.join(', ') })),
+        'POR REVISAR',
+        [16, 32, 40],
+      );
+    }
+
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+    const nombre = { DINSIDES: 'Dinsides', EVA: 'EvaCourier', SHALOM: 'Shalom', GENERAL: 'Envios' }[formato];
+    const bookType = 'xlsx';
+    const buffer: Buffer = XLSX.write(wb, { bookType, type: 'buffer' });
+    return { buffer, nombreArchivo: `${nombre}_${hoy}.xlsx`, filas: ops.length, incompletos: incompletos.length };
   }
 }

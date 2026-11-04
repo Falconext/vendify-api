@@ -17,6 +17,8 @@ import {
   ShalomDerivado,
 } from './shalom.util';
 import { ConectarInstanciaDto, CrearGuiaDto } from './dto/shalom.dto';
+import { destinoDelEnvio } from '../envio-despacho/destino-envio';
+import { lineasDelRotulo } from './rotulo-datos';
 
 export type { ShalomAgencia, ShalomOrderInput } from './shalom-lat.service';
 
@@ -212,7 +214,7 @@ export class ShalomService {
   async datosRotulo(comprobanteId: number, empresaId: number) {
     const empresa = await this.prisma.empresa.findUnique({
       where: { id: empresaId },
-      select: { shalomClaveEnRotulo: true },
+      select: { shalomClaveEnRotulo: true, nombreComercial: true, razonSocial: true },
     });
     const envio = await this.prisma.envioDespacho.findFirst({
       where: { comprobanteId, comprobante: { empresaId } },
@@ -227,8 +229,19 @@ export class ShalomService {
         tipoEnvio: true,
         agenciaDestino: true,
         direccionDestino: true,
+        distrito: true,
         shalomAgenciaDestinoId: true,
-        comprobante: { select: { serie: true, correlativo: true, cliente: { select: { nombre: true, nroDoc: true, telefono: true } } } },
+        repartidor: { select: { nombre: true, color: true } },
+        comprobante: {
+          select: {
+            serie: true,
+            correlativo: true,
+            fechaEmision: true,
+            saldo: true,
+            cliente: { select: { nombre: true, nroDoc: true, telefono: true } },
+            detalles: { select: { descripcion: true, cantidad: true }, orderBy: { id: 'asc' } },
+          },
+        },
       },
     });
     if (!envio) {
@@ -276,6 +289,20 @@ export class ShalomService {
       ubicacion,
       agenciaNombre,
       direccion,
+      // De quién es el paquete, quién lo lleva y qué lleva (para alistar), y en
+      // Lima cuánto cobrar (el courier lo pide).
+      empresaNombre: (empresa?.nombreComercial || empresa?.razonSocial || '').trim(),
+      repartidor: envio.repartidor?.nombre ?? null,
+      repartidorColor: envio.repartidor?.color ?? null,
+      destino: destinoDelEnvio(envio),
+      distrito: envio.distrito ?? '',
+      // En una agencia (Shalom) el monto no va: solo en el reparto en Lima.
+      porCobrar:
+        destinoDelEnvio(envio) === 'LOCAL'
+          ? Math.max(0, Math.round(Number(envio.comprobante?.saldo ?? 0) * 100) / 100)
+          : null,
+      productos: lineasDelRotulo(envio.comprobante?.detalles ?? []),
+      fecha: envio.comprobante?.fechaEmision ?? null,
     };
   }
 
