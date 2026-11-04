@@ -448,12 +448,32 @@ describe('stock de la tienda por producto', () => {
     expect(disponibleEnOtrasSedes(ctx, p)).toEqual([
       { sedeId: 2, nombre: 'Norte', stock: 3 },
     ]);
-    const enSede = resolverContextoStock(
-      9,
-      { tiendaStockModo: 'SEDE' },
-      ACTIVAS,
-    );
-    expect(disponibleEnOtrasSedes(enSede, p)).toEqual([]);
+    const enTodas = resolverContextoStock(9, { tiendaStockModo: 'TODAS' }, ACTIVAS);
+    expect(disponibleEnOtrasSedes(enTodas, p)).toEqual([]);
+  });
+
+  // Pedido 02-11: con una sola sede en la tienda, el cliente igual se entera
+  // de que hay en otra (con su dirección), aunque no pueda comprar ahí online.
+  it('SEDE: avisa las otras sedes con stock, con su dirección', () => {
+    const enSede = resolverContextoStock(9, { tiendaStockModo: 'SEDE' }, ACTIVAS);
+    const p = producto([
+      [1, { disponible: 0 }],
+      [2, { disponible: 3 }],
+      [3, { disponible: 5, vendible: false }],
+    ]);
+    expect(disponibleEnOtrasSedes(enSede, p)).toEqual([
+      { sedeId: 2, nombre: 'Norte', stock: 3, direccion: 'Av. Túpac 500' },
+    ]);
+  });
+
+  it('SEDE: si la tienda marcó sedes, solo avisa esas', () => {
+    const enSede = resolverContextoStock(9, { tiendaStockModo: 'SEDE', tiendaSedesIds: [1, 3] }, ACTIVAS);
+    const p = producto([
+      [1, { disponible: 0 }],
+      [2, { disponible: 3 }],
+      [3, { disponible: 5 }],
+    ]);
+    expect(disponibleEnOtrasSedes(enSede, p).map((d) => d.sedeId)).toEqual([3]);
   });
 
   it('combo: mínimo de componentes ÷ cantidad; un componente no vendible lo bloquea', () => {

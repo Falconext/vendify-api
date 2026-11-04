@@ -1756,7 +1756,8 @@ export class TiendaService {
     const mapaStock = await this.stockTienda.cargar(
       ctx,
       StockTienda.idsConVariantes([producto as any]),
-      { todasHabilitadas: ctx.modo === 'CLIENTE' },
+      // SEDE también: para avisar "hay en otra sede" (sin cambiar la visibilidad).
+      { todasHabilitadas: ctx.modo === 'CLIENTE' || ctx.modo === 'SEDE' },
     );
     const visibleEnTienda = stockTiendaDe(
       ctx,

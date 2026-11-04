@@ -72,6 +72,11 @@ export interface ContextoStockTienda {
   sede: SedeTienda | null;
   /** Sedes cuyo stock cuenta en esta consulta. */
   sedeIds: number[];
+  /**
+   * SEDE: las otras sedes donde se avisa que hay stock ("Agotado aquí · hay en
+   * Surco"). El cliente no puede cambiar de sede, pero sí ir o preguntar.
+   */
+  sedesOtras?: SedeTienda[];
 }
 
 /** Lo que la tienda muestra de un producto. */
@@ -87,6 +92,8 @@ export interface DisponibleEnSede {
   sedeId: number;
   nombre: string;
   stock: number;
+  /** SEDE: dónde queda, porque el cliente no puede comprar ahí desde la web. */
+  direccion?: string | null;
 }
 
 const idValido = (v: unknown): number | null => {
@@ -161,6 +168,7 @@ export function resolverContextoStock(
       sedeDefaultId: sede.id,
       sede,
       sedeIds: [sede.id],
+      sedesOtras: sedesHabilitadas(config, activas).filter((s) => s.id !== sede.id),
     };
   }
   const habilitadas = sedesHabilitadas(config, activas);
@@ -224,13 +232,20 @@ export function stockTiendaDe(
   return { stock, vendible, visible };
 }
 
-/** CLIENTE: otras sedes habilitadas donde sí hay (para "Disponible en …"). */
+/**
+ * Otras sedes donde sí hay (para "Disponible en …"). CLIENTE: las habilitadas,
+ * y el cliente puede pasarse a una. SEDE: las demás de la empresa (o las
+ * marcadas para la tienda), con su dirección: no se compra ahí por la web,
+ * pero el cliente sabe adónde ir o qué preguntar (pedido 02-11).
+ */
 export function disponibleEnOtrasSedes(
   ctx: ContextoStockTienda,
   p: ProductoConStock | undefined,
 ): DisponibleEnSede[] {
-  if (!p || ctx.modo !== 'CLIENTE' || !ctx.sede || p.esServicio) return [];
-  return ctx.sedesHabilitadas
+  if (!p || !ctx.sede || p.esServicio) return [];
+  const candidatas =
+    ctx.modo === 'CLIENTE' ? ctx.sedesHabilitadas : ctx.modo === 'SEDE' ? (ctx.sedesOtras ?? []) : [];
+  return candidatas
     .filter((s) => s.id !== ctx.sede?.id)
     .map((s) => ({ sede: s, en: p.porSede.get(s.id) }))
     .filter(({ en }) => !!en && en.vendible && en.disponible > 0)
@@ -238,6 +253,7 @@ export function disponibleEnOtrasSedes(
       sedeId: sede.id,
       nombre: sede.nombre,
       stock: round3(en!.disponible),
+      ...(ctx.modo === 'SEDE' ? { direccion: sede.direccion ?? null } : {}),
     }));
 }
 
@@ -377,7 +393,13 @@ export class StockTienda {
     opciones: { todasHabilitadas?: boolean } = {},
   ): Promise<Map<number, ProductoConStock>> {
     const sedeIds = opciones.todasHabilitadas
-      ? [...new Set([...ctx.sedeIds, ...ctx.sedesHabilitadas.map((s) => s.id)])]
+      ? [
+          ...new Set([
+            ...ctx.sedeIds,
+            ...ctx.sedesHabilitadas.map((s) => s.id),
+            ...(ctx.sedesOtras ?? []).map((s) => s.id),
+          ]),
+        ]
       : ctx.sedeIds;
     return cargarStockPorSede(this.prisma, {
       empresaId: ctx.empresaId,
@@ -407,7 +429,7 @@ export class StockTienda {
     opciones: { conDisponibleEn?: boolean } = {},
   ): Promise<Array<ProductoTienda<T>>> {
     const conOtras =
-      opciones.conDisponibleEn === true && ctx.modo === 'CLIENTE';
+      opciones.conDisponibleEn === true && (ctx.modo === 'CLIENTE' || ctx.modo === 'SEDE');
     const mapa = await this.cargar(
       ctx,
       StockTienda.idsConVariantes(productos),
