@@ -28,6 +28,8 @@ const ETAPA_A_DESPACHO: Record<ShalomEstado, EstadoDespacho | null> = {
 // un estado puesto a mano, ni se toca un DEVUELTO).
 const RANK_DESPACHO: Record<string, number> = {
   [EstadoDespacho.PREPARANDO]: 0,
+  // Interno (rótulo impreso): el rastreo lo sigue moviendo hacia adelante.
+  [EstadoDespacho.CONFIRMADO]: 0,
   [EstadoDespacho.EN_CAMINO]: 1,
   [EstadoDespacho.EN_AGENCIA]: 2,
   [EstadoDespacho.EN_DESTINO]: 2,

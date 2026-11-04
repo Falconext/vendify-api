@@ -327,7 +327,7 @@ export class VentasService {
               nroOrden: true,
               claveOrden: true,
               repartidorId: true,
-              repartidor: { select: { nombre: true } },
+              repartidor: { select: { nombre: true, color: true } },
             } as const;
     const { empresaId, fecha, sedeId, usuarioId } = params;
 
@@ -461,7 +461,7 @@ export class VentasService {
           clienteDireccion: true,
           clienteTelefono: true,
           repartidorId: true,
-          repartidor: { select: { nombre: true } },
+          repartidor: { select: { nombre: true, color: true } },
           sede: { select: { nombre: true } },
           items: {
             select: {
@@ -578,6 +578,8 @@ export class VentasService {
         envioAgrupadoEn: (c.envioDespacho as any)?.agrupadoEn ?? null,
         repartidorId: c.envioDespacho?.repartidorId ?? null,
         repartidor: c.envioDespacho?.repartidor?.nombre ?? 'No aplica',
+        // Color de la etiqueta en la lista: quien alista ubica su pedido rápido.
+        repartidorColor: c.envioDespacho?.repartidor?.color ?? null,
         tipoEnvio: c.envioDespacho?.tipoEnvio ?? '—',
         agenciaDestino: c.envioDespacho?.agenciaDestino ?? '—',
         celularDest: c.envioDespacho?.celularDest ?? '—',
@@ -650,6 +652,7 @@ export class VentasService {
         ),
         repartidorId: p.repartidorId ?? null,
         repartidor: p.repartidor?.nombre ?? 'No aplica',
+        repartidorColor: p.repartidor?.color ?? null,
         tipoEnvio: 'AGENCIA',
         agenciaDestino: p.clienteDireccion ?? '—',
         celularDest: p.clienteTelefono ?? '—',

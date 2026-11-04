@@ -63,6 +63,7 @@ export class RepartidorService {
         tipo: dto.tipo ?? TipoRepartidorDto.EVENTUAL,
         sedeId: dto.sedeId ?? null,
         activo: dto.activo ?? true,
+        color: dto.color || null,
       },
       include: {
         sede: {
@@ -88,6 +89,7 @@ export class RepartidorService {
         ...(dto.tipo !== undefined && { tipo: dto.tipo }),
         ...(dto.sedeId !== undefined && { sedeId: dto.sedeId ?? null }),
         ...(dto.activo !== undefined && { activo: dto.activo }),
+        ...(dto.color !== undefined && { color: dto.color || null }),
       },
       include: {
         sede: {

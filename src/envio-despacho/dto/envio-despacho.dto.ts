@@ -8,11 +8,14 @@ import {
   Min,
   IsIn,
   IsBoolean,
+  IsArray,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum EstadoDespacho {
   PREPARANDO = 'PREPARANDO',
+  CONFIRMADO = 'CONFIRMADO',
   EN_CAMINO = 'EN_CAMINO',
   EN_AGENCIA = 'EN_AGENCIA',
   EN_DESTINO = 'EN_DESTINO',
@@ -83,6 +86,8 @@ export class CreateEnvioDespachoDto {
    * la ficha del cliente para que la próxima venta ya salga completa.
    */
   @IsOptional() @IsBoolean() actualizarFichaCliente?: boolean;
+  /** false = cambiar el estado sin el aviso automático (el negocio lo manda editado). */
+  @IsOptional() @IsBoolean() notificar?: boolean;
   @IsOptional() @IsString() contenidoPaquete?: string;
   /** type_product de Shalom elegido en la coordinación de envío. */
   @IsOptional() @Type(() => Number) @IsInt() shalomTipoProducto?: number;
@@ -133,3 +138,17 @@ export class ExportarRepartoQueryDto {
   @IsIn(['PROPIOS', 'SHALOM', 'OLVA', 'TODOS'])
   courier?: 'PROPIOS' | 'SHALOM' | 'OLVA' | 'TODOS';
 }
+
+/** Envíos elegidos en el Panel de Ventas para picking, packing o una plantilla de courier. */
+export class OperacionesLogisticasDto {
+  @IsArray()
+  @ArrayMaxSize(500)
+  @Type(() => Number)
+  @IsInt({ each: true })
+  comprobanteIds!: number[];
+
+  @IsOptional()
+  @IsIn(['DINSIDES', 'EVA', 'SHALOM', 'GENERAL'])
+  formato?: 'DINSIDES' | 'EVA' | 'SHALOM' | 'GENERAL';
+}
+

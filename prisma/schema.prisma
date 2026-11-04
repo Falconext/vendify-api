@@ -2311,6 +2311,8 @@ enum TipoGuiaRemision {
 
 enum EstadoDespacho {
   PREPARANDO
+  /// Interno: los rótulos ya se imprimieron y lo están alistando. No avisa al cliente.
+  CONFIRMADO
   EN_CAMINO
   EN_AGENCIA
   EN_DESTINO
@@ -2330,6 +2332,12 @@ model EnvioDespacho {
   transportista            String?
   codigoGuia               String?
   estado                   EstadoDespacho     @default(PREPARANDO)
+  /// Token del enlace que se le manda al CLIENTE para que llene él mismo sus
+  /// datos de envío (nombre, DNI, celular, agencia). Ver
+  /// `datos-cliente-envio.ts`: se cierra cuando hay guía o el paquete salió.
+  datosClienteToken        String?            @unique
+  /// Cuándo los llenó (o corrigió) el cliente por última vez.
+  datosClienteEn           DateTime?
   observaciones            String?
   direccionDestino         String?
   fechaEstimada            DateTime?
@@ -2409,6 +2417,8 @@ model Repartidor {
   celular        String?
   tipo           TipoRepartidor  @default(EVENTUAL)
   activo         Boolean         @default(true)
+  /// Color de su etiqueta en la lista de ventas (#RRGGBB): quien alista ubica rápido su pedido.
+  color          String?
   empresaId      Int
   empresa        Empresa         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   sedeId         Int?
@@ -2429,7 +2439,13 @@ model DespachoMensajeTemplate {
   empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   mensajeEnCamino    String?
+  /// Variante opcional de "en camino" para envíos a provincia (agencia
+  /// Shalom/Olva). Null o vacío = sale `mensajeEnCamino`.
+  mensajeEnCaminoAgencia  String?
   mensajeEntregado   String?
+  /// Variante opcional de "entregado" para provincia (recogió en agencia).
+  /// Null o vacío = sale `mensajeEntregado`.
+  mensajeEntregadoAgencia String?
   notificarEnCamino  Boolean @default(true)
   notificarEntregado Boolean @default(true)
 

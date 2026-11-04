@@ -19,6 +19,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { EnvioDespachoService } from './envio-despacho.service';
 import { EvidenciaEntregaService } from './evidencia-entrega.service';
+import { DatosEnvioClienteService } from './datos-cliente-envio.service';
 import { evidenciaUploadOptions } from '../common/utils/multer.config';
 import {
   RegistrarEvidenciaDto,
@@ -32,6 +33,7 @@ import {
   CreateEnvioDespachoDto,
   UpdateEnvioDespachoDto,
   ExportarRepartoQueryDto,
+  OperacionesLogisticasDto,
 } from './dto/envio-despacho.dto';
 import { DespachoConfigDto } from './dto/despacho-config.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -43,6 +45,7 @@ export class EnvioDespachoController {
   constructor(
     private readonly service: EnvioDespachoService,
     private readonly evidencias: EvidenciaEntregaService,
+    private readonly datosCliente: DatosEnvioClienteService,
   ) {}
 
   /**
@@ -177,6 +180,39 @@ export class EnvioDespachoController {
     res.status(200).send(buffer);
   }
 
+  /** Picking y packing: los envíos elegidos con sus productos y destino. */
+  @Post('operaciones/detalle')
+  operacionesDetalle(@User() user: any, @Body() dto: OperacionesLogisticasDto) {
+    return this.service.operacionesDetalle(user.empresaId, dto.comprobanteIds);
+  }
+
+  /** Rótulos impresos: los que seguían en Preparando pasan a Confirmado. */
+  @Post('rotulos-impresos')
+  rotulosImpresos(@User() user: any, @Body() dto: OperacionesLogisticasDto) {
+    return this.service.marcarRotulosImpresos(
+      user.empresaId,
+      dto.comprobanteIds,
+      user.sub ?? user.id,
+    );
+  }
+
+  /** Plantilla de carga masiva del courier (Shalom, Dinsides, Eva) o Excel general. */
+  @Post('operaciones/exportar')
+  async exportarOperaciones(
+    @User() user: any,
+    @Body() dto: OperacionesLogisticasDto,
+    @Res() res: Response,
+  ) {
+    const { buffer, nombreArchivo } = await this.service.exportarOperaciones(
+      user.empresaId,
+      dto.comprobanteIds,
+      dto.formato ?? 'GENERAL',
+    );
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${nombreArchivo}`);
+    res.status(200).send(buffer);
+  }
+
   /** Resumen del reparto propio (mismos filtros que el export) para el panel. */
   @Get('reparto/resumen')
   resumenReparto(@User() user: any, @Query() query: ExportarRepartoQueryDto) {
@@ -226,6 +262,48 @@ export class EnvioDespachoController {
       user.empresaId,
       dto,
       user.id ?? undefined,
+    );
+  }
+
+  /** El aviso que saldría al pasar a `estado`, para revisarlo antes de mandarlo. */
+  @Get('comprobante/:comprobanteId/mensaje-estado')
+  mensajeParaEstado(
+    @Param('comprobanteId', ParseIntPipe) comprobanteId: number,
+    @Query('estado') estado: string,
+    @User() user: any,
+  ) {
+    return this.service.mensajeParaEstado(comprobanteId, user.empresaId, estado);
+  }
+
+  /** Manda al cliente el aviso que el negocio revisó o editó. */
+  @Post('comprobante/:comprobanteId/mensaje')
+  enviarMensajeCliente(
+    @Param('comprobanteId', ParseIntPipe) comprobanteId: number,
+    @Body() body: { telefono: string; texto: string },
+    @User() user: any,
+  ) {
+    return this.service.enviarMensajeCliente(
+      comprobanteId,
+      user.empresaId,
+      body.telefono,
+      body.texto,
+    );
+  }
+
+  /**
+   * El enlace para que el CLIENTE llene sus datos de envío (provincia).
+   * Crea el despacho si la venta todavía no tenía. Se manda desde el WhatsApp
+   * de quien vende.
+   */
+  @Post('comprobante/:comprobanteId/enlace-datos-cliente')
+  enlaceDatosCliente(
+    @User() user: any,
+    @Param('comprobanteId', ParseIntPipe) comprobanteId: number,
+  ) {
+    return this.datosCliente.enlace(
+      comprobanteId,
+      user.empresaId,
+      user.sub ?? user.id,
     );
   }
 
