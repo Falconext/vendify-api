@@ -41,6 +41,14 @@ export class ListProductoDto {
   @Min(1)
   categoriaId?: number;
 
+  /**
+   * Solo los modelos que tienen esta variante activa, como "Talla=M" o
+   * "Color=Rojo" (sin distinguir mayúsculas). Filtro del inventario.
+   */
+  @IsOptional()
+  @IsString()
+  variante?: string;
+
   /** Filtra por localización física (estante/zona) tal como está guardada en el producto. */
   @IsOptional()
   @Type(() => String)

@@ -103,13 +103,14 @@ describe('Categorías adicionales del producto', () => {
 
   describe('filtros', () => {
     it('principal, adicional o adicional del padre (variantes)', () => {
-      expect(filtroPorCategoria(7)).toEqual({
-        OR: [
+      // (más las subcategorías: subcategorias-filtros.spec.ts)
+      expect(filtroPorCategoria(7).OR).toEqual(
+        expect.arrayContaining([
           { categoriaId: 7 },
           { categoriasExtra: { some: { categoriaId: 7 } } },
           { productoPadre: { categoriasExtra: { some: { categoriaId: 7 } } } },
-        ],
-      });
+        ]),
+      );
     });
 
     it('se suma al AND de la búsqueda sin pisar su OR', () => {
@@ -138,10 +139,12 @@ describe('Categorías adicionales del producto', () => {
 
     it('tienda: por nombre, principal o adicional, sin mayúsculas', () => {
       const igual = { equals: 'Ofertas', mode: 'insensitive' };
-      expect(condicionesCategoriaPorNombre(['Ofertas'])).toEqual([
-        { categoria: { nombre: igual } },
-        { categoriasExtra: { some: { categoria: { nombre: igual } } } },
-      ]);
+      expect(condicionesCategoriaPorNombre(['Ofertas'])).toEqual(
+        expect.arrayContaining([
+          { categoria: { nombre: igual } },
+          { categoriasExtra: { some: { categoria: { nombre: igual } } } },
+        ]),
+      );
     });
   });
 

@@ -514,9 +514,15 @@ model Categoria {
   imagenUrl      String?
   empresaId      Int?
   empresa        Empresa?                @relation(fields: [empresaId], references: [id])
+  /// Subcategoría de esta categoría (un solo nivel). Al borrar la madre, la hija queda suelta.
+  padreId        Int?
+  padre          Categoria?              @relation("CategoriaSubcategorias", fields: [padreId], references: [id], onDelete: SetNull)
+  subcategorias  Categoria[]             @relation("CategoriaSubcategorias")
   productos      Producto[]
   productosExtra ProductoCategoriaExtra[]
   fichasTecnicas FichaTecnicaPlantilla[]
+
+  @@index([padreId])
 }
 
 model FichaTecnicaPlantilla {

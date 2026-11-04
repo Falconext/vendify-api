@@ -1172,13 +1172,21 @@ export class TiendaService {
             id: true,
             nombre: true,
             imagenUrl: true,
+            padre: { select: { nombre: true, imagenUrl: true } },
           },
         },
         // Una categoría que el producto tiene solo como adicional también
         // debe salir en el menú de la tienda.
         categoriasExtra: {
           select: {
-            categoria: { select: { id: true, nombre: true, imagenUrl: true } },
+            categoria: {
+              select: {
+                id: true,
+                nombre: true,
+                imagenUrl: true,
+                padre: { select: { nombre: true, imagenUrl: true } },
+              },
+            },
           },
         },
       },
@@ -1196,6 +1204,17 @@ export class TiendaService {
           categoriasMap.set(categoria.nombre, {
             nombre: categoria.nombre,
             imagenUrl: categoria.imagenUrl,
+            // Subcategoría: el nombre de su madre, para que la tienda agrupe.
+            padre: categoria.padre?.nombre ?? null,
+          });
+        }
+        // La madre sale en el menú aunque sus productos estén todos en hijas.
+        const madre = categoria?.padre;
+        if (madre?.nombre && !categoriasMap.has(madre.nombre)) {
+          categoriasMap.set(madre.nombre, {
+            nombre: madre.nombre,
+            imagenUrl: madre.imagenUrl,
+            padre: null,
           });
         }
       }

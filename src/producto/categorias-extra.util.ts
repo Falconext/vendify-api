@@ -71,11 +71,17 @@ export function sanitizarCategoriasExtraIds(
 export function filtroPorCategoria(
   categoriaId: number,
 ): Prisma.ProductoWhereInput {
+  // Una categoría con subcategorías incluye lo de sus hijas: filtrar por
+  // "Peluches" trae también "Peluches > Osos".
+  const hija = { padreId: categoriaId };
   return {
     OR: [
       { categoriaId },
+      { categoria: hija },
       { categoriasExtra: { some: { categoriaId } } },
+      { categoriasExtra: { some: { categoria: hija } } },
       { productoPadre: { categoriasExtra: { some: { categoriaId } } } },
+      { productoPadre: { categoriasExtra: { some: { categoria: hija } } } },
     ],
   };
 }
@@ -167,6 +173,9 @@ export function condicionesCategoriaPorNombre(
     return [
       { categoria: { nombre: igual } },
       { categoriasExtra: { some: { categoria: { nombre: igual } } } },
+      // Elegir la categoría madre trae también lo de sus subcategorías.
+      { categoria: { padre: { nombre: igual } } },
+      { categoriasExtra: { some: { categoria: { padre: { nombre: igual } } } } },
     ];
   });
 }
@@ -196,4 +205,17 @@ export function separarNombresCategorias(valor: unknown): string[] {
 /** Nombres de las adicionales como van en la columna CATEGORIAS_EXTRA. */
 export function unirNombresCategorias(categorias: CategoriaResumen[]): string {
   return categorias.map((c) => c.nombre).join(' | ');
+}
+
+/**
+ * Celda CATEGORIA del Excel con subcategoría: "Peluches > Osos" →
+ * ["Peluches", "Osos"]. Sin ">", un solo nombre. Más de un nivel se recorta a
+ * los dos primeros (solo hay un nivel de subcategorías).
+ */
+export function separarRutaCategoria(valor: string): string[] {
+  const partes = String(valor ?? '')
+    .split('>')
+    .map((p) => p.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  return partes.slice(0, 2);
 }

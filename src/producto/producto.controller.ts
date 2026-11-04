@@ -931,6 +931,7 @@ export class ProductoController {
       order: query.order,
       marcaId: query.marcaId,
       categoriaId: query.categoriaId,
+      variante: query.variante,
       localizacion: query.localizacion,
       soloVendibles: query.soloVendibles,
       usarPrecioSede: query.usarPrecioSede,
@@ -946,6 +947,13 @@ export class ProductoController {
     });
     res.locals.message = 'Productos listados correctamente';
     return resultado;
+  }
+
+  /** Tallas, colores… de las variantes activas: opciones del filtro del inventario. */
+  @Get('atributos-variantes')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  atributosVariantes(@User() user: any) {
+    return this.service.atributosDeVariantes(user.empresaId);
   }
 
   // ==================== DISPONIBILIDAD POR SEDE ====================

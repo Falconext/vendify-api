@@ -48,6 +48,7 @@ import { estadosAListar } from './vendibilidad';
 import {
   SELECT_CATEGORIAS_EXTRA,
   agregarFiltroCategoria,
+  separarRutaCategoria,
   aplanarCategoriasExtra,
   guardarCategoriasExtra,
   quitarPrincipalDeExtras,
@@ -68,6 +69,7 @@ import {
   saldoPrometible,
   type EnCaminoDeProducto,
 } from '../compras/stock-en-camino';
+import { agruparAtributos, parsearFiltroVariante } from './filtro-variante';
 import { conStockDeSede } from './stock-variante-sede';
 @Injectable()
 export class ProductoService {
@@ -1069,6 +1071,51 @@ export class ProductoService {
     );
   }
 
+  /**
+   * Filtro "tiene la talla M" del inventario: los modelos con esa variante
+   * activa (y, si el listado incluye variantes, esas variantes). El nombre y
+   * el valor se comparan sin mayúsculas ni espacios de más.
+   */
+  private async condicionPorVariante(
+    empresaId: number,
+    variante: string | undefined,
+    conVariantes: boolean,
+  ): Promise<any | null> {
+    const par = parsearFiltroVariante(variante);
+    if (!par) return null;
+    const filas = await this.prisma.$queryRaw<{ id: number; padre: number }[]>`
+      SELECT p.id, p."productoPadreId" AS padre FROM "Producto" p
+      WHERE p."empresaId" = ${empresaId}
+        AND p."productoPadreId" IS NOT NULL
+        AND p.estado = 'ACTIVO'
+        AND p."valoresAtributos" IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM jsonb_each_text(CASE WHEN jsonb_typeof(p."valoresAtributos"::jsonb) = 'object' THEN p."valoresAtributos"::jsonb ELSE '{}'::jsonb END) a
+          WHERE upper(trim(a.key)) = upper(${par.nombre})
+            AND upper(trim(a.value)) = upper(${par.valor})
+        )`;
+    const ids = conVariantes
+      ? [...filas.map((f) => f.id), ...filas.map((f) => f.padre)]
+      : filas.map((f) => f.padre);
+    return { id: { in: [...new Set(ids)] } };
+  }
+
+  /** Tallas, colores… que existen en las variantes activas, para el filtro. */
+  async atributosDeVariantes(empresaId: number) {
+    const filas = await this.prisma.$queryRaw<{ nombre: string; valor: string; modelos: number }[]>`
+      SELECT min(trim(a.key)) AS nombre, min(trim(a.value)) AS valor,
+             count(DISTINCT p."productoPadreId")::int AS modelos
+      FROM "Producto" p, jsonb_each_text(CASE WHEN jsonb_typeof(p."valoresAtributos"::jsonb) = 'object' THEN p."valoresAtributos"::jsonb ELSE '{}'::jsonb END) a
+      WHERE p."empresaId" = ${empresaId}
+        AND p."productoPadreId" IS NOT NULL
+        AND p.estado = 'ACTIVO'
+        AND p."valoresAtributos" IS NOT NULL
+        AND trim(a.value) <> ''
+      GROUP BY upper(trim(a.key)), upper(trim(a.value))`;
+    return agruparAtributos(filas);
+  }
+
+
   async listar(params: {
     empresaId: number;
     sedeId?: number;
@@ -1079,6 +1126,8 @@ export class ProductoService {
     order?: 'asc' | 'desc';
     marcaId?: number;
     categoriaId?: number;
+    /** "Talla=M": solo modelos con esa variante activa. */
+    variante?: string;
     /** Localización física (estante/zona); comparación sin distinguir mayúsculas. */
     localizacion?: string;
     incluirVariantes?: string | boolean;
@@ -1151,6 +1200,11 @@ export class ProductoService {
     // La categoría vale como principal o adicional; va al AND junto a la
     // búsqueda, que ya usa OR por palabra.
     if (categoriaId) where.AND = agregarFiltroCategoria(where, categoriaId).AND;
+    const filtroVariante = await this.condicionPorVariante(empresaId, params.variante, conVariantes);
+    if (filtroVariante) {
+      const previo = where.AND;
+      where.AND = [...(Array.isArray(previo) ? previo : previo ? [previo] : []), filtroVariante];
+    }
 
     if (!conVariantes && !porIds) {
       where.productoPadreId = null;
@@ -5108,20 +5162,26 @@ export class ProductoService {
         // Auto-upsert category: create if it doesn't exist
         let categoriaId: number | undefined;
         if (categoriaRaw) {
-          const categoriaKey = categoriaRaw
-            .toString()
-            .toUpperCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '');
-          let id = categoriaMap.get(categoriaKey);
-          if (!id) {
-            const nueva = await this.prisma.categoria.create({
-              data: { nombre: String(categoriaRaw).trim(), empresaId },
-            });
-            id = nueva.id;
-            categoriaMap.set(categoriaKey, id);
-          }
-          categoriaId = id;
+          const clave = (n: string) =>
+            n.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const obtener = async (nombre: string, padreId: number | null) => {
+            let id = categoriaMap.get(clave(nombre));
+            if (!id) {
+              const nueva = await this.prisma.categoria.create({
+                data: { nombre, empresaId, padreId },
+              });
+              id = nueva.id;
+              categoriaMap.set(clave(nombre), id);
+            }
+            return id;
+          };
+          // "Peluches > Osos": la subcategoría Osos dentro de Peluches. Si la
+          // subcategoría ya existía, se usa tal como está.
+          const ruta = separarRutaCategoria(String(categoriaRaw));
+          categoriaId =
+            ruta.length === 2
+              ? await obtener(ruta[1], await obtener(ruta[0], null))
+              : await obtener(ruta[0] ?? String(categoriaRaw).trim(), null);
         }
 
         // Adicionales: mismo alta automática que la principal. Celda vacía =

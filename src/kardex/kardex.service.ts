@@ -791,7 +791,11 @@ export class KardexService {
     };
 
     if (filtros?.categoriaId) {
-      whereProductos.categoriaId = filtros.categoriaId;
+      // La categoría y sus subcategorías.
+      whereProductos.OR = [
+        { categoriaId: filtros.categoriaId },
+        { categoria: { padreId: filtros.categoriaId } },
+      ];
     }
 
     // Para stock crítico, filtraremos después de obtener los datos
