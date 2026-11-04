@@ -22,6 +22,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { User } from '../common/decorators/user.decorator';
+import { SoloFotosInterceptor } from '../usuarios/solo-fotos';
 import type { Response } from 'express';
 import { CreateProductoDto } from './dto/create-producto.dto';
 import { ListProductoDto } from './dto/list-producto.dto';
@@ -43,6 +44,7 @@ import { KardexService } from '../kardex/kardex.service';
 import { parseFechaSoloDia } from '../common/utils/fecha';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
+@UseInterceptors(SoloFotosInterceptor)
 @Controller('productos')
 export class ProductoController {
   private readonly imageSearchCache = new Map<

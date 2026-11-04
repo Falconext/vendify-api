@@ -42,6 +42,7 @@ import {
 } from '../common/utils/multer.config';
 import { numeroALetras } from './utils/numero-a-letras';
 import { verificarPuedeAnularComprobante } from './puede-anular-comprobante.util';
+import { verificarPuedeVenderEnSede } from '../usuarios/puede-vender-en-sede.util';
 import { IdempotenciaPanelInterceptor } from '../integraciones/idempotencia/idempotencia-panel.interceptor';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -635,6 +636,7 @@ export class ComprobanteController {
   @UseInterceptors(IdempotenciaPanelInterceptor)
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearBoleta(@User() user: any, @Body() dto: CrearComprobanteDto) {
+    verificarPuedeVenderEnSede(user, undefined, dto?.sedeId);
     let comp;
     try {
       console.log(
@@ -712,6 +714,7 @@ export class ComprobanteController {
   @UseInterceptors(IdempotenciaPanelInterceptor)
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearFactura(@User() user: any, @Body() dto: CrearComprobanteDto) {
+    verificarPuedeVenderEnSede(user, undefined, dto?.sedeId);
     let comp;
     try {
       console.log(
@@ -847,6 +850,7 @@ export class ComprobanteController {
     @User() user: any,
     @Body() dto: CrearComprobanteDto,
   ) {
+    verificarPuedeVenderEnSede(user, dto?.tipoDoc, dto?.sedeId);
     const effectiveSedeId = user.sedeId ?? dto?.sedeId ?? undefined;
     const comp = await this.service.crearInformal(
       dto,
@@ -877,6 +881,7 @@ export class ComprobanteController {
         'Solo se pueden importar Facturas (01) o Boletas (03).',
       );
     }
+    verificarPuedeVenderEnSede(user, undefined, dto?.sedeId);
     const effectiveSedeId = user.sedeId ?? dto?.sedeId ?? undefined;
     const comp = await this.service.crearFormal(
       dto,
@@ -926,6 +931,7 @@ export class ComprobanteController {
     if (!files?.length) {
       throw new BadRequestException('No se recibieron archivos XML');
     }
+    verificarPuedeVenderEnSede(user);
     const effectiveSedeId = user.sedeId ?? undefined;
     // Flags opcionales (llegan como string en multipart). Default: true.
     const afectarStock = body?.afectarStock !== 'false';
@@ -1047,6 +1053,7 @@ export class ComprobanteController {
     @User() user: any,
     @Body() dto: ImportarNotaVentaDto,
   ) {
+    verificarPuedeVenderEnSede(user);
     const effectiveSedeId = user.sedeId ?? undefined;
     const comp = await this.importarNotaVenta.importarUno(
       user.empresaId,
@@ -1073,6 +1080,7 @@ export class ComprobanteController {
     if (!file?.buffer) {
       throw new BadRequestException('No se recibió ningún archivo Excel/CSV.');
     }
+    verificarPuedeVenderEnSede(user);
     // Flags llegan como string en multipart. Default: APAGADOS (histórico).
     const afectarStock = body?.afectarStock === 'true';
     const afectarCaja = body?.afectarCaja === 'true';

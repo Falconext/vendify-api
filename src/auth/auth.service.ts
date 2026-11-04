@@ -415,9 +415,11 @@ export class AuthService {
         sistemaNegocio: true,
         sistemaProducto: true,
         puedeAnularComprobantes: true,
+        soloImagenesProductos: true,
         sedeId: true,
         sedesAsignadas: {
           select: {
+            puedeVender: true,
             sede: {
               select: {
                 id: true,
@@ -630,7 +632,10 @@ export class AuthService {
         orderBy: [{ esPrincipal: 'desc' }, { id: 'asc' }],
       });
     } else {
-      usuario.sedes = (usuario.sedesAsignadas || []).map((us: any) => us.sede);
+      usuario.sedes = (usuario.sedesAsignadas || []).map((us: any) => ({
+        ...us.sede,
+        puedeVender: us.puedeVender,
+      }));
     }
     delete usuario.sedesAsignadas;
 

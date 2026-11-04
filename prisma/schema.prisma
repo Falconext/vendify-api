@@ -481,6 +481,8 @@ model Usuario {
   // permiso, igual que el comportamiento actual): anular/eliminar
   // comprobantes queda reservado a ADMIN_EMPRESA salvo que se active aquí.
   puedeAnularComprobantes         Boolean                 @default(false)
+  /// Solo gestiona las fotos de los productos: no ve ni toca precios, costos ni datos.
+  soloImagenesProductos           Boolean                 @default(false)
   actasInspeccion                 ActaInspeccion[]
   listasPrecio                    ListaPrecioUsuario[]
   reglasComision                  ReglaComision[]
@@ -1807,6 +1809,8 @@ model UsuarioSede {
   id        Int     @id @default(autoincrement())
   usuarioId Int
   sedeId    Int
+  /// false = entra a la sede (stock, cotizaciones, traslados) pero no emite ventas ahí.
+  puedeVender Boolean @default(true)
   usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   sede      Sede    @relation(fields: [sedeId], references: [id], onDelete: Cascade)
 

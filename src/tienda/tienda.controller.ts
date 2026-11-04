@@ -17,6 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { imageUploadOptions } from '../common/utils/multer.config';
 import { TiendaService } from './tienda.service';
 import { PedidoNotaVentaService } from './pedido-nota-venta.service';
+import { verificarPuedeVenderEnSede } from '../usuarios/puede-vender-en-sede.util';
 import { ConfigurarTiendaDto } from './dto/configurar-tienda.dto';
 import { ActualizarEstadoPedidoDto } from './dto/actualizar-pedido.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -153,6 +154,7 @@ export class TiendaController {
     @Param('id') id: string,
     @Body() body: { adelanto?: number; medioPago?: string },
   ) {
+    verificarPuedeVenderEnSede(req.user, 'NV');
     return this.pedidoNotaVenta.generar(
       req.user.empresaId,
       +id,
