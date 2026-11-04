@@ -137,6 +137,12 @@ model Empresa {
   // seguir agregando de la misma lista (true) o limpiar y mostrar todo el
   // catálogo (false, comportamiento original pedido por Demenver)?
   posMantenerBusqueda       Boolean                       @default(false)
+  // Dólar y márgenes (Compras): cuánto tiene que moverse el TC desde la última
+  // compra en US$ para avisar, qué margen sobre el precio se busca y cuántos
+  // soles se suman al TC del día al sugerir precios (colchón).
+  tcAlertaUmbralPct         Decimal                       @default(3) @db.Decimal(5, 2)
+  margenObjetivoPct         Decimal                       @default(30) @db.Decimal(5, 2)
+  tcColchon                 Decimal                       @default(0) @db.Decimal(6, 3)
   // Resumen diario de productos en su stock mínimo o por debajo (8:00 Lima),
   // además del aviso en la campana del panel. Por correo a los administradores
   // (o a `alertaStockCorreos`) y por WhatsApp a `alertaStockCelular` desde el
@@ -1919,6 +1925,10 @@ model Compra {
   // del mes (neto, sin IGV: ese IGV es crédito fiscal). Por defecto se marca
   // sola cuando ninguna línea está enlazada a un producto del catálogo.
   esGasto              Boolean            @default(false)
+  // Factura registrada SOLO por su crédito de IGV: la empresa no la pagó.
+  // No resta de la ganancia ni de la caja, bancos o cuentas por pagar; sí va
+  // al registro de compras (SIRE) y al crédito fiscal. Solo sin productos del catálogo.
+  soloCreditoIgv       Boolean            @default(false)
   creadoEn             DateTime           @default(now())
   actualizadoEn        DateTime           @updatedAt
   cuotas               Json?
@@ -1960,6 +1970,10 @@ model DetalleCompra {
   total            Decimal
   lote             String?
   fechaVencimiento DateTime?
+  // Lo que ya entró al stock. null = todo (la compra normal). Menor que
+  // cantidad = la factura se registró completa pero la mercadería llega por
+  // partes (orden de compra con entregas parciales).
+  cantidadRecibida Decimal?
   // Distribución por sede: a qué sede/almacén entra ESTA línea. null = la sede
   // de la cabecera de la compra. Una factura de 10 unidades repartida 6/4 entre
   // dos sedes se guarda como dos líneas del mismo producto con distinta sede.
@@ -2223,6 +2237,10 @@ model DetalleOrdenCompra {
   cantidad       Decimal
   precioUnitario Decimal
   subtotal       Decimal
+  // Lo que ya llegó, en unidades. El proveedor puede mandar la orden en
+  // varias entregas (factura una sola vez, despacha por partes): la orden
+  // queda PARCIAL hasta que cantidadRecibida alcanza cantidad.
+  cantidadRecibida Decimal     @default(0)
   ordenCompra    OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
   producto       Producto?   @relation(fields: [productoId], references: [id])
 
@@ -2264,6 +2282,7 @@ model OrdenCompraOrigen {
 enum EstadoOrdenCompra {
   BORRADOR
   EMITIDA
+  PARCIAL
   RECIBIDA
   ANULADA
 }

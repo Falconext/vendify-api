@@ -13,10 +13,12 @@ import { S3Module } from '../s3/s3.module';
 import { OrdenCompraController } from './orden-compra.controller';
 import { OrdenCompraService } from './orden-compra.service';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
+import { CostoReposicionController } from './costo-reposicion.controller';
+import { CostoReposicionService } from './costo-reposicion.service';
 
 @Module({
   imports: [PrismaModule, KardexModule, ProductoModule, ComprobanteModule, GeminiModule, S3Module, ClienteModule, TipoCambioModule, NotificacionesModule],
-  controllers: [OrdenCompraController, ComprasController],
-  providers: [ComprasService, OrdenCompraService, ImportarComprasService],
+  controllers: [OrdenCompraController, CostoReposicionController, ComprasController],
+  providers: [ComprasService, OrdenCompraService, ImportarComprasService, CostoReposicionService],
 })
 export class ComprasModule {}

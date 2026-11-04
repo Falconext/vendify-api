@@ -50,7 +50,7 @@ import { etiquetaDeMotivo } from './motivo-ajuste-stock';
 import { colorDe, tallaDe, varianteDe } from './atributos-variante';
 import { afectacionDeCelda, afectacionPorDefecto } from './afectacion-igv';
 import {
-  ESTADO_EN_CAMINO,
+  ESTADOS_EN_CAMINO,
   agruparEnCamino,
   agregarDeVariantes,
   cantidadEnCamino,
@@ -946,8 +946,9 @@ export class ProductoService {
    * Lo pedido al proveedor y todavía no recibido, por producto.
    *
    * Pedido de KREZKA: la vendedora necesita saber si la talla que no está en
-   * el almacén viene en camino. Sale de las órdenes de compra EMITIDAS (las
-   * RECIBIDAS ya movieron el kardex, las BORRADOR no se mandaron).
+   * el almacén viene en camino. Sale de las órdenes de compra EMITIDAS y de lo
+   * que falta de las PARCIALES (las RECIBIDAS ya movieron el kardex, las
+   * BORRADOR no se mandaron).
    *
    * Si se consulta por sede, entran las órdenes de esa sede y las que no
    * tienen sede asignada: esas últimas llegan al negocio, no a un local.
@@ -965,13 +966,14 @@ export class ProductoService {
         productoId: { in: productoIds },
         ordenCompra: {
           empresaId,
-          estado: ESTADO_EN_CAMINO as any,
+          estado: { in: ESTADOS_EN_CAMINO as any },
           ...(sedeId ? { OR: [{ sedeId }, { sedeId: null }] } : {}),
         },
       },
       select: {
         productoId: true,
         cantidad: true,
+        cantidadRecibida: true,
         ordenCompra: {
           select: {
             numero: true,
@@ -984,7 +986,8 @@ export class ProductoService {
     return agruparEnCamino(
       detalles.map((d: any) => ({
         productoId: d.productoId,
-        cantidad: d.cantidad,
+        // De una orden PARCIAL solo falta lo no recibido.
+        cantidad: Number(d.cantidad) - Number(d.cantidadRecibida ?? 0),
         fechaEntrega: d.ordenCompra?.fechaEntrega ?? null,
         proveedor: d.ordenCompra?.proveedor?.nombre ?? null,
         numero: d.ordenCompra?.numero ?? null,
@@ -1505,9 +1508,20 @@ export class ProductoService {
                 : null,
             );
 
+            const varianteEnCamino = enCaminoPorProducto.get(variante.id) ?? null;
             return {
               ...variante,
               stock: varianteStock,
+              // Cada talla sabe lo suyo: es lo que la vendedora necesita ver.
+              enCamino: varianteEnCamino?.cantidad ?? 0,
+              enCaminoProximaEntrega: varianteEnCamino?.proximaEntrega ?? null,
+              comprometido: comprometidoPorProducto.get(variante.id) ?? 0,
+              saldoPrometible: saldoPrometible({
+                stock: varianteStock,
+                reservado: 0,
+                enCamino: varianteEnCamino?.cantidad ?? 0,
+                comprometido: comprometidoPorProducto.get(variante.id) ?? 0,
+              }),
               precioUnitario: variantePrecioUnitario,
               precioOferta: variantePrecioOferta,
               sedeStockConfig: varianteStockSede
@@ -1540,6 +1554,19 @@ export class ProductoService {
           stockBase: stockTotal,
           stockReservado: reservado,
           stockDisponibleVenta,
+          // Pedido al proveedor y aún no recibido. No es stock: no se vende
+          // contra esto. El padre agrega lo de sus variantes.
+          ...agregarDeVariantes(
+            {
+              enCamino: enCaminoProducto?.cantidad ?? 0,
+              enCaminoProximaEntrega: enCaminoProducto?.proximaEntrega ?? null,
+              comprometido: comprometidoPorProducto.get(p.id) ?? 0,
+            },
+            variantes as any,
+            stockTotal,
+            reservado,
+          ),
+          enCaminoOrdenes: enCaminoProducto?.ordenes ?? [],
           stockMinimo: stockMinimo,
           stockMaximo: stockSede?.stockMaximo ?? (p as any).stockMaximo ?? null,
           // Disponible en la sede consultada (sin sede = catálogo completo).

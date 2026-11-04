@@ -218,6 +218,22 @@ export class ComprasController {
     );
   }
 
+  /** Solo para crédito de IGV: no resta de la ganancia ni de la caja. */
+  @Patch(':id/solo-credito-igv')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN_EMPRESA')
+  async marcarSoloCreditoIgv(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { soloCreditoIgv: boolean },
+  ) {
+    return this.comprasService.marcarSoloCreditoIgv(
+      req.user.empresaId,
+      id,
+      body?.soloCreditoIgv === true,
+    );
+  }
+
   // Anular compra (borrado lógico): marca estado ANULADO y revierte el stock con
   // un movimiento de kardex compensatorio. No borra el registro (auditoría).
   @Delete(':id')
