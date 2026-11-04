@@ -26,6 +26,7 @@ describe('verificarPuedeVenderEnSede', () => {
     const sinSede = { ...vendedor, sedeId: null };
     expect(() => verificarPuedeVenderEnSede(sinSede, 'NV', 2)).toThrow(ForbiddenException);
     expect(() => verificarPuedeVenderEnSede(sinSede, 'NV', 1)).not.toThrow();
+    expect(() => verificarPuedeVenderEnSede(sinSede, 'NV')).toThrow(ForbiddenException);
   });
 
   it('con sede en el token, la del body no cuenta (es la que se usa al emitir)', () => {

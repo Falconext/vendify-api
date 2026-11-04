@@ -18,9 +18,10 @@ export function verificarPuedeVenderEnSede(
 ) {
   if (user?.rol !== 'USUARIO_EMPRESA') return;
   if (tipoDoc && TIPOS_QUE_NO_SON_VENTA.has(String(tipoDoc))) return;
+  const sinVenta = user.sedesSinVenta ?? [];
   const sedeId = user.sedeId ?? sedeIdBody;
-  if (sedeId == null) return;
-  if ((user.sedesSinVenta ?? []).includes(Number(sedeId))) {
+  // Sin sede elegida (token de selección) no se sabe dónde caería la venta.
+  if (sinVenta.length > 0 && (sedeId == null || sinVenta.includes(Number(sedeId)))) {
     throw new ForbiddenException(
       'No puedes vender en esta sede. Cambia a una sede donde tengas venta habilitada o pídele a tu administrador que te la habilite en Usuarios.',
     );

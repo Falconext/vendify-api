@@ -35,6 +35,7 @@ const LECTURAS_DE_PRODUCTOS = [
   /^\/productos$/,
   /^\/productos\/:id$/,
   /^\/productos\/limite-imagenes$/,
+  /^\/productos\/localizaciones$/,
 ];
 
 /** Lo que el panel necesita para abrir la sesión y pintar la lista. Sin plata. */
@@ -71,7 +72,7 @@ export function verificarAccesoSoloFotos(user: any, req: any) {
 
 /** Campos de plata: no salen hacia un usuario de solo fotos. */
 const CAMPO_DE_PLATA =
-  /precio|costo|margen|utilidad|ganancia|rentabilidad|comision|provision|mayorista|oferta|descuento|igv|^valor(?!esAtributos)|^mto|presentaciones|^listas?/i;
+  /precio|costo|margen|utilidad|ganancia|rentabilidad|comision|provision|porcentaje|mayorista|oferta|descuento|igv|valor(?!esAtributos)|^mto|presentaciones|^listas?/i;
 
 /** Copia de la respuesta sin campos de plata, a cualquier profundidad. */
 export function quitarCamposDePlata<T>(valor: T): T {
