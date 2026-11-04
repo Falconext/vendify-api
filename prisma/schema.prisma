@@ -260,6 +260,15 @@ model Empresa {
   // (se registra la salida aunque el stock quede en 0/negativo). Default false = mantiene
   // el bloqueo por stock insuficiente.
   permitirVentaSinStock     Boolean                       @default(false)
+  /// Precio por mayor mezclando productos: en el POS, las unidades de los
+  /// productos del alcance se suman y cada uno toma su escala de precio por
+  /// mayor según ese total (6 perfumes distintos = precio de 6 en cada uno).
+  /// Apagado = cada línea cuenta solo su propia cantidad (comportamiento de
+  /// siempre). Ver frontend facturacion/mayoristaMezcla.ts.
+  mayoristaMezclaActivo         Boolean                       @default(false)
+  /// Categorías cuyos productos se suman entre sí (principal o adicional).
+  /// Vacío = todos los productos.
+  mayoristaMezclaCategoriaIds   Int[]                         @default([])
   // Cobranza con vendedores de campo: cuando es true, "Registrar Pago" pide el vendedor de
   // campo que envió el comprobante, a quién se dirigió el pago y permite adjuntar el comprobante.
   // Default false = flujo de cobro estándar (la mayoría de negocios).
@@ -374,6 +383,18 @@ model Empresa {
   // sin habilitar la sobreventa en el mostrador. Default false = la tienda
   // sigue rechazando lo que no hay en stock.
   tiendaVentaSinStock     Boolean                        @default(false)
+  /// De qué stock vende la tienda virtual (ver tienda/stock-tienda.ts):
+  /// SEDE = una sola sede (`tiendaSedeId`, null = la principal); CLIENTE = el
+  /// comprador elige entre `tiendaSedesIds`; TODAS = suma de esas sedes y la
+  /// sede se elige al generar la nota. Vacío en `tiendaSedesIds` = todas las
+  /// sedes activas.
+  tiendaStockModo               ModoStockTienda               @default(SEDE)
+  tiendaSedeId                  Int?
+  tiendaSede                    Sede?                         @relation("TiendaSede", fields: [tiendaSedeId], references: [id], onDelete: SetNull)
+  tiendaSedesIds                Int[]                         @default([])
+  /// Cuándo el dueño eligió el modo a mano. Null = lo puso la migración: el
+  /// panel invita a las empresas con varias sedes a revisarlo.
+  tiendaStockModoElegidoEn      DateTime?
   sireClientSecret        String?
   sireUsuarioSol          String?
   /// Clave SOL cifrada (AES-256-GCM). Nunca se devuelve al frontend.
@@ -499,8 +520,15 @@ model Categoria {
   imagenUrl      String?
   empresaId      Int?
   empresa        Empresa?                @relation(fields: [empresaId], references: [id])
+  /// Subcategoría de esta categoría (un solo nivel). Al borrar la madre, la hija queda suelta.
+  padreId        Int?
+  padre          Categoria?              @relation("CategoriaSubcategorias", fields: [padreId], references: [id], onDelete: SetNull)
+  subcategorias  Categoria[]             @relation("CategoriaSubcategorias")
   productos      Producto[]
+  productosExtra ProductoCategoriaExtra[]
   fichasTecnicas FichaTecnicaPlantilla[]
+
+  @@index([padreId])
 }
 
 model FichaTecnicaPlantilla {
@@ -612,6 +640,8 @@ model Producto {
   valoresAtributos    Json?
 
   categoria                Categoria?                    @relation(fields: [categoriaId], references: [id])
+  /// Otras categorías donde también aparece (la principal sigue en categoriaId).
+  categoriasExtra          ProductoCategoriaExtra[]
   productoPadre            Producto?                     @relation("ProductoVariantes", fields: [productoPadreId], references: [id])
   variantes                Producto[]                    @relation("ProductoVariantes")
   empresa                  Empresa?                      @relation(fields: [empresaId], references: [id])
@@ -650,6 +680,18 @@ model Producto {
   @@index([empresaId, publicarEnTienda])
   @@index([marcaId])
   @@index([empresaId, codigoBarras])
+  @@index([categoriaId])
+}
+
+/// Categorías adicionales de un producto (la principal es Producto.categoriaId y no se repite aquí).
+model ProductoCategoriaExtra {
+  productoId  Int
+  producto    Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  categoriaId Int
+  categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@id([productoId, categoriaId])
+  @@index([categoriaId])
 }
 
 enum EstadoProductoReview {
@@ -1779,6 +1821,7 @@ model Sede {
   ingresosManuales           IngresoManual[]
   campanasMarketing          CampanaMarketing[]
   ordenesCompra              OrdenCompra[]
+  empresasTienda             Empresa[]          @relation("TiendaSede")
 
   @@index([empresaId])
 }
@@ -2140,6 +2183,13 @@ enum TipoEmpresa {
 enum TipoSede {
   PUNTO_DE_VENTA
   ALMACEN
+}
+
+/// De qué sedes sale el stock que muestra y vende la tienda virtual.
+enum ModoStockTienda {
+  SEDE
+  CLIENTE
+  TODAS
 }
 
 enum TipoMovimiento {

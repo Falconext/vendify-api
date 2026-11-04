@@ -45,6 +45,18 @@ import {
 import * as XLSX from 'xlsx';
 import axios from 'axios';
 import { estadosAListar } from './vendibilidad';
+import {
+  SELECT_CATEGORIAS_EXTRA,
+  agregarFiltroCategoria,
+  separarRutaCategoria,
+  aplanarCategoriasExtra,
+  guardarCategoriasExtra,
+  quitarPrincipalDeExtras,
+  sanitizarCategoriasExtraIds,
+  separarNombresCategorias,
+  unirNombresCategorias,
+  validarCategoriasExtra,
+} from './categorias-extra.util';
 import { etiquetaDeMotivo } from './motivo-ajuste-stock';
 
 import { colorDe, tallaDe, varianteDe } from './atributos-variante';
@@ -57,6 +69,8 @@ import {
   saldoPrometible,
   type EnCaminoDeProducto,
 } from '../compras/stock-en-camino';
+import { agruparAtributos, parsearFiltroVariante } from './filtro-variante';
+import { conStockDeSede } from './stock-variante-sede';
 @Injectable()
 export class ProductoService {
   constructor(
@@ -337,6 +351,8 @@ export class ProductoService {
       igvPorcentaje?: number;
       stock: number;
       categoriaId?: number;
+      /** Otras categorías donde también aparece. Ver categorias-extra.util. */
+      categoriasExtraIds?: number[] | null;
       marcaId?: number;
       stockMinimo?: number;
       stockMaximo?: number;
@@ -517,6 +533,13 @@ export class ProductoService {
         this.normalizarCodigosExtra(data.codigosBarrasExtra, codigoBarras),
       );
     }
+
+    // Antes de crear: una categoría ajena no debe dejar un producto a medias.
+    await validarCategoriasExtra(
+      this.prisma,
+      empresaId,
+      sanitizarCategoriasExtraIds(data.categoriasExtraIds, categoriaId),
+    );
 
     if (!unidadMedidaId) {
       const niuUnidad = await this.prisma.unidadMedida.findFirst({
@@ -775,6 +798,19 @@ export class ProductoService {
       data.codigosBarrasExtra,
       nuevo.codigoBarras,
     );
+
+    // Un PLACEHOLDER restaurado arranca sin las adicionales de su vida pasada,
+    // igual que con el stock: es un alta nueva.
+    const categoriasExtraIds =
+      sanitizarCategoriasExtraIds(data.categoriasExtraIds, nuevo.categoriaId) ??
+      (existe ? [] : undefined);
+    if (categoriasExtraIds !== undefined) {
+      await guardarCategoriasExtra(this.prisma, {
+        productoId: nuevo.id,
+        empresaId,
+        ids: categoriasExtraIds,
+      });
+    }
 
     return this.obtenerPorId(nuevo.id, empresaId);
   }
@@ -1038,6 +1074,51 @@ export class ProductoService {
     );
   }
 
+  /**
+   * Filtro "tiene la talla M" del inventario: los modelos con esa variante
+   * activa (y, si el listado incluye variantes, esas variantes). El nombre y
+   * el valor se comparan sin mayúsculas ni espacios de más.
+   */
+  private async condicionPorVariante(
+    empresaId: number,
+    variante: string | undefined,
+    conVariantes: boolean,
+  ): Promise<any | null> {
+    const par = parsearFiltroVariante(variante);
+    if (!par) return null;
+    const filas = await this.prisma.$queryRaw<{ id: number; padre: number }[]>`
+      SELECT p.id, p."productoPadreId" AS padre FROM "Producto" p
+      WHERE p."empresaId" = ${empresaId}
+        AND p."productoPadreId" IS NOT NULL
+        AND p.estado = 'ACTIVO'
+        AND p."valoresAtributos" IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM jsonb_each_text(CASE WHEN jsonb_typeof(p."valoresAtributos"::jsonb) = 'object' THEN p."valoresAtributos"::jsonb ELSE '{}'::jsonb END) a
+          WHERE upper(trim(a.key)) = upper(${par.nombre})
+            AND upper(trim(a.value)) = upper(${par.valor})
+        )`;
+    const ids = conVariantes
+      ? [...filas.map((f) => f.id), ...filas.map((f) => f.padre)]
+      : filas.map((f) => f.padre);
+    return { id: { in: [...new Set(ids)] } };
+  }
+
+  /** Tallas, colores… que existen en las variantes activas, para el filtro. */
+  async atributosDeVariantes(empresaId: number) {
+    const filas = await this.prisma.$queryRaw<{ nombre: string; valor: string; modelos: number }[]>`
+      SELECT min(trim(a.key)) AS nombre, min(trim(a.value)) AS valor,
+             count(DISTINCT p."productoPadreId")::int AS modelos
+      FROM "Producto" p, jsonb_each_text(CASE WHEN jsonb_typeof(p."valoresAtributos"::jsonb) = 'object' THEN p."valoresAtributos"::jsonb ELSE '{}'::jsonb END) a
+      WHERE p."empresaId" = ${empresaId}
+        AND p."productoPadreId" IS NOT NULL
+        AND p.estado = 'ACTIVO'
+        AND p."valoresAtributos" IS NOT NULL
+        AND trim(a.value) <> ''
+      GROUP BY upper(trim(a.key)), upper(trim(a.value))`;
+    return agruparAtributos(filas);
+  }
+
+
   async listar(params: {
     empresaId: number;
     sedeId?: number;
@@ -1048,6 +1129,8 @@ export class ProductoService {
     order?: 'asc' | 'desc';
     marcaId?: number;
     categoriaId?: number;
+    /** "Talla=M": solo modelos con esa variante activa. */
+    variante?: string;
     /** Localización física (estante/zona); comparación sin distinguir mayúsculas. */
     localizacion?: string;
     incluirVariantes?: string | boolean;
@@ -1098,7 +1181,6 @@ export class ProductoService {
       // Excluir productos del sistema (PENALIDAD, INTERES POR MORA, DESCUENTO GLOBAL)
       codigo: { notIn: productosDelSistema },
       marcaId: marcaId ? Number(marcaId) : undefined,
-      categoriaId: categoriaId ? Number(categoriaId) : undefined,
       ...this.filtroLocalizacion(params.localizacion),
     };
 
@@ -1118,6 +1200,14 @@ export class ProductoService {
     // Búsqueda flexible por palabras (cada palabra debe aparecer en algún campo).
     const searchAnd = this.busquedaPorPalabras(searchTerm);
     if (searchAnd) where.AND = searchAnd;
+    // La categoría vale como principal o adicional; va al AND junto a la
+    // búsqueda, que ya usa OR por palabra.
+    if (categoriaId) where.AND = agregarFiltroCategoria(where, categoriaId).AND;
+    const filtroVariante = await this.condicionPorVariante(empresaId, params.variante, conVariantes);
+    if (filtroVariante) {
+      const previo = where.AND;
+      where.AND = [...(Array.isArray(previo) ? previo : previo ? [previo] : []), filtroVariante];
+    }
 
     if (!conVariantes && !porIds) {
       where.productoPadreId = null;
@@ -1340,6 +1430,7 @@ export class ProductoService {
               nombre: true,
             },
           },
+          categoriasExtra: SELECT_CATEGORIAS_EXTRA,
           marca: {
             select: {
               id: true,
@@ -1547,6 +1638,7 @@ export class ProductoService {
 
         return {
           ...p,
+          categoriasExtra: aplanarCategoriasExtra(p.categoriasExtra),
           variantes,
           precioUnitario: precioUnitarioEfectivo,
           precioOferta: precioOfertaEfectivo,
@@ -1643,13 +1735,14 @@ export class ProductoService {
       codigo: { notIn: productosDelSistema },
       productoPadreId: null,
       marcaId: marcaId ? Number(marcaId) : undefined,
-      categoriaId: categoriaId ? Number(categoriaId) : undefined,
       ...this.filtroLocalizacion(params.localizacion),
     };
 
     // Búsqueda flexible por palabras (misma lógica que `listar`).
     const searchAnd = this.busquedaPorPalabras(searchTerm);
     if (searchAnd) where.AND = searchAnd;
+    // Principal o adicional, igual que el listado (los totales deben cuadrar).
+    if (categoriaId) where.AND = agregarFiltroCategoria(where, categoriaId).AND;
     // Misma regla de disponibilidad por sede que `listar`.
     if (params.sedeId) {
       where.NOT = {
@@ -1728,7 +1821,6 @@ export class ProductoService {
     const where: any = {
       empresaId,
       estado: EstadoType.ACTIVO,
-      ...(categoriaId ? { categoriaId: Number(categoriaId) } : {}),
       stocks: {
         some: {
           sedeId,
@@ -1741,6 +1833,8 @@ export class ProductoService {
     // Búsqueda flexible por palabras (misma lógica que `listar`).
     const searchAnd = this.busquedaPorPalabras(searchTerm);
     if (searchAnd) where.AND = searchAnd;
+    // Principal o adicional, igual que el listado.
+    if (categoriaId) where.AND = agregarFiltroCategoria(where, categoriaId).AND;
 
     const [productosRaw, total] = await Promise.all([
       this.prisma.producto.findMany({
@@ -1950,12 +2044,23 @@ export class ProductoService {
     return { productos, total, page, limit };
   }
 
-  async obtenerPorId(id: number, empresaId: number) {
+  /** El id si la sede es de la empresa y está activa; si no, null. */
+  async sedeActivaDeEmpresa(empresaId: number, sedeId: number): Promise<number | null> {
+    if (!Number.isInteger(sedeId) || sedeId <= 0) return null;
+    const sede = await this.prisma.sede.findFirst({
+      where: { id: sedeId, empresaId, activo: true },
+      select: { id: true },
+    });
+    return sede?.id ?? null;
+  }
+
+  async obtenerPorId(id: number, empresaId: number, sedeId?: number | null) {
     const producto = await this.prisma.producto.findFirst({
       where: { id, empresaId },
       include: {
         unidadMedida: true,
         categoria: true,
+        categoriasExtra: SELECT_CATEGORIAS_EXTRA,
         marca: true,
         variantes: {
           select: {
@@ -1966,6 +2071,7 @@ export class ProductoService {
             moneda: true,
             precioOferta: true,
             stock: true,
+            stocks: { select: { sedeId: true, stock: true } },
             estado: true,
             valoresAtributos: true,
             imagenUrl: true,
@@ -2010,7 +2116,8 @@ export class ProductoService {
             variante.imagenUrl as string | null,
           );
           return {
-            ...variante,
+            // El stock de la sede que se está viendo, no la suma de todas.
+            ...conStockDeSede(variante, sedeId),
             imagenUrl: varianteImagenUrl,
             imagenUrlDisplay: await signIfS3(varianteImagenUrl),
           };
@@ -2027,6 +2134,7 @@ export class ProductoService {
 
     return {
       ...producto,
+      categoriasExtra: aplanarCategoriasExtra(producto.categoriasExtra),
       variantes,
       imagenUrl,
       imagenUrlDisplay: await signIfS3(imagenUrl),
@@ -2332,6 +2440,7 @@ export class ProductoService {
             moneda: true,
             precioOferta: true,
             stock: true,
+            stocks: { select: { sedeId: true, stock: true } },
             valoresAtributos: true,
             imagenUrl: true,
             codigoBarras: true,
@@ -2377,6 +2486,8 @@ export class ProductoService {
 
     return {
       ...producto,
+      // El selector de talla/color del POS muestra el stock de ESTA sede.
+      variantes: ((producto as any).variantes || []).map((v: any) => conStockDeSede(v, sedeId)),
       stock: stockTotal,
       stockBase: stockTotal,
       // false = el producto existe pero NO está asignado a la sede consultada;
@@ -2665,6 +2776,8 @@ export class ProductoService {
       codigo?: string;
       descripcion?: string;
       categoriaId?: number | null;
+      /** undefined = no tocar; [] o null = quitar todas. Ver categorias-extra.util. */
+      categoriasExtraIds?: number[] | null;
       marcaId?: number | null;
       unidadMedidaId?: number;
       tipoAfectacionIGV?: string;
@@ -2733,6 +2846,8 @@ export class ProductoService {
       prioridadVenta?: number | null;
 
       sedeId?: number; // Nueva propiedad opcional para identificar dónde se ajusta el stock
+      /** Sede donde se escribe el stock; null = "Todas las sedes". */
+      stockSedeId?: number | null;
     },
     usuarioId?: number,
   ) {
@@ -2750,6 +2865,20 @@ export class ProductoService {
       data.porcentajeVenta = 100;
       data.porcentajeProvision = 0;
     }
+
+    // Categorías adicionales: el PUT no pasa por el ValidationPipe (el body es
+    // un Omit<>), así que se limpian y validan aquí, antes de escribir nada.
+    const categoriaPrincipalNueva =
+      data.categoriaId === null
+        ? null
+        : data.categoriaId !== undefined && Number(data.categoriaId) > 0
+          ? Number(data.categoriaId)
+          : producto.categoriaId;
+    const categoriasExtraIds = sanitizarCategoriasExtraIds(
+      data.categoriasExtraIds,
+      categoriaPrincipalNueva,
+    );
+    await validarCategoriasExtra(this.prisma, data.empresaId, categoriasExtraIds);
 
     // Validar unicidad del Código de producto (SKU) si cambió: no puede repetirse
     // dentro de la empresa. Normaliza vacío → conserva el actual (no lo borra).
@@ -2896,7 +3025,7 @@ export class ProductoService {
       });
     } else if (data.stock !== undefined) {
       // Obtener sede principal por defecto si no viene en data
-      let targetSedeId = data.sedeId;
+      let targetSedeId = data.stockSedeId ?? data.sedeId;
       if (!targetSedeId) {
         const sedePrincipal = await this.prisma.sede.findFirst({
           where: { empresaId: data.empresaId, esPrincipal: true },
@@ -3243,7 +3372,8 @@ export class ProductoService {
         actualizado,
         sedesSync,
         data.variantesConfig || [],
-        data.sedeId,
+        // null = "Todas las sedes": el stock de las variantes no se toca.
+        data.stockSedeId !== undefined ? data.stockSedeId : data.sedeId,
       );
       await this.sincronizarDisponibilidadVariantes(actualizado.id);
     }
@@ -3254,6 +3384,20 @@ export class ProductoService {
       data.codigosBarrasExtra,
       actualizado.codigoBarras,
     );
+
+    if (categoriasExtraIds !== undefined) {
+      await guardarCategoriasExtra(this.prisma, {
+        productoId: actualizado.id,
+        empresaId: data.empresaId,
+        ids: categoriasExtraIds,
+      });
+    } else if (actualizado.categoriaId !== producto.categoriaId) {
+      await quitarPrincipalDeExtras(
+        this.prisma,
+        actualizado.id,
+        actualizado.categoriaId,
+      );
+    }
 
     return this.obtenerPorId(actualizado.id, data.empresaId);
   }
@@ -4025,15 +4169,22 @@ export class ProductoService {
       });
       if (!categoria) throw new NotFoundException('Categoría no encontrada');
     }
-    return this.prisma.producto.update({
+    // Si la nueva principal era una adicional, deja de serlo (no se repite).
+    await quitarPrincipalDeExtras(this.prisma, id, categoriaId);
+    const actualizado = await this.prisma.producto.update({
       where: { id },
       data: { categoriaId },
       select: {
         id: true,
         categoriaId: true,
         categoria: { select: { id: true, nombre: true } },
+        categoriasExtra: SELECT_CATEGORIAS_EXTRA,
       },
     });
+    return {
+      ...actualizado,
+      categoriasExtra: aplanarCategoriasExtra(actualizado.categoriasExtra),
+    };
   }
 
   async cambiarMarca(id: number, empresaId: number, marcaId: number | null) {
@@ -4383,6 +4534,7 @@ export class ProductoService {
       include: {
         unidadMedida: true,
         categoria: true,
+        categoriasExtra: SELECT_CATEGORIAS_EXTRA,
         marca: true,
         // Cuando se pide una sede concreta, traer solo su stock; si no
         // ("Todas las sedes"), traer el stock de todas para sumarlo y
@@ -4466,6 +4618,10 @@ export class ProductoService {
         DISPONIBILIDAD: producto.disponibilidad ?? '',
         PRIORIDAD: escribirPrioridadVenta(producto.prioridadVenta ?? null),
         CATEGORIA: producto.categoria?.nombre || '',
+        // Adicionales separadas por " | "; la importación las lee igual.
+        CATEGORIAS_EXTRA: unirNombresCategorias(
+          aplanarCategoriasExtra(producto.categoriasExtra),
+        ),
         MARCA: p?.marca?.nombre || '',
         LOCALIZACION: localizacion || '',
       };
@@ -4486,6 +4642,7 @@ export class ProductoService {
       'VALOR INVENTARIO': totalValorInventario,
       'STOCK MINIMO': '',
       CATEGORIA: '',
+      CATEGORIAS_EXTRA: '',
       MARCA: '',
       LOCALIZACION: '',
     });
@@ -4505,6 +4662,7 @@ export class ProductoService {
       { wch: 18 }, // VALOR INVENTARIO
       { wch: 13 }, // STOCK MINIMO
       { wch: 20 }, // CATEGORIA
+      { wch: 30 }, // CATEGORIAS_EXTRA
       { wch: 20 }, // MARCA
       { wch: 30 }, // LOCALIZACION
     ];
@@ -4526,6 +4684,7 @@ export class ProductoService {
         STOCK: 100,
         'STOCK MINIMO': 10,
         CATEGORIA: 'General',
+        CATEGORIAS_EXTRA: '',
         MARCA: '',
       },
       {
@@ -4539,6 +4698,7 @@ export class ProductoService {
         STOCK: 50,
         'STOCK MINIMO': 5,
         CATEGORIA: 'Abarrotes',
+        CATEGORIAS_EXTRA: 'Ofertas | Más vendidos',
         MARCA: 'Ejemplo',
       },
     ];
@@ -4556,6 +4716,7 @@ export class ProductoService {
       { wch: 8 }, // STOCK
       { wch: 13 }, // STOCK MINIMO
       { wch: 20 }, // CATEGORIA
+      { wch: 30 }, // CATEGORIAS_EXTRA
       { wch: 20 }, // MARCA
     ];
     return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
@@ -4932,6 +5093,12 @@ export class ProductoService {
         const stockRaw = row['STOCK'] ?? row['Stock'] ?? row['stock'] ?? null;
         const categoriaRaw =
           row['CATEGORIA'] ?? row['Categoría'] ?? row['categoria'] ?? null;
+        const categoriasExtraNombres = separarNombresCategorias(
+          row['CATEGORIAS_EXTRA'] ??
+            row['CATEGORIAS EXTRA'] ??
+            row['OTRAS CATEGORIAS'] ??
+            null,
+        );
         const marcaRaw =
           row['MARCA'] ?? row['Marca'] ?? row['marca'] ?? null;
         // Qué se le puede prometer al cliente y cuánto empujar el producto. Si
@@ -5022,20 +5189,45 @@ export class ProductoService {
         // Auto-upsert category: create if it doesn't exist
         let categoriaId: number | undefined;
         if (categoriaRaw) {
-          const categoriaKey = categoriaRaw
-            .toString()
-            .toUpperCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '');
-          let id = categoriaMap.get(categoriaKey);
-          if (!id) {
-            const nueva = await this.prisma.categoria.create({
-              data: { nombre: String(categoriaRaw).trim(), empresaId },
-            });
-            id = nueva.id;
-            categoriaMap.set(categoriaKey, id);
+          const clave = (n: string) =>
+            n.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const obtener = async (nombre: string, padreId: number | null) => {
+            let id = categoriaMap.get(clave(nombre));
+            if (!id) {
+              const nueva = await this.prisma.categoria.create({
+                data: { nombre, empresaId, padreId },
+              });
+              id = nueva.id;
+              categoriaMap.set(clave(nombre), id);
+            }
+            return id;
+          };
+          // "Peluches > Osos": la subcategoría Osos dentro de Peluches. Si la
+          // subcategoría ya existía, se usa tal como está.
+          const ruta = separarRutaCategoria(String(categoriaRaw));
+          categoriaId =
+            ruta.length === 2
+              ? await obtener(ruta[1], await obtener(ruta[0], null))
+              : await obtener(ruta[0] ?? String(categoriaRaw).trim(), null);
+        }
+
+        // Adicionales: mismo alta automática que la principal. Celda vacía =
+        // no se tocan (un Excel viejo sin la columna no debe borrarlas).
+        let categoriasExtraIds: number[] | undefined;
+        if (categoriasExtraNombres.length > 0) {
+          categoriasExtraIds = [];
+          for (const nombre of categoriasExtraNombres) {
+            const clave = this.normClave(nombre);
+            let id = categoriaMap.get(clave);
+            if (!id) {
+              const nueva = await this.prisma.categoria.create({
+                data: { nombre, empresaId },
+              });
+              id = nueva.id;
+              categoriaMap.set(clave, id);
+            }
+            categoriasExtraIds.push(id);
           }
-          categoriaId = id;
         }
 
         // Auto-upsert marca: crear si no existe (por empresa)
@@ -5167,6 +5359,20 @@ export class ProductoService {
             },
           });
 
+          if (categoriasExtraIds) {
+            await guardarCategoriasExtra(this.prisma, {
+              productoId: existe.id,
+              empresaId,
+              ids:
+                sanitizarCategoriasExtraIds(
+                  categoriasExtraIds,
+                  producto.categoriaId,
+                ) ?? [],
+            });
+          } else if (categoriaId != null) {
+            await quitarPrincipalDeExtras(this.prisma, existe.id, categoriaId);
+          }
+
           // El Excel de una sede asigna el producto a esa sede (catálogo por
           // sede): si ya existía en otra, ahora también está disponible aquí.
           await this.marcarDisponibleEnSede(existe.id, sedeDestinoId);
@@ -5206,6 +5412,7 @@ export class ProductoService {
                   ? stockMinimoImport
                   : undefined,
               categoriaId,
+              categoriasExtraIds,
               marcaId,
               codigoBarras,
             },

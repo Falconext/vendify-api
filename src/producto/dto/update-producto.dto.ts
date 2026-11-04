@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsIn,
@@ -34,6 +35,14 @@ export class UpdateProductoDto {
   @IsInt()
   @Type(() => Number)
   categoriaId?: number | null;
+
+  /** Otras categorías donde también aparece (la principal es categoriaId). [] = quitar todas. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsInt({ each: true })
+  @Type(() => Number)
+  categoriasExtraIds?: number[];
 
   @IsOptional()
   @IsInt()
@@ -72,6 +81,16 @@ export class UpdateProductoDto {
   @IsNumber({ maxDecimalPlaces: 3 })
   @Type(() => Number)
   stock?: number;
+
+  /**
+   * Sede cuyo stock se edita: la que el Kardex está mostrando. null = "Todas
+   * las sedes" (el formulario muestra el total y el stock de las variantes no
+   * se toca). Sin enviar, la sede de la sesión. Solo para administradores.
+   */
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  stockSedeId?: number | null;
 
   @IsOptional()
   @IsNumber()

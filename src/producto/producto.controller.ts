@@ -931,6 +931,7 @@ export class ProductoController {
       order: query.order,
       marcaId: query.marcaId,
       categoriaId: query.categoriaId,
+      variante: query.variante,
       localizacion: query.localizacion,
       soloVendibles: query.soloVendibles,
       usarPrecioSede: query.usarPrecioSede,
@@ -946,6 +947,13 @@ export class ProductoController {
     });
     res.locals.message = 'Productos listados correctamente';
     return resultado;
+  }
+
+  /** Tallas, colores… de las variantes activas: opciones del filtro del inventario. */
+  @Get('atributos-variantes')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  atributosVariantes(@User() user: any) {
+    return this.service.atributosDeVariantes(user.empresaId);
   }
 
   // ==================== DISPONIBILIDAD POR SEDE ====================
@@ -1155,8 +1163,13 @@ export class ProductoController {
     @Param('id', ParseIntPipe) id: number,
     @User() user: any,
     @Res({ passthrough: true }) res: Response,
+    @Query('sedeId') sedeIdQuery?: string,
   ) {
-    const producto = await this.service.obtenerPorId(id, user.empresaId);
+    // Igual que el listado: el admin ve la sede que eligió (sin sede, el
+    // total); el usuario de empresa, siempre la suya.
+    const esAdmin = user.rol === 'ADMIN_EMPRESA' || user.rol === 'ADMIN_SISTEMA';
+    const sedeId = esAdmin ? (Number(sedeIdQuery) || null) : user.sedeId;
+    const producto = await this.service.obtenerPorId(id, user.empresaId, sedeId);
     res.locals.message = 'Producto obtenido correctamente';
     return producto;
   }
@@ -1175,11 +1188,29 @@ export class ProductoController {
         empresaId: user.empresaId,
         sedeId: user.sedeId ?? undefined,
         ...body,
+        // Solo el administrador elige la sede del stock.
+        stockSedeId:
+          user.rol === 'ADMIN_EMPRESA' || user.rol === 'ADMIN_SISTEMA'
+            ? await this.sedeDeStock(user.empresaId, (body as any).stockSedeId)
+            : undefined,
       },
       user.id,
     );
     res.locals.message = 'Producto actualizado correctamente';
     return actualizado;
+  }
+
+  /**
+   * La sede donde el admin edita el stock: la que está viendo en el Kardex.
+   * Antes siempre era la de su sesión, así que viendo el almacén guardaba en
+   * la principal. undefined = cliente viejo (sesión); null = todas las sedes.
+   */
+  private async sedeDeStock(empresaId: number, valor: unknown): Promise<number | null | undefined> {
+    if (valor === undefined) return undefined;
+    if (valor === null || valor === '' || Number(valor) === 0) return null;
+    const sedeId = await this.service.sedeActivaDeEmpresa(empresaId, Number(valor));
+    if (!sedeId) throw new BadRequestException('La sede no es de tu empresa');
+    return sedeId;
   }
 
   @Patch(':id/publicar-tienda')

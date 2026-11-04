@@ -1,6 +1,11 @@
 import { ventanaTurnoAbierto } from '../caja/turno-abierto';
 import { resolverDespachoAgrupado, selectDespachoAgrupado } from '../envio-despacho/despacho-agrupado';
 import { num, round3 } from '../common/utils/stock';
+import {
+  disponibleParaVenta,
+  ESTADOS_RESERVA_ACTIVA,
+} from '../common/utils/stock-disponible-sede';
+import { mensajeSedeDistinta } from '../tienda/stock-tienda';
 import { lineasPagoMixto } from '../common/utils/pago-mixto';
 import { stockEnEdicion } from './stock-edicion-informal';
 import {
@@ -23,6 +28,7 @@ import { resolverCuentaVinculada } from '../common/utils/cuenta-vinculada.util';
 import { DEMO_MAX_COMPROBANTES } from '../common/demo-limits';
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   Inject,
@@ -34,7 +40,6 @@ import {
   Prisma,
   EstadoPago,
   EstadoProductoSerie,
-  EstadoReserva,
   EstadoSunat,
   EstadoType,
 } from '@prisma/client';
@@ -2950,6 +2955,57 @@ export class ComprobanteService {
     }
   }
 
+  /**
+   * Comprobante que documenta un pedido de la tienda (`input.pedidoTiendaId`,
+   * lo manda el punto de venta y "Generar nota" de Pedidos):
+   *   - un pedido con sede solo se documenta en esa sede (409): si saliera de
+   *     otra, el stock bajaría donde el cliente no compró;
+   *   - si la tienda lo aceptó con "vender sin stock" (tiendaVentaSinStock),
+   *     la venta no se bloquea por stock aunque el mostrador no permita
+   *     sobreventa: el dueño ya lo decidió para la tienda.
+   * Sin pedido no cambia nada.
+   */
+  private async reglasVentaDesdePedidoTienda(
+    empresaId: number,
+    pedidoTiendaId: unknown,
+    sedeEmisionId: number | undefined,
+  ): Promise<{ permitirSinStock: boolean }> {
+    if (pedidoTiendaId == null || pedidoTiendaId === '') {
+      return { permitirSinStock: false };
+    }
+    const id = Number(pedidoTiendaId);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new BadRequestException('pedidoTiendaId inválido');
+    }
+    const pedido = await this.prisma.pedidoTienda.findFirst({
+      where: { id, empresaId },
+      select: {
+        estado: true,
+        comprobanteId: true,
+        sedeId: true,
+        sede: { select: { nombre: true } },
+        empresa: { select: { tiendaVentaSinStock: true } },
+      },
+    });
+    if (!pedido) throw new NotFoundException('Pedido de la tienda no encontrado');
+    if (pedido.estado === 'CANCELADO') {
+      throw new BadRequestException('El pedido está cancelado.');
+    }
+    if (pedido.comprobanteId) {
+      throw new BadRequestException('Este pedido ya tiene su comprobante.');
+    }
+    if (pedido.sedeId && sedeEmisionId && pedido.sedeId !== sedeEmisionId) {
+      const emision = await this.prisma.sede.findFirst({
+        where: { id: sedeEmisionId, empresaId },
+        select: { nombre: true },
+      });
+      throw new ConflictException(
+        mensajeSedeDistinta(pedido.sede?.nombre, emision?.nombre),
+      );
+    }
+    return { permitirSinStock: pedido.empresa?.tiendaVentaSinStock === true };
+  }
+
   private async resolverSedeParaStock(data: {
     empresaId: number;
     usuarioId?: number;
@@ -2997,6 +3053,11 @@ export class ComprobanteService {
       // queda negativo.
       soloAvisar?: boolean;
       avisos?: string[];
+      // Venta que sale de un pedido de la tienda aceptado con "vender sin
+      // stock" (Empresa.tiendaVentaSinStock): el dueño ya decidió vender lo
+      // agotado y la nota no puede contradecirlo. Solo lo activa
+      // `reglasVentaDesdePedidoTienda`.
+      permitirSinStock?: boolean;
     },
   ): Promise<number> {
     const soloAvisar = data.soloAvisar === true;
@@ -3010,7 +3071,8 @@ export class ComprobanteService {
       where: { id: data.empresaId },
       select: { permitirVentaSinStock: true },
     });
-    const permitirVentaSinStock = Boolean(empresaVenta?.permitirVentaSinStock);
+    const permitirVentaSinStock =
+      Boolean(empresaVenta?.permitirVentaSinStock) || data.permitirSinStock === true;
 
     for (const item of detalles) {
       // Ítems de servicio libre (sin productoId) no tienen stock que validar
@@ -3116,18 +3178,16 @@ export class ComprobanteService {
           empresaId: data.empresaId,
           sedeId,
           productoId,
-          estado: { in: [EstadoReserva.PENDIENTE, EstadoReserva.CONFIRMADA] },
+          estado: { in: ESTADOS_RESERVA_ACTIVA },
         },
       });
       const reservado = num(reservasActivas._sum.cantidad);
-      const cupoProvision = Math.floor(
-        (stockBase * (producto.porcentajeProvision ?? 0)) / 100,
-      );
-      const cupoVenta = Math.max(0, stockBase - cupoProvision);
-      const disponibleVenta = Math.max(
-        0,
-        Math.min(stockBase - reservado, cupoVenta),
-      );
+      // Misma regla que la tienda virtual (common/utils/stock-disponible-sede).
+      const disponibleVenta = disponibleParaVenta({
+        stockBase,
+        reservado,
+        porcentajeProvision: producto.porcentajeProvision,
+      });
 
       if (soloAvisar && disponibleVenta < cantidad) {
         data.avisos?.push(
@@ -3156,6 +3216,7 @@ export class ComprobanteService {
       // Sync offline: hora real y uuid de la operación (van al kardex).
       fecha?: Date;
       origenSyncUuid?: string;
+      permitirSinStock?: boolean;
     },
   ) {
     if (!data) {
@@ -4011,6 +4072,18 @@ export class ComprobanteService {
     // Validar receta médica en backend (guardia real, no solo UX)
     await this.validarRecetasSiFarmacia(detalles, empresaId);
 
+    // Boleta/factura del punto de venta que documenta un pedido de la tienda:
+    // misma sede del pedido y su "vender sin stock" (ver la función).
+    const ventaPedidoTienda = importado
+      ? { permitirSinStock: false }
+      : await this.reglasVentaDesdePedidoTienda(
+          empresaId,
+          input?.pedidoTiendaId,
+          input?.pedidoTiendaId
+            ? await this.resolverSedeParaStock({ empresaId, usuarioId, sedeId })
+            : undefined,
+        );
+
     // En importación no se bloquea por stock insuficiente: son documentos
     // históricos y el inventario pudo variar por otras vías.
     if (!origenYaDescontoStock && !importado) {
@@ -4018,6 +4091,7 @@ export class ComprobanteService {
         empresaId,
         sedeId,
         usuarioId,
+        permitirSinStock: ventaPedidoTienda.permitirSinStock,
       });
     }
 
@@ -4082,6 +4156,7 @@ export class ComprobanteService {
         comprobanteId: comprobante.id,
         concepto: `Venta ${formalTipo === '01' ? 'Factura' : formalTipo === '03' ? 'Boleta' : 'Nota de Débito'} ${comprobante.serie}-${comprobante.correlativo}`,
         sedeId,
+        permitirSinStock: ventaPedidoTienda.permitirSinStock,
         usuarioId,
       });
       await this.registrarSeriesVendidas(comprobante.id, empresaId, sedeId);
@@ -5372,6 +5447,10 @@ export class ComprobanteService {
       offline?: boolean;
       realizadoEn?: Date;
       origenSyncUuid?: string;
+      // La nota sale del stock de una sede (la del pedido de la tienda), pero
+      // la caja es del usuario que la emite: su turno puede estar en otra.
+      // Presente (aunque sea undefined) = esa es la sede de la caja.
+      sedeCajaId?: number;
     },
   ) {
     const importado = opts?.importado === true;
@@ -5420,7 +5499,7 @@ export class ComprobanteService {
       await this.exigirCajaAbiertaSiConfigurado(
         empresaId,
         usuarioId,
-        sedeId,
+        opts && 'sedeCajaId' in opts ? opts.sedeCajaId : sedeId,
         realizadoEn,
       );
     }
@@ -5678,6 +5757,16 @@ export class ComprobanteService {
     // Validar receta médica en backend si rubro farmacia/botica
     await this.validarRecetasSiFarmacia(detalles, empresaId);
 
+    // Nota de venta de un pedido de la tienda (desde Pedidos o desde el punto
+    // de venta): misma sede del pedido y su "vender sin stock".
+    const ventaPedidoTienda = importado
+      ? { permitirSinStock: false }
+      : await this.reglasVentaDesdePedidoTienda(
+          empresaId,
+          input?.pedidoTiendaId,
+          finalSedeId,
+        );
+
     // En importado (histórico) NO se bloquea por stock insuficiente: el
     // inventario pudo variar por otras vías.
     if (afectaStock && !importado) {
@@ -5687,6 +5776,7 @@ export class ComprobanteService {
         usuarioId,
         soloAvisar: offline,
         avisos: avisosOffline,
+        permitirSinStock: ventaPedidoTienda.permitirSinStock,
       });
     }
 
@@ -5731,6 +5821,7 @@ export class ComprobanteService {
         usuarioId,
         fecha: realizadoEn,
         origenSyncUuid,
+        permitirSinStock: ventaPedidoTienda.permitirSinStock,
       });
       await this.registrarSeriesVendidas(comp.id, empresaId, finalSedeId);
     }
