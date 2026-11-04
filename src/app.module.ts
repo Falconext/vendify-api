@@ -57,6 +57,7 @@ import { SyncMovilModule } from './sync-movil/sync-movil.module';
 import { VehiculoModule } from './vehiculo/vehiculo.module';
 import { ContratoVehicularModule } from './contrato-vehicular/contrato-vehicular.module';
 import { TipoCambioModule } from './tipo-cambio/tipo-cambio.module';
+import { LibroReclamacionesModule } from './libro-reclamaciones/libro-reclamaciones.module';
 
 @Module({
   imports: [
@@ -116,6 +117,7 @@ import { TipoCambioModule } from './tipo-cambio/tipo-cambio.module';
     VehiculoModule,
     ContratoVehicularModule,
     TipoCambioModule,
+    LibroReclamacionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

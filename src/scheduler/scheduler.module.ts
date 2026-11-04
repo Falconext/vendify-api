@@ -14,6 +14,7 @@ import { VerificarEnviosOlvaService } from './services/verificar-envios-olva.ser
 import { ShalomModule } from '../shalom/shalom.module';
 import { OlvaModule } from '../olva/olva.module';
 import { EnvioDespachoModule } from '../envio-despacho/envio-despacho.module';
+import { LibroReclamacionesModule } from '../libro-reclamaciones/libro-reclamaciones.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { EnvioDespachoModule } from '../envio-despacho/envio-despacho.module';
     ShalomModule,
     OlvaModule,
     EnvioDespachoModule,
+    LibroReclamacionesModule,
   ],
   providers: [
     SchedulerService,
