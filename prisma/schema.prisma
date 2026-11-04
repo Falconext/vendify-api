@@ -1970,6 +1970,10 @@ model DetalleCompra {
   total            Decimal
   lote             String?
   fechaVencimiento DateTime?
+  // Lo que ya entró al stock. null = todo (la compra normal). Menor que
+  // cantidad = la factura se registró completa pero la mercadería llega por
+  // partes (orden de compra con entregas parciales).
+  cantidadRecibida Decimal?
   // Distribución por sede: a qué sede/almacén entra ESTA línea. null = la sede
   // de la cabecera de la compra. Una factura de 10 unidades repartida 6/4 entre
   // dos sedes se guarda como dos líneas del mismo producto con distinta sede.
@@ -2233,6 +2237,10 @@ model DetalleOrdenCompra {
   cantidad       Decimal
   precioUnitario Decimal
   subtotal       Decimal
+  // Lo que ya llegó, en unidades. El proveedor puede mandar la orden en
+  // varias entregas (factura una sola vez, despacha por partes): la orden
+  // queda PARCIAL hasta que cantidadRecibida alcanza cantidad.
+  cantidadRecibida Decimal     @default(0)
   ordenCompra    OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
   producto       Producto?   @relation(fields: [productoId], references: [id])
 
@@ -2274,6 +2282,7 @@ model OrdenCompraOrigen {
 enum EstadoOrdenCompra {
   BORRADOR
   EMITIDA
+  PARCIAL
   RECIBIDA
   ANULADA
 }

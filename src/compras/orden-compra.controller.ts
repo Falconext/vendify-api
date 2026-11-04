@@ -19,6 +19,7 @@ import {
   ActualizarOrdenCompraDto,
   CrearOrdenCompraDto,
   DesdeVentasDto,
+  RecibirEntregaDto,
   RecibirOrdenCompraDto,
 } from './dto/orden-compra.dto';
 
@@ -106,5 +107,21 @@ export class OrdenCompraController {
       body,
       req.user.sedeId,
     );
+  }
+
+  // Una entrega más de una orden que llega por partes.
+  @Post(':id/entregas')
+  async recibirEntrega(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: RecibirEntregaDto,
+  ) {
+    return this.service.recibirEntrega(req.user.empresaId, req.user.id, id, body);
+  }
+
+  // El proveedor no mandará el resto.
+  @Patch(':id/cerrar')
+  async cerrar(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.service.cerrarConLoRecibido(req.user.empresaId, id);
   }
 }

@@ -423,6 +423,12 @@ export class ComprasService {
         fechaVencimiento: item.fechaVencimiento
           ? parseFechaSoloDia(item.fechaVencimiento)
           : null,
+        // Orden de compra con entregas parciales: la factura va completa pero
+        // al stock entra solo lo que llegó. null = llegó todo.
+        cantidadRecibida:
+          this.cantidadQueIngresa(item) < Number(item.cantidad)
+            ? this.cantidadQueIngresa(item)
+            : null,
         // Distribución por sede: null = entra a la sede de la cabecera.
         sedeId:
           item.sedeId != null && Number(item.sedeId) !== sedeId
@@ -548,7 +554,7 @@ export class ComprasService {
     // del mes en el Análisis Financiero, y si además sumara stock su costo
     // volvería a restar al vender. Eso es contarla dos veces.
     for (const item of esPendiente || esConsumoPropio ? [] : data.detalles) {
-      if (item.productoId) {
+      if (item.productoId && this.cantidadQueIngresa(item) > 0) {
         try {
           // costoPromedio siempre se actualiza con el precio NETO (sin IGV) y
           // EN SOLES: una compra en dólares entra al TC de la factura.
@@ -564,7 +570,7 @@ export class ComprasService {
             productoId: item.productoId,
             tipoMovimiento: 'INGRESO',
             concepto: `COMPRA ${compra.serie}-${compra.numero}`,
-            cantidad: Number(item.cantidad),
+            cantidad: this.cantidadQueIngresa(item),
             costoUnitario: costoNetoKardex,
             compraId: compra.id,
             usuarioId,
@@ -584,7 +590,7 @@ export class ComprasService {
                 empresaId,
                 lote: item.lote,
                 fechaVencimiento: parseFechaSoloDia(item.fechaVencimiento),
-                cantidad: Number(item.cantidad),
+                cantidad: this.cantidadQueIngresa(item),
                 costoUnitario: costoNetoKardex,
                 movimientoKardexId: movimiento.id,
               })
@@ -733,7 +739,7 @@ export class ComprasService {
     // El detalle está en la moneda de la factura; al kardex va en soles.
     const factorSoles = this.factorASoles(compra);
     for (const detalle of compra.esGasto ? [] : compra.detalles) {
-      if (!detalle.productoId) continue;
+      if (!detalle.productoId || this.cantidadEnStock(detalle) <= 0) continue;
       try {
         // precioUnitario en DetalleCompra ya está guardado NETO (sin IGV).
         const costoSoles = this.costoEnSoles(
@@ -745,7 +751,7 @@ export class ComprasService {
           productoId: detalle.productoId,
           tipoMovimiento: 'INGRESO',
           concepto: `COMPRA ${compra.serie}-${compra.numero}`,
-          cantidad: Number(detalle.cantidad),
+          cantidad: this.cantidadEnStock(detalle),
           costoUnitario: costoSoles,
           compraId: compra.id,
           usuarioId: adminId,
@@ -760,7 +766,7 @@ export class ComprasService {
             empresaId,
             lote: detalle.lote,
             fechaVencimiento: detalle.fechaVencimiento,
-            cantidad: Number(detalle.cantidad),
+            cantidad: this.cantidadEnStock(detalle),
             costoUnitario: costoSoles,
             movimientoKardexId: movimiento.id,
           });
@@ -938,6 +944,101 @@ export class ComprasService {
     }
   }
 
+  /** Lo que entra al stock al crear: lo que llegó si es entrega parcial, si no todo. */
+  private cantidadQueIngresa(item: { cantidad: any; cantidadRecibida?: any }) {
+    const total = Number(item.cantidad) || 0;
+    if (item.cantidadRecibida == null) return total;
+    return Math.min(total, Math.max(0, Number(item.cantidadRecibida) || 0));
+  }
+
+  /** Lo que de verdad entró al stock de una línea ya guardada. */
+  private cantidadEnStock(det: { cantidad: any; cantidadRecibida?: any }) {
+    return det.cantidadRecibida == null
+      ? Number(det.cantidad) || 0
+      : Number(det.cantidadRecibida) || 0;
+  }
+
+  /**
+   * Ingresa al stock una entrega más de una compra cuya mercadería llega por
+   * partes. La factura ya está registrada: acá no se toca deuda ni pagos, solo
+   * kardex (al costo de la factura, en soles) y lotes. `cantidades` va en el
+   * orden de los detalles de la compra (id asc).
+   */
+  async ingresarEntrega(
+    empresaId: number,
+    usuarioId: number,
+    compraId: number,
+    cantidades: number[],
+    concepto: string,
+  ): Promise<string[]> {
+    const compra = await this.prisma.compra.findFirst({
+      where: { id: compraId, empresaId },
+      include: { detalles: { orderBy: { id: 'asc' } } },
+    });
+    if (!compra) throw new NotFoundException('Compra no encontrada');
+    if (compra.estado === ('ANULADO' as any) || compra.estado === ('RECHAZADA' as any)) {
+      throw new BadRequestException(
+        'La compra de esta orden está anulada o rechazada: no se puede recibir más mercadería.',
+      );
+    }
+    if (cantidades.length !== compra.detalles.length) {
+      throw new BadRequestException('Las líneas de la entrega no coinciden con la compra.');
+    }
+    const sedeId = await this.resolverSedeDestino(empresaId, compra.sedeId ?? undefined);
+    const factorSoles = this.factorASoles(compra);
+    const warnings: string[] = [];
+    for (let i = 0; i < compra.detalles.length; i++) {
+      const det = compra.detalles[i];
+      const llega = Number(cantidades[i]) || 0;
+      if (llega <= 0) continue;
+      const recibido = Math.min(
+        Number(det.cantidad),
+        Number((this.cantidadEnStock(det) + llega).toFixed(4)),
+      );
+      await this.prisma.detalleCompra.update({
+        where: { id: det.id },
+        // Completa vuelve a null: la línea queda como una compra normal.
+        data: { cantidadRecibida: recibido >= Number(det.cantidad) ? null : recibido },
+      });
+      // Pendiente de aprobación: el stock entra al aprobar (por cantidadRecibida).
+      if (!det.productoId || compra.esGasto || compra.estado !== ('REGISTRADO' as any)) continue;
+      try {
+        const costoSoles = this.costoEnSoles(Number(det.precioUnitario), factorSoles);
+        const movimiento = await this.kardexService.registrarMovimiento({
+          empresaId,
+          productoId: det.productoId,
+          tipoMovimiento: 'INGRESO',
+          concepto,
+          cantidad: llega,
+          costoUnitario: costoSoles,
+          compraId: compra.id,
+          usuarioId,
+          sedeId: det.sedeId ?? sedeId,
+          lote: det.lote ?? undefined,
+          fechaVencimiento: det.fechaVencimiento ?? undefined,
+        });
+        if (det.lote && det.fechaVencimiento) {
+          await this.productoLoteService.sincronizarLoteDesdeIngreso({
+            productoId: det.productoId,
+            empresaId,
+            lote: det.lote,
+            fechaVencimiento: det.fechaVencimiento,
+            cantidad: llega,
+            costoUnitario: costoSoles,
+            movimientoKardexId: movimiento.id,
+          });
+        }
+      } catch (error) {
+        warnings.push(
+          `No se pudo ingresar el stock de "${det.descripcion ?? det.productoId}": ${
+            (error as any)?.message ?? 'error desconocido'
+          }. Revisa/ajusta el stock manualmente.`,
+        );
+      }
+    }
+    return warnings;
+  }
+
   // Revierte el inventario ingresado por una compra: por cada detalle con
   // producto registra un movimiento de kardex compensatorio (SALIDA) que baja el
   // stock, y descuenta el lote FEFO correspondiente. Best-effort: los fallos no
@@ -955,6 +1056,7 @@ export class ComprasService {
       detalles: {
         productoId: number | null;
         cantidad: any;
+        cantidadRecibida?: any;
         precioUnitario: any;
         lote: string | null;
         fechaVencimiento: Date | null;
@@ -977,7 +1079,8 @@ export class ComprasService {
     // negativo por mercadería que nunca entró.
     for (const det of compra.esGasto ? [] : compra.detalles) {
       if (!det.productoId) continue;
-      const cantidad = Number(det.cantidad) || 0;
+      // Solo sale lo que entró: en una entrega parcial no todo llegó.
+      const cantidad = this.cantidadEnStock(det);
       if (cantidad <= 0) continue;
       const nombreItem = det.descripcion ?? `producto ${det.productoId}`;
       try {
@@ -1162,6 +1265,13 @@ export class ComprasService {
         'No se puede editar una compra pendiente de aprobación o rechazada. Anúlala y regístrala de nuevo.',
       );
     }
+    // La edición revierte el stock por lo facturado: con mercadería por llegar
+    // sacaría unidades que nunca entraron.
+    if (existente.detalles.some((d) => this.cantidadEnStock(d) < Number(d.cantidad))) {
+      throw new BadRequestException(
+        'Esta compra tiene mercadería por llegar (orden de compra con entregas parciales). Recibe lo que falta desde la orden, o anúlala y regístrala de nuevo.',
+      );
+    }
     await this.assertSinSeriesUsadas(id, empresaId);
 
     // Igual que al crear: decide que la compra pese como gasto del mes y que
@@ -1300,6 +1410,12 @@ export class ComprasService {
         fechaVencimiento: item.fechaVencimiento
           ? parseFechaSoloDia(item.fechaVencimiento)
           : null,
+        // Orden de compra con entregas parciales: la factura va completa pero
+        // al stock entra solo lo que llegó. null = llegó todo.
+        cantidadRecibida:
+          this.cantidadQueIngresa(item) < Number(item.cantidad)
+            ? this.cantidadQueIngresa(item)
+            : null,
         // Distribución por sede: null = entra a la sede de la cabecera.
         sedeId:
           item.sedeId != null && Number(item.sedeId) !== sedeId

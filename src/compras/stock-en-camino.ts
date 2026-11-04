@@ -6,9 +6,8 @@
  * sistema solo sabe lo que hay en el almacén, así que la vendedora no tiene
  * cómo responder "¿llega o no llega?" sin preguntar.
  *
- * Una orden de compra se recibe entera (pasa a RECIBIDA y nace la Compra que
- * sí mueve el kardex), no hay recepción parcial. Entonces "en camino" es
- * exactamente lo pedido en las órdenes EMITIDAS: lo demás o todavía no se
+ * "En camino" es lo pedido en las órdenes EMITIDAS más lo que falta de las
+ * PARCIALES (el proveedor despacha por partes): lo demás o todavía no se
  * mandó (BORRADOR), o ya entró al stock (RECIBIDA), o se canceló (ANULADA).
  *
  * Esto NO es stock: no se vende contra él ni se suma al inventario valorizado.
@@ -17,6 +16,12 @@
 
 /** Único estado que representa mercadería pedida y no recibida. */
 export const ESTADO_EN_CAMINO = 'EMITIDA';
+
+/**
+ * Estados con mercadería por llegar. Una orden PARCIAL ya entregó una parte:
+ * de ella solo cuenta lo que falta (cantidad − cantidadRecibida).
+ */
+export const ESTADOS_EN_CAMINO = [ESTADO_EN_CAMINO, 'PARCIAL'];
 
 export interface DetallePedido {
     productoId: number | null;

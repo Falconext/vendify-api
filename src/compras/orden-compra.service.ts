@@ -29,8 +29,10 @@ import {
 import {
   ActualizarOrdenCompraDto,
   CrearOrdenCompraDto,
+  RecibirEntregaDto,
   RecibirOrdenCompraDto,
 } from './dto/orden-compra.dto';
+import { repartirEntrega, type LlegadaDeLinea } from './entregas-parciales';
 
 const IGV_RATE = 0.18;
 
@@ -438,6 +440,8 @@ export class OrdenCompraService {
           usuario: { select: { nombre: true } },
           sede: { select: { nombre: true } },
           compra: { select: { id: true, serie: true, numero: true } },
+          // Para mostrar el avance de una orden que llega por partes.
+          detalles: { select: { cantidad: true, cantidadRecibida: true } },
           _count: { select: { detalles: true, origenes: true } },
         },
       }),
@@ -495,9 +499,11 @@ export class OrdenCompraService {
       select: { id: true, estado: true },
     });
     if (!orden) throw new NotFoundException('Orden de compra no encontrada');
-    if (orden.estado === 'RECIBIDA' || orden.estado === 'ANULADA') {
+    if (orden.estado === 'RECIBIDA' || orden.estado === 'ANULADA' || orden.estado === 'PARCIAL') {
       throw new BadRequestException(
-        `No se puede editar una orden ${orden.estado === 'RECIBIDA' ? 'ya recibida' : 'anulada'}`,
+        `No se puede editar una orden ${
+          orden.estado === 'RECIBIDA' ? 'ya recibida' : orden.estado === 'PARCIAL' ? 'que ya empezó a llegar' : 'anulada'
+        }`,
       );
     }
     if (!dto.detalles?.length) {
@@ -552,9 +558,11 @@ export class OrdenCompraService {
       select: { id: true, estado: true },
     });
     if (!orden) throw new NotFoundException('Orden de compra no encontrada');
-    if (orden.estado === 'RECIBIDA') {
+    if (orden.estado === 'RECIBIDA' || orden.estado === 'PARCIAL') {
       throw new BadRequestException(
-        'No se puede anular una orden ya recibida (anula la compra asociada primero)',
+        orden.estado === 'PARCIAL'
+          ? 'La orden ya empezó a llegar y su factura está registrada. Si el proveedor no mandará el resto, usa "Cerrar con lo recibido".'
+          : 'No se puede anular una orden ya recibida (anula la compra asociada primero)',
       );
     }
     return this.prisma.ordenCompra.update({
@@ -577,11 +585,16 @@ export class OrdenCompraService {
   ) {
     const orden = await this.prisma.ordenCompra.findFirst({
       where: { id, empresaId },
-      include: { detalles: true },
+      include: { detalles: { orderBy: { id: 'asc' } } },
     });
     if (!orden) throw new NotFoundException('Orden de compra no encontrada');
     if (orden.estado === 'RECIBIDA') {
       throw new BadRequestException('La orden ya fue recibida');
+    }
+    if (orden.estado === 'PARCIAL') {
+      throw new BadRequestException(
+        'La factura de esta orden ya está registrada: usa "Recibir entrega" para lo que va llegando.',
+      );
     }
     if (orden.estado === 'ANULADA') {
       throw new BadRequestException('La orden está anulada');
@@ -591,6 +604,11 @@ export class OrdenCompraService {
     // monto guardado, el mismo criterio que ya usa el PDF de la orden. Si el
     // proveedor no cobra IGV (RUS, exonerado) la compra tampoco debe sumarlo.
     const ordenSinIgv = Number(orden.igv ?? 0) <= 0;
+
+    // Opción A del proveedor extranjero: factura todo de una vez y despacha
+    // por partes. La compra nace con la factura completa (deuda o pago por el
+    // total) pero al stock entra solo lo que llegó.
+    const { cantidades, completa } = this.reparto(orden.detalles, dto.lineas);
 
     const compra = await this.comprasService.crear(
       empresaId,
@@ -613,10 +631,11 @@ export class OrdenCompraService {
         formaPago: dto.formaPago,
         montoPagadoInicial: dto.montoPagadoInicial,
         metodoPagoInicial: dto.metodoPagoInicial,
-        detalles: orden.detalles.map((d) => ({
+        detalles: orden.detalles.map((d, i) => ({
           productoId: d.productoId ?? undefined,
           descripcion: d.descripcion,
           cantidad: Number(d.cantidad),
+          ...(completa ? {} : { cantidadRecibida: cantidades[i] }),
           precioUnitario: Number(d.precioUnitario),
           incluyeIgv: orden.igvIncluido,
           // Lo que se pactó en la orden manda sobre la afectación del producto.
@@ -629,21 +648,174 @@ export class OrdenCompraService {
       reqSedeId,
     );
 
-    await this.prisma.ordenCompra.update({
-      where: { id },
-      data: { estado: 'RECIBIDA', compraId: (compra as any).id },
+    await this.prisma.$transaction([
+      this.prisma.ordenCompra.update({
+        where: { id },
+        data: { estado: completa ? 'RECIBIDA' : 'PARCIAL', compraId: (compra as any).id },
+      }),
+      ...orden.detalles.map((d, i) =>
+        this.prisma.detalleOrdenCompra.update({
+          where: { id: d.id },
+          data: { cantidadRecibida: cantidades[i] },
+        }),
+      ),
+    ]);
+
+    const pedidosListos = await this.avisarPedidosListos(
+      empresaId,
+      orden,
+      orden.detalles.filter((_, i) => cantidades[i] > 0),
+    );
+
+    return { ordenId: id, compra, pedidosListos, completa };
+  }
+
+  /** Lo que llega en esta entrega, validado contra lo que falta. */
+  private reparto(
+    detalles: { id: number; descripcion: string; cantidad: any; cantidadRecibida: any }[],
+    lineas?: LlegadaDeLinea[] | null,
+  ) {
+    try {
+      return repartirEntrega(detalles, lineas);
+    } catch (e) {
+      throw new BadRequestException((e as Error).message);
+    }
+  }
+
+  /**
+   * Una entrega más de una orden PARCIAL. La factura ya se registró al
+   * recibir la primera: acá solo entra stock, al costo de esa factura.
+   */
+  async recibirEntrega(
+    empresaId: number,
+    usuarioId: number,
+    id: number,
+    dto: RecibirEntregaDto,
+  ) {
+    const orden = await this.prisma.ordenCompra.findFirst({
+      where: { id, empresaId },
+      include: {
+        detalles: { orderBy: { id: 'asc' } },
+        compra: { select: { id: true, serie: true, numero: true, estado: true } },
+      },
+    });
+    if (!orden) throw new NotFoundException('Orden de compra no encontrada');
+    if (orden.estado !== 'PARCIAL' || !orden.compra) {
+      throw new BadRequestException(
+        orden.estado === 'RECIBIDA'
+          ? 'La orden ya llegó completa.'
+          : 'Esta orden no tiene entregas pendientes: recíbela primero.',
+      );
+    }
+    if (orden.compra.estado === 'ANULADO' || orden.compra.estado === 'RECHAZADA') {
+      throw new BadRequestException(
+        `La compra ${orden.compra.serie}-${orden.compra.numero} de esta orden está anulada: no se puede recibir más mercadería.`,
+      );
+    }
+    const { cantidades, completa } = this.reparto(orden.detalles, dto.lineas);
+
+    // Se "reserva" la entrega antes de mover stock: si dos personas registran
+    // la misma llegada a la vez, la segunda choca acá y no duplica el ingreso.
+    const nuevas = orden.detalles.map((d, i) =>
+      Number((Number(d.cantidadRecibida) + cantidades[i]).toFixed(4)),
+    );
+    await this.prisma.$transaction(async (tx) => {
+      for (let i = 0; i < orden.detalles.length; i++) {
+        if (cantidades[i] <= 0) continue;
+        const d = orden.detalles[i];
+        const r = await tx.detalleOrdenCompra.updateMany({
+          where: { id: d.id, cantidadRecibida: d.cantidadRecibida },
+          data: { cantidadRecibida: nuevas[i] },
+        });
+        if (r.count !== 1) {
+          throw new BadRequestException(
+            'Alguien registró una entrega de esta orden al mismo tiempo. Vuelve a abrirla y revisa lo que falta.',
+          );
+        }
+      }
+      if (completa) {
+        await tx.ordenCompra.update({ where: { id }, data: { estado: 'RECIBIDA' } });
+      }
     });
 
-    // Cierre del flujo: avisar qué pedidos quedaron listos para entregar.
+    const numeroOrden = OrdenCompraService.formatNumero(orden.numero);
+    let stockWarnings: string[];
+    try {
+      stockWarnings = await this.comprasService.ingresarEntrega(
+        empresaId,
+        usuarioId,
+        orden.compra.id,
+        cantidades,
+        `COMPRA ${orden.compra.serie}-${orden.compra.numero} (entrega ${numeroOrden})`,
+      );
+    } catch (error) {
+      // No entró nada: se devuelve la orden a como estaba.
+      await this.prisma.$transaction([
+        ...orden.detalles.map((d) =>
+          this.prisma.detalleOrdenCompra.update({
+            where: { id: d.id },
+            data: { cantidadRecibida: d.cantidadRecibida },
+          }),
+        ),
+        this.prisma.ordenCompra.update({ where: { id }, data: { estado: 'PARCIAL' } }),
+      ]);
+      throw error;
+    }
+
+    const pedidosListos = await this.avisarPedidosListos(
+      empresaId,
+      orden,
+      orden.detalles.filter((_, i) => cantidades[i] > 0),
+    );
+    return {
+      ordenId: id,
+      completa,
+      pedidosListos,
+      ...(stockWarnings.length ? { stockWarnings } : {}),
+    };
+  }
+
+  /**
+   * El proveedor no mandará el resto: la orden se da por recibida con lo que
+   * llegó. La factura queda como se registró (si el proveedor devuelve plata o
+   * emite una nota de crédito, se registra aparte).
+   */
+  async cerrarConLoRecibido(empresaId: number, id: number) {
+    const orden = await this.prisma.ordenCompra.findFirst({
+      where: { id, empresaId },
+      include: { detalles: { orderBy: { id: 'asc' } } },
+    });
+    if (!orden) throw new NotFoundException('Orden de compra no encontrada');
+    if (orden.estado !== 'PARCIAL') {
+      throw new BadRequestException('Solo se cierra así una orden que llegó en parte.');
+    }
+    const faltantes = orden.detalles
+      .map((d) => ({ d, falta: Number((Number(d.cantidad) - Number(d.cantidadRecibida)).toFixed(4)) }))
+      .filter((x) => x.falta > 0)
+      .map((x) => `${x.d.descripcion}: ${x.falta}`);
+    const fecha = new Date().toLocaleDateString('es-PE', { timeZone: 'America/Lima' });
+    const nota = `Cerrada con lo recibido el ${fecha}. No llegó: ${faltantes.join('; ')}.`;
+    return this.prisma.ordenCompra.update({
+      where: { id },
+      data: {
+        estado: 'RECIBIDA',
+        observaciones: orden.observaciones ? `${orden.observaciones}\n${nota}` : nota,
+      },
+    });
+  }
+
+  /** Cierre del flujo: avisar qué pedidos quedaron listos para entregar. */
+  private async avisarPedidosListos(
+    empresaId: number,
+    orden: { id: number; numero: number },
+    lineasQueLlegaron: { productoId: number | null }[],
+  ): Promise<PedidoListo[]> {
     // Sin esto, la Nota de Pedido de hace tres semanas se queda esperando
     // hasta que el cliente llama a reclamar. No bloquea la recepción: si el
     // aviso falla, la mercadería igual entró.
-    const pedidosListos = await this.pedidosListosTrasRecibir(
-      empresaId,
-      orden.detalles,
-    );
+    const pedidosListos = await this.pedidosListosTrasRecibir(empresaId, lineasQueLlegaron);
     const aviso = avisoDeLlegada(
-      id,
+      orden.id,
       OrdenCompraService.formatNumero(orden.numero),
       pedidosListos,
     );
@@ -660,8 +832,7 @@ export class OrdenCompraService {
         console.warn('[orden-compra] No se pudo avisar los pedidos listos:', (error as any)?.message);
       }
     }
-
-    return { ordenId: id, compra, pedidosListos };
+    return pedidosListos;
   }
 
 

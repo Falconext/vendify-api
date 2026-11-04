@@ -103,7 +103,32 @@ export class DesdeVentasDto {
 export class ActualizarOrdenCompraDto extends CrearOrdenCompraDto {}
 
 /** Datos de la factura del proveedor al recibir la mercadería. */
+/** Cuánto llegó de una línea de la orden en esta entrega. */
+export class LlegadaLineaDto {
+  @IsNumber()
+  detalleId: number;
+
+  @IsNumber()
+  cantidad: number;
+}
+
+/** Una entrega más de una orden que llega por partes (la factura ya está). */
+export class RecibirEntregaDto {
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LlegadaLineaDto)
+  lineas?: LlegadaLineaDto[];
+}
+
 export class RecibirOrdenCompraDto {
+  // Entrega parcial: cuánto llegó de cada línea. Sin enviar = llegó todo.
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LlegadaLineaDto)
+  lineas?: LlegadaLineaDto[];
+
   @IsString()
   tipoDoc: string;
 
