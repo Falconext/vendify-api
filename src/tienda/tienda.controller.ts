@@ -156,7 +156,7 @@ export class TiendaController {
     @Body() body: { adelanto?: number; medioPago?: string; sedeId?: number },
   ) {
     // La sede de la que sale la nota la resuelve el servicio (la del pedido,
-    // la elegida o la única).
+    // la elegida o la única), y es esa la que valida "sedes sin venta".
     return this.pedidoNotaVenta.generar(
       req.user.empresaId,
       +id,
@@ -166,7 +166,11 @@ export class TiendaController {
         sedeId: body?.sedeId,
       },
       req.user.id,
-      { sedeId: req.user.sedeId ?? null },
+      {
+        sedeId: req.user.sedeId ?? null,
+        rol: req.user.rol,
+        sedesSinVenta: req.user.sedesSinVenta,
+      },
     );
   }
 

@@ -150,6 +150,50 @@ describe('Generar nota de un pedido · sede', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  describe('sedes sin venta: vale la sede resuelta, no la de la sesión', () => {
+    it('sesión en sede con venta, pedido de sede sin venta: rechaza y no crea nada', async () => {
+      const { service, comprobantes } = armar({ sedePedido: 2 });
+      await expect(
+        service.generar(9, 41, {}, 5, usuario({ sedeId: 1, sedesSinVenta: [2] })),
+      ).rejects.toThrow('No puedes vender en esta sede');
+      expect(comprobantes.crearInformal).not.toHaveBeenCalled();
+    });
+
+    it('sesión en sede sin venta, pedido de sede con venta: la nota sale', async () => {
+      const { service, sedeUsada } = armar({ sedePedido: 1 });
+      await service.generar(9, 41, {}, 5, usuario({ sedeId: 2, sedesSinVenta: [2] }));
+      expect(sedeUsada()).toBe(1);
+    });
+
+    it('pedido sin sede, elige en el panel una sede sin venta: rechaza', async () => {
+      const { service, comprobantes } = armar({ sedePedido: null });
+      await expect(
+        service.generar(9, 41, { sedeId: 2 }, 5, usuario({ sedeId: 1, sedesSinVenta: [2] })),
+      ).rejects.toThrow('No puedes vender en esta sede');
+      expect(comprobantes.crearInformal).not.toHaveBeenCalled();
+    });
+
+    it('modo TODAS: cae a la principal y esa es la que se valida', async () => {
+      const bloqueada = armar({ sedePedido: null });
+      await expect(
+        bloqueada.service.generar(9, 41, {}, 5, usuario({ sedeId: null, sedesSinVenta: [1] })),
+      ).rejects.toThrow('No puedes vender en esta sede');
+      const libre = armar({ sedePedido: null });
+      await libre.service.generar(9, 41, {}, 5, usuario({ sedeId: null, sedesSinVenta: [2] }));
+      expect(libre.sedeUsada()).toBe(1);
+    });
+
+    it('el administrador no se restringe', async () => {
+      const { service, sedeUsada } = armar({ sedePedido: 2 });
+      await service.generar(9, 41, {}, 5, {
+        rol: 'ADMIN_EMPRESA',
+        sedeId: 1,
+        sedesSinVenta: [2],
+      });
+      expect(sedeUsada()).toBe(2);
+    });
+  });
+
   it('empresa sin sedes (antigua): sigue como antes, sin sede', async () => {
     const { service, sedeUsada } = armar({
       sedePedido: null,

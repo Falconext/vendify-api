@@ -12,6 +12,7 @@ import {
   Res,
   UploadedFile,
   UseGuards,
+  HttpCode,
   UseInterceptors,
   Delete,
 } from '@nestjs/common';
@@ -22,6 +23,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { User } from '../common/decorators/user.decorator';
+import { SoloFotosInterceptor } from '../usuarios/solo-fotos';
 import type { Response } from 'express';
 import { CreateProductoDto } from './dto/create-producto.dto';
 import { ListProductoDto } from './dto/list-producto.dto';
@@ -43,6 +45,7 @@ import { KardexService } from '../kardex/kardex.service';
 import { parseFechaSoloDia } from '../common/utils/fecha';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
+@UseInterceptors(SoloFotosInterceptor)
 @Controller('productos')
 export class ProductoController {
   private readonly imageSearchCache = new Map<
@@ -1120,6 +1123,53 @@ export class ProductoController {
       'attachment; filename=plantilla_productos.xlsx',
     );
     res.status(200).send(buffer);
+  }
+
+  /**
+   * Asigna códigos de barra internos (EAN-13 prefijo 2) a los productos
+   * indicados. Sirve tanto para uno solo como para una selección masiva; con
+   * `incluirVariantes` alcanza a las variantes (cada talla×color se etiqueta
+   * por separado). No pisa un código existente salvo que se pida `forzar`.
+   */
+  @Post('codigos-barras/generar')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  async generarCodigosBarras(
+    @User() user: any,
+    @Body()
+    body: {
+      productoIds?: number[];
+      forzar?: boolean;
+      incluirVariantes?: boolean;
+    },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const resultado = await this.service.generarCodigosBarras(
+      user.empresaId,
+      Array.isArray(body?.productoIds) ? body.productoIds : [],
+      {
+        forzar: body?.forzar === true,
+        incluirVariantes: body?.incluirVariantes === true,
+      },
+    );
+    res.locals.message = `Se generaron ${resultado.generados.length} códigos de barra`;
+    return resultado;
+  }
+
+  /** Datos mínimos para imprimir las etiquetas de una selección de productos. */
+  @Post('codigos-barras/etiquetas')
+  @HttpCode(200)
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  async datosEtiquetas(
+    @User() user: any,
+    @Body() body: { productoIds?: number[] },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const datos = await this.service.datosEtiquetas(
+      user.empresaId,
+      Array.isArray(body?.productoIds) ? body.productoIds : [],
+    );
+    res.locals.message = 'Datos de etiquetas obtenidos correctamente';
+    return datos;
   }
 
   @Get('barcode/:codigo')

@@ -44,6 +44,12 @@ export class UsersController {
     if (!esAdmin && body && 'puedeAnularComprobantes' in body) {
       delete body.puedeAnularComprobantes;
     }
+    // Igual con las restricciones: un usuario que gestiona usuarios no puede
+    // quitárselas a sí mismo.
+    if (!esAdmin && body) {
+      delete body.soloImagenesProductos;
+      delete body.sedesSinVenta;
+    }
   }
 
   @Post()

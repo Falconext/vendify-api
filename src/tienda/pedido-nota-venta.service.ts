@@ -12,6 +12,7 @@ import {
   transportistaDelPedido,
   type MedioPagoNv,
 } from './pedido-nota-venta';
+import { verificarPuedeVenderEnSede } from '../usuarios/puede-vender-en-sede.util';
 
 /**
  * Genera la nota de venta de un pedido de la tienda sin pasar por el punto de
@@ -43,7 +44,7 @@ export class PedidoNotaVentaService {
     pedidoId: number,
     opts: { adelanto?: number; medioPago?: string; sedeId?: unknown },
     usuarioId?: number,
-    usuario?: { sedeId?: number | null },
+    usuario?: { sedeId?: number | null; rol?: string; sedesSinVenta?: number[] },
   ) {
     const pedido = await this.prisma.pedidoTienda.findFirst({
       where: { id: pedidoId, empresaId },
@@ -64,6 +65,9 @@ export class PedidoNotaVentaService {
       opts.sedeId,
       usuario?.sedeId ?? null,
     );
+    // "Sedes sin venta" se valida contra la sede donde cae la venta, no contra la
+    // de la sesión: el pedido de otra sede descuenta y factura en la del pedido.
+    if (usuario) verificarPuedeVenderEnSede({ ...usuario, sedeId: sedeId ?? null }, 'NV');
 
     const medio = String(opts.medioPago ?? 'EFECTIVO').toUpperCase() as MedioPagoNv;
     if (!MEDIOS_PAGO_NV.includes(medio)) {
