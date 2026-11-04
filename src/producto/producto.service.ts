@@ -68,6 +68,7 @@ import {
   saldoPrometible,
   type EnCaminoDeProducto,
 } from '../compras/stock-en-camino';
+import { conStockDeSede } from './stock-variante-sede';
 @Injectable()
 export class ProductoService {
   constructor(
@@ -1962,7 +1963,17 @@ export class ProductoService {
     return { productos, total, page, limit };
   }
 
-  async obtenerPorId(id: number, empresaId: number) {
+  /** El id si la sede es de la empresa y está activa; si no, null. */
+  async sedeActivaDeEmpresa(empresaId: number, sedeId: number): Promise<number | null> {
+    if (!Number.isInteger(sedeId) || sedeId <= 0) return null;
+    const sede = await this.prisma.sede.findFirst({
+      where: { id: sedeId, empresaId, activo: true },
+      select: { id: true },
+    });
+    return sede?.id ?? null;
+  }
+
+  async obtenerPorId(id: number, empresaId: number, sedeId?: number | null) {
     const producto = await this.prisma.producto.findFirst({
       where: { id, empresaId },
       include: {
@@ -1979,6 +1990,7 @@ export class ProductoService {
             moneda: true,
             precioOferta: true,
             stock: true,
+            stocks: { select: { sedeId: true, stock: true } },
             estado: true,
             valoresAtributos: true,
             imagenUrl: true,
@@ -2023,7 +2035,8 @@ export class ProductoService {
             variante.imagenUrl as string | null,
           );
           return {
-            ...variante,
+            // El stock de la sede que se está viendo, no la suma de todas.
+            ...conStockDeSede(variante, sedeId),
             imagenUrl: varianteImagenUrl,
             imagenUrlDisplay: await signIfS3(varianteImagenUrl),
           };
@@ -2346,6 +2359,7 @@ export class ProductoService {
             moneda: true,
             precioOferta: true,
             stock: true,
+            stocks: { select: { sedeId: true, stock: true } },
             valoresAtributos: true,
             imagenUrl: true,
             codigoBarras: true,
@@ -2391,6 +2405,8 @@ export class ProductoService {
 
     return {
       ...producto,
+      // El selector de talla/color del POS muestra el stock de ESTA sede.
+      variantes: ((producto as any).variantes || []).map((v: any) => conStockDeSede(v, sedeId)),
       stock: stockTotal,
       stockBase: stockTotal,
       // false = el producto existe pero NO está asignado a la sede consultada;
@@ -2749,6 +2765,8 @@ export class ProductoService {
       prioridadVenta?: number | null;
 
       sedeId?: number; // Nueva propiedad opcional para identificar dónde se ajusta el stock
+      /** Sede donde se escribe el stock; null = "Todas las sedes". */
+      stockSedeId?: number | null;
     },
     usuarioId?: number,
   ) {
@@ -2926,7 +2944,7 @@ export class ProductoService {
       });
     } else if (data.stock !== undefined) {
       // Obtener sede principal por defecto si no viene en data
-      let targetSedeId = data.sedeId;
+      let targetSedeId = data.stockSedeId ?? data.sedeId;
       if (!targetSedeId) {
         const sedePrincipal = await this.prisma.sede.findFirst({
           where: { empresaId: data.empresaId, esPrincipal: true },
@@ -3273,7 +3291,8 @@ export class ProductoService {
         actualizado,
         sedesSync,
         data.variantesConfig || [],
-        data.sedeId,
+        // null = "Todas las sedes": el stock de las variantes no se toca.
+        data.stockSedeId !== undefined ? data.stockSedeId : data.sedeId,
       );
       await this.sincronizarDisponibilidadVariantes(actualizado.id);
     }

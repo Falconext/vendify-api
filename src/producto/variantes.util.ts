@@ -92,7 +92,8 @@ export async function sincronizarVariantes(
   productoPadre: any,
   sedes: any[],
   variantesConfig: VarianteConfig[] = [],
-  sedeConStockId?: number,
+  /** Sede del stock del formulario; null = "Todas las sedes" (no se toca el stock). */
+  sedeConStockId?: number | null,
 ) {
   // No cortar temprano si opcionesAtributos/combinaciones viene vacío: eso es
   // justo lo que pasa cuando el usuario borra toda la matriz de variantes
@@ -120,6 +121,9 @@ export async function sincronizarVariantes(
   );
   const sedePrincipalId = sedes.find((s) => s.esPrincipal)?.id;
   const stockSedeId = sedeConStockId ?? sedePrincipalId ?? sedes[0]?.id;
+  // Viendo "Todas las sedes" el formulario muestra el total; no hay una sede
+  // donde escribirlo. Solo una variante nueva recibe su stock inicial.
+  const sinSedeDeStock = sedeConStockId === null;
 
   // Crear/actualizar variantes de la matriz actual — solo si queda alguna
   // combinación; si la matriz está vacía, se salta directo a desactivar las
@@ -185,6 +189,10 @@ export async function sincronizarVariantes(
         : existe
           ? Number((existe as any).stock ?? 0)
           : 0;
+    // Una variante existente solo cambia de stock si el formulario lo mandó y
+    // se está viendo una sede concreta. Sin config, `existe.stock` es la suma
+    // de todas las sedes: escribirla en una sola la inflaba.
+    const tocaStock = !existe || (config?.stock != null && !sinSedeDeStock);
     // El costo NO viene en variantesConfig: al crear una variante quedaba en 0
     // aunque el padre tuviera costo (Excel de inventario con Costo / Valor
     // inventario en S/0). Se hereda del padre al crearla y también cuando la
@@ -278,11 +286,11 @@ export async function sincronizarVariantes(
             // stock: no tiene como saber lo que hay en las otras sedes, asi
             // que no puede decidir por ellas.
             update:
-              s.id === stockSedeId ? { stock, stockMinimo: 0 } : {},
+              s.id === stockSedeId && tocaStock ? { stock, stockMinimo: 0 } : {},
             create: {
               productoId: varianteId,
               sedeId: s.id,
-              stock: s.id === stockSedeId ? stock : 0,
+              stock: s.id === stockSedeId && tocaStock ? stock : 0,
               stockMinimo: 0,
             },
           }),

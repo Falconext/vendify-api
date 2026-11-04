@@ -82,6 +82,16 @@ export class UpdateProductoDto {
   @Type(() => Number)
   stock?: number;
 
+  /**
+   * Sede cuyo stock se edita: la que el Kardex está mostrando. null = "Todas
+   * las sedes" (el formulario muestra el total y el stock de las variantes no
+   * se toca). Sin enviar, la sede de la sesión. Solo para administradores.
+   */
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  stockSedeId?: number | null;
+
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
