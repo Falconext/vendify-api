@@ -63,6 +63,21 @@ export class AnalisisFinancieroController {
     });
   }
 
+  /** GET /analisis-financiero/resumen-anual?anio=2026 — ganancia mes a mes y total del año. */
+  @Get('resumen-anual')
+  getResumenAnual(
+    @User() user: any,
+    @Query('anio') anioQuery?: string,
+    @Query('sedeId') sedeIdQuery?: string,
+  ) {
+    const anio = Number(anioQuery);
+    return this.service.getResumenAnual(
+      user.empresaId,
+      Number.isInteger(anio) && anio >= 2000 && anio <= 2100 ? anio : new Date().getFullYear(),
+      this.resolverSedeId(user, sedeIdQuery),
+    );
+  }
+
   /**
    * GET /analisis-financiero/evolucion?meses=6
    * meses defaults to 6 if not provided.

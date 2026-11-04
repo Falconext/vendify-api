@@ -15,6 +15,7 @@ import { parseFechaSoloDia } from '../common/utils/fecha';
 import { GeminiService } from '../gemini/gemini.service';
 import { S3Service } from '../s3/s3.service';
 import { COMPRA_OCUPA_NUMERO } from './numero-ocupado';
+import { resolverSoloCreditoIgv } from './solo-credito-igv';
 
 @Injectable()
 export class ComprasService {
@@ -451,6 +452,7 @@ export class ComprasService {
       typeof data.esGasto === 'boolean'
         ? data.esGasto
         : data.detalles.length > 0 && data.detalles.every((d) => !d.productoId);
+    const soloCreditoIgv = resolverSoloCreditoIgv(data.soloCreditoIgv, data.detalles);
 
     // Uno o varios pagos (pago mixto al contado). Ver pagos-iniciales.ts.
     const pagosDeEntrada = pagosIniciales(data, total, esPendiente);
@@ -507,6 +509,7 @@ export class ComprasService {
           // Consumo propio: explícito desde el formulario o inferido cuando
           // ninguna línea apunta a un producto del catálogo (ítems libres).
           esGasto: esConsumoPropio,
+          soloCreditoIgv: soloCreditoIgv === true,
           // Save installments
           cuotas: data.cuotas ? JSON.stringify(data.cuotas) : undefined,
           detalles: {
@@ -1109,6 +1112,24 @@ export class ComprasService {
   // Edición completa de una compra: revierte los efectos de inventario previos y
   // re-aplica los nuevos a partir del payload (mismos cálculos que `crear`). No
   // toca los pagos ya registrados; sí recalcula el saldo según el nuevo total.
+  /**
+   * Marca (o desmarca) una compra como solo para crédito de IGV, sin abrir el
+   * formulario. Lo usa la pantalla de Rentabilidad en sus compras de consumo.
+   */
+  async marcarSoloCreditoIgv(empresaId: number, id: number, valor: boolean) {
+    const compra = await this.prisma.compra.findFirst({
+      where: { id, empresaId },
+      select: { id: true, detalles: { select: { productoId: true } } },
+    });
+    if (!compra) throw new NotFoundException('Compra no encontrada');
+    const soloCreditoIgv = resolverSoloCreditoIgv(valor === true, compra.detalles) === true;
+    return this.prisma.compra.update({
+      where: { id },
+      data: { soloCreditoIgv },
+      select: { id: true, soloCreditoIgv: true },
+    });
+  }
+
   async actualizar(
     empresaId: number,
     usuarioId: number,
@@ -1149,6 +1170,10 @@ export class ComprasService {
       typeof data.esGasto === 'boolean'
         ? data.esGasto
         : data.detalles.length > 0 && data.detalles.every((d) => !d.productoId);
+    // Sin enviar se conserva; si ahora trae productos, deja de ser "solo IGV".
+    const soloCreditoIgv =
+      resolverSoloCreditoIgv(data.soloCreditoIgv, data.detalles) ??
+      (data.detalles.some((d) => d.productoId) ? false : undefined);
 
     // Duplicado serie+numero excluyendo la propia compra.
     const duplicado = await this.prisma.compra.findFirst({
@@ -1366,6 +1391,7 @@ export class ComprasService {
           // por IA en edición); si no viene, se conserva la existente.
           ...(data.fotoUrl !== undefined ? { fotoUrl: data.fotoUrl || null } : {}),
           esGasto: esConsumoPropio,
+          ...(soloCreditoIgv !== undefined ? { soloCreditoIgv } : {}),
           cuotas: data.cuotas ? JSON.stringify(data.cuotas) : undefined,
           sedeId,
           detalles: { create: detallesData },

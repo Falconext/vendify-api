@@ -14,6 +14,7 @@ import {
   normalizarCriterio,
   type CriterioIgvVentas,
 } from '../finanzas/igv-ventas';
+import { COMPRA_CON_DINERO } from '../compras/solo-credito-igv';
 
 @Injectable()
 export class DashboardService {
@@ -1172,7 +1173,8 @@ export class DashboardService {
     // que se registraron (no con el de hoy), para que el mes no "se mueva".
     const sumarComprasSoles = async (rango: any) => {
       const filas = await this.prisma.compra.findMany({
-        where: { ...baseCompraWhere, fechaEmision: rango },
+        // Las de "solo crédito de IGV" no son compras de la empresa.
+        where: { ...baseCompraWhere, ...COMPRA_CON_DINERO, fechaEmision: rango },
         select: { total: true, moneda: true, tipoCambio: true },
       });
       return filas.reduce((acc, c) => acc + montoCompraEnSoles(c.total, c), 0);

@@ -1919,6 +1919,10 @@ model Compra {
   // del mes (neto, sin IGV: ese IGV es crédito fiscal). Por defecto se marca
   // sola cuando ninguna línea está enlazada a un producto del catálogo.
   esGasto              Boolean            @default(false)
+  // Factura registrada SOLO por su crédito de IGV: la empresa no la pagó.
+  // No resta de la ganancia ni de la caja, bancos o cuentas por pagar; sí va
+  // al registro de compras (SIRE) y al crédito fiscal. Solo sin productos del catálogo.
+  soloCreditoIgv       Boolean            @default(false)
   creadoEn             DateTime           @default(now())
   actualizadoEn        DateTime           @updatedAt
   cuotas               Json?

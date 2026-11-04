@@ -14,6 +14,7 @@ import {
   costoSegunCriterio,
   normalizarCriterio,
 } from './igv-ventas';
+import { COMPRA_CON_DINERO, PAGO_DE_COMPRA_CON_DINERO } from '../compras/solo-credito-igv';
 
 @Injectable()
 export class FinanzasService {
@@ -48,6 +49,8 @@ export class FinanzasService {
         ...(sedeId ? { sedeId } : {}),
         estado: { notIn: ['ANULADO', 'RECHAZADA', 'PENDIENTE_APROBACION'] as any },
         saldo: { gt: 0 },
+        // Solo para crédito de IGV: la empresa no la debe.
+        ...COMPRA_CON_DINERO,
       },
       select: { saldo: true, moneda: true, tipoCambio: true },
     });
@@ -142,6 +145,8 @@ export class FinanzasService {
       where: {
         empresaId,
         fecha: rangoFecha,
+        // Una factura registrada solo por su IGV no sacó plata de la caja.
+        ...PAGO_DE_COMPRA_CON_DINERO,
       },
       select: {
         fecha: true,
