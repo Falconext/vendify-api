@@ -488,6 +488,7 @@ export class AuthService {
             mostrarMarcaSistema: true,
             formatoImpresionDefault: true,
             imprimirAutomatico: true,
+            permitirFechaAnteriorEnSerie: true,
             tipoEmpresa: true,
             rubroId: true,
             cuentasBancarias: {
@@ -702,6 +703,7 @@ export class AuthService {
             mostrarMarcaSistema: true,
             formatoImpresionDefault: true,
             imprimirAutomatico: true,
+            permitirFechaAnteriorEnSerie: true,
             directorTecnico: true,
             sunatClientId: true,
             sunatClientSecret: true,

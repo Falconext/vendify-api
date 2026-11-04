@@ -10,6 +10,28 @@ import {
   IsString,
 } from 'class-validator';
 
+export class UpdateEmpresaUsuarioDto {
+  @IsOptional()
+  @IsString()
+  nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  password?: string;
+
+  @IsOptional()
+  @IsString()
+  dni?: string;
+
+  @IsOptional()
+  @IsString()
+  celular?: string;
+}
+
 export class UpdateEmpresaDto {
   @IsInt()
   id: number;
@@ -168,6 +190,11 @@ export class UpdateEmpresaDto {
   @IsOptional()
   @IsBoolean()
   imprimirAutomatico?: boolean;
+
+  /** Permitir Factura/Boleta con fecha anterior a la del último de su serie. */
+  @IsOptional()
+  @IsBoolean()
+  permitirFechaAnteriorEnSerie?: boolean;
 
   @IsOptional()
   @IsBoolean()
@@ -389,26 +416,4 @@ export class UpdateEmpresaDto {
 
   @IsOptional()
   usuario?: UpdateEmpresaUsuarioDto;
-}
-
-export class UpdateEmpresaUsuarioDto {
-  @IsOptional()
-  @IsString()
-  nombre?: string;
-
-  @IsOptional()
-  @IsString()
-  email?: string;
-
-  @IsOptional()
-  @IsString()
-  password?: string;
-
-  @IsOptional()
-  @IsString()
-  dni?: string;
-
-  @IsOptional()
-  @IsString()
-  celular?: string;
 }

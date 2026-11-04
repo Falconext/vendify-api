@@ -1282,6 +1282,9 @@ export class EmpresaService {
         updateData.formatoImpresionDefault = dto.formatoImpresionDefault;
       if (dto.imprimirAutomatico !== undefined)
         updateData.imprimirAutomatico = dto.imprimirAutomatico;
+      if (dto.permitirFechaAnteriorEnSerie !== undefined)
+        updateData.permitirFechaAnteriorEnSerie =
+          dto.permitirFechaAnteriorEnSerie;
       if (dto.cotizTerminosDefault !== undefined)
         updateData.cotizTerminosDefault = dto.cotizTerminosDefault || null;
       if (dto.cotizObservacionesDefault !== undefined)

@@ -1,0 +1,1 @@
+ALTER TABLE "Empresa" ADD COLUMN IF NOT EXISTS "permitirFechaAnteriorEnSerie" BOOLEAN NOT NULL DEFAULT false;

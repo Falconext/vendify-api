@@ -1992,6 +1992,10 @@ export class ComprobanteService {
    *
    * Solo Factura y Boleta: son las series que SUNAT fiscaliza por este lado, y
    * acotarlo deja fuera del cambio a las notas y los documentos internos.
+   *
+   * Como SUNAT no lo rechaza, la empresa puede desactivar el bloqueo bajo su
+   * responsabilidad (`Empresa.permitirFechaAnteriorEnSerie`, Configuración →
+   * Comprobantes e impresión). La opción se lee solo cuando el bloqueo aplicaría.
    */
   private async validarOrdenCronologico(
     empresaId: number,
@@ -2013,10 +2017,16 @@ export class ComprobanteService {
     const diaPrevio = this.diaDe(previo.fechaEmision);
     if (dia >= diaPrevio) return;
 
+    const empresa = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { permitirFechaAnteriorEnSerie: true },
+    });
+    if (empresa?.permitirFechaAnteriorEnSerie) return;
+
     throw new BadRequestException(
       `La fecha ${dia} es anterior a la de ${serie}-${previo.correlativo} (${diaPrevio}). ` +
-        `Dentro de una serie el número mayor no puede tener fecha anterior: SUNAT exige que vayan en orden. ` +
-        `Usá una fecha desde ${diaPrevio} en adelante.`,
+        `Para mantener la serie en orden, usa una fecha desde ${diaPrevio} en adelante. ` +
+        `Si necesitas emitirla igual, el administrador puede activar "Permitir fechas anteriores dentro de una serie" en Configuración → Comprobantes e impresión.`,
     );
   }
 
