@@ -1,4 +1,5 @@
 import { emisionAlEnviar } from './emision-al-enviar';
+import { faltaDatoDelConductor } from './datos-conductor';
 import {
   Injectable,
   NotFoundException,
@@ -745,6 +746,13 @@ export class GuiaRemisionService {
       );
     }
 
+    // Una guía guardada antes de esta validación puede no tener la licencia:
+    // mejor avisarlo aquí que gastar el número en un rechazo de SUNAT.
+    const faltaConductor = faltaDatoDelConductor(guia as any);
+    if (faltaConductor) {
+      throw new BadRequestException(`${faltaConductor} Edita la guía y vuelve a enviarla.`);
+    }
+
     try {
       let guiaParaEnviar = guia;
       // Si SUNAT todavía no la recibió, se emite ahora: fecha y hora del envío
@@ -1167,15 +1175,10 @@ export class GuiaRemisionService {
       }
     }
 
-    if (dto.modoTransporte === '02' && !dto.vehiculoM1oL) {
-      // Transporte privado (excepto vehículos categoría M1 o L, exonerados
-      // por SUNAT de identificar conductor y vehículo)
-      if (!dto.conductorNumDoc || !dto.vehiculoPlaca) {
-        throw new BadRequestException(
-          'Para transporte privado se requieren los datos del conductor y vehículo',
-        );
-      }
-    }
+    // Transporte privado (excepto vehículos categoría M1 o L, exonerados
+    // por SUNAT de identificar conductor y vehículo)
+    const faltaConductor = faltaDatoDelConductor(dto as any);
+    if (faltaConductor) throw new BadRequestException(faltaConductor);
   }
 
   private getCurrentTime(): string {

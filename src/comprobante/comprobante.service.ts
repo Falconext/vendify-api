@@ -2,6 +2,7 @@ import { ventanaTurnoAbierto } from '../caja/turno-abierto';
 import { resolverDespachoAgrupado, selectDespachoAgrupado } from '../envio-despacho/despacho-agrupado';
 import { num, round3 } from '../common/utils/stock';
 import { lineasPagoMixto } from '../common/utils/pago-mixto';
+import { stockEnEdicion } from './stock-edicion-informal';
 import {
   cobroDeEdicion,
   fecharPagosEdicion,
@@ -6370,10 +6371,22 @@ export class ComprobanteService {
       finalClienteId = Number(clienteId);
     }
 
+    // Una NP (o una OT de `crearOT`) puede no haber descontado nunca: entonces
+    // lo anterior no cuenta, y lo nuevo solo si se marcó "Descontar del stock
+    // ahora". Ver stock-edicion-informal.ts.
+    const { contarAnterior, contarNueva } = stockEnEdicion({
+      tipoDoc: comp.tipoDoc,
+      yaDescontoStock:
+        (await this.prisma.movimientoKardex.count({
+          where: { comprobanteId: comp.id, tipoMovimiento: 'SALIDA' },
+        })) > 0,
+      descontarStock: input.descontarStock,
+    });
+
     // 1) Cantidades ANTERIORES por producto (para mover solo la diferencia en el
     // Kardex, sin registrar el par revertir+aplicar que ensucia el historial).
     const cantidadAnteriorPorProducto = new Map<number, number>();
-    for (const d of comp.detalles) {
+    for (const d of contarAnterior ? comp.detalles : []) {
       if (d.productoId == null) continue;
       cantidadAnteriorPorProducto.set(
         d.productoId,
@@ -6389,15 +6402,6 @@ export class ComprobanteService {
       where: { comprobanteId: comp.id },
       select: { monto: true, medioPago: true, fecha: true, usuarioId: true },
     });
-    await this.prisma.pago.deleteMany({ where: { comprobanteId: comp.id } });
-    await this.prisma.comisionVendedor.deleteMany({
-      where: { comprobanteId: comp.id },
-    });
-    await this.prisma.leyenda.deleteMany({ where: { comprobanteId: comp.id } });
-    await this.prisma.detalleComprobante.deleteMany({
-      where: { comprobanteId: comp.id },
-    });
-
     // 2) Recomputar totales con los nuevos detalles
     const {
       detalleFinal,
@@ -6470,7 +6474,7 @@ export class ComprobanteService {
     //    delta > 0 ⇒ hay que descontar más (SALIDA); delta < 0 ⇒ devolver (INGRESO);
     //    delta = 0 ⇒ no se genera movimiento. Así el Kardex solo refleja el cambio real.
     const cantidadNuevaPorProducto = new Map<number, number>();
-    for (const d of detalleFinal) {
+    for (const d of contarNueva ? detalleFinal : []) {
       if (d.productoId == null) continue;
       cantidadNuevaPorProducto.set(
         d.productoId,
@@ -6500,6 +6504,17 @@ export class ComprobanteService {
         usuarioId,
       });
     }
+
+    // Recién ahora, validado todo, se borra lo viejo. Antes se borraba al
+    // empezar: si faltaba stock, la nota quedaba sin productos ni pagos.
+    await this.prisma.pago.deleteMany({ where: { comprobanteId: comp.id } });
+    await this.prisma.comisionVendedor.deleteMany({
+      where: { comprobanteId: comp.id },
+    });
+    await this.prisma.leyenda.deleteMany({ where: { comprobanteId: comp.id } });
+    await this.prisma.detalleComprobante.deleteMany({
+      where: { comprobanteId: comp.id },
+    });
 
     // Cronograma de cuotas (solo si es crédito con saldo e info de cuotas/fecha).
     let cuotasCronograma: any = null;
