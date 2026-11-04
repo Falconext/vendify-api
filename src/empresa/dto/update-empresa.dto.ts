@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsIn,
@@ -183,6 +185,18 @@ export class UpdateEmpresaDto {
   @IsOptional()
   @IsBoolean()
   permitirVentaSinStock?: boolean;
+
+  /** Precio por mayor sumando las unidades de productos distintos. */
+  @IsBoolean()
+  @IsOptional()
+  mayoristaMezclaActivo?: boolean;
+
+  /** Categorías que se mezclan; vacío = todos los productos. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsInt({ each: true })
+  mayoristaMezclaCategoriaIds?: number[];
 
   // Modo offline-first de la app móvil (se activa por empresa desde el panel de sistema).
   @IsOptional()

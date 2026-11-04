@@ -254,6 +254,15 @@ model Empresa {
   // (se registra la salida aunque el stock quede en 0/negativo). Default false = mantiene
   // el bloqueo por stock insuficiente.
   permitirVentaSinStock     Boolean                       @default(false)
+  /// Precio por mayor mezclando productos: en el POS, las unidades de los
+  /// productos del alcance se suman y cada uno toma su escala de precio por
+  /// mayor según ese total (6 perfumes distintos = precio de 6 en cada uno).
+  /// Apagado = cada línea cuenta solo su propia cantidad (comportamiento de
+  /// siempre). Ver frontend facturacion/mayoristaMezcla.ts.
+  mayoristaMezclaActivo         Boolean                       @default(false)
+  /// Categorías cuyos productos se suman entre sí (principal o adicional).
+  /// Vacío = todos los productos.
+  mayoristaMezclaCategoriaIds   Int[]                         @default([])
   // Cobranza con vendedores de campo: cuando es true, "Registrar Pago" pide el vendedor de
   // campo que envió el comprobante, a quién se dirigió el pago y permite adjuntar el comprobante.
   // Default false = flujo de cobro estándar (la mayoría de negocios).
