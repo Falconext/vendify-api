@@ -167,6 +167,11 @@ export class UpdateEmpresaDto {
   @IsBoolean()
   imprimirAutomatico?: boolean;
 
+  /** Permitir Factura/Boleta con fecha anterior a la del último de su serie. */
+  @IsOptional()
+  @IsBoolean()
+  permitirFechaAnteriorEnSerie?: boolean;
+
   @IsOptional()
   @IsBoolean()
   usaCodigoBarrasManual?: boolean;

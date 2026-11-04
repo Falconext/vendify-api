@@ -247,6 +247,10 @@ model Empresa {
   // cajero tenga que elegir formato. Opt-in: hay negocios que no imprimen todas
   // las ventas (las mandan por WhatsApp) y el diálogo bloquea la pantalla.
   imprimirAutomatico        Boolean                       @default(false)
+  // Deja emitir Factura/Boleta con fecha anterior a la del correlativo previo
+  // de su serie. SUNAT lo acepta; por defecto se bloquea para mantener la serie
+  // en orden. Opt-in bajo responsabilidad de la empresa.
+  permitirFechaAnteriorEnSerie  Boolean                       @default(false)
   ticketLogoSize            Int?                          @default(96)
   usaCodigoBarrasManual     Boolean?
   usarPrecioLoteFefo        Boolean                       @default(false)
