@@ -599,6 +599,26 @@ export class ComprobanteController {
     );
   }
 
+  // Corregir el método de un cobro ya registrado, sin mover monto ni fecha.
+  @Get(':id/medio-pago')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  async obtenerCorreccionPago(
+    @Param('id', ParseIntPipe) id: number,
+    @User() user: any,
+  ) {
+    return this.service.obtenerCorreccionPago(id, user.empresaId);
+  }
+
+  @Patch(':id/medio-pago')
+  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  async corregirMedioPago(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() input: any,
+    @User() user: any,
+  ) {
+    return this.service.corregirMedioPago(id, user.empresaId, user.id, input);
+  }
+
   // Editar una Nota de Venta (NV) in-place: revierte y re-aplica stock, pagos y
   // comisiones. Editable esté COMPLETADO o PENDIENTE de pago.
   @Patch(':id/nota-venta')

@@ -14,6 +14,15 @@ import {
   type PagoAnterior,
 } from './pagos-edicion';
 import {
+  MEDIOS_CON_CUENTA,
+  MEDIOS_CORREGIBLES,
+  comprobanteCorregido,
+  etiquetaCuenta,
+  normalizarMedio,
+  referenciaReal,
+  turnoQueContiene,
+} from './corregir-medio-pago';
+import {
   lineasDetalleAdicional,
   normalizarDetalleAdicional,
 } from './detalle-adicional';
@@ -6738,6 +6747,274 @@ export class ComprobanteService {
       where: { id: comp.id },
       include: { detalles: true },
     });
+  }
+
+  // Lo que se puede corregir del pago de una nota, y qué turnos ya cerraron.
+  private async cargarCorreccionPago(comprobanteId: number, empresaId: number) {
+    const comp = await this.prisma.comprobante.findFirst({
+      where: { id: comprobanteId, empresaId },
+      include: {
+        pagos: {
+          orderBy: { fecha: 'asc' },
+          include: { cuentaBancaria: true },
+        },
+      },
+    });
+    if (!comp) throw new NotFoundException('Comprobante no encontrado');
+
+    let motivoBloqueo: string | null = null;
+    if (!['NV', 'TICKET', 'NP', 'OT', 'RH', 'CP'].includes(comp.tipoDoc)) {
+      motivoBloqueo = 'Solo se corrige el método de pago de comprobantes informales.';
+    } else if (comp.estadoEnvioSunat === 'ANULADO') {
+      motivoBloqueo = 'El comprobante está anulado.';
+    } else if (comp.pagos.length === 0) {
+      motivoBloqueo = 'Este comprobante no tiene cobros registrados.';
+    } else {
+      const derivado = await this.formalQueContieneNota(comprobanteId);
+      if (derivado) {
+        motivoBloqueo = `Esta nota ya se convirtió a ${derivado.serie}-${String(derivado.correlativo).padStart(8, '0')}.`;
+      }
+    }
+
+    // Los mismos turnos que arma el reporte: de la apertura al cierre, por sede.
+    const desdeFecha = comp.pagos[0]?.fecha;
+    const cierres = desdeFecha
+      ? await this.prisma.movimientoCaja.findMany({
+          where: {
+            empresaId,
+            ...(comp.sedeId ? { sedeId: comp.sedeId } : {}),
+            tipoMovimiento: 'CIERRE',
+            estado: 'ACTIVO',
+            fecha: { gte: desdeFecha },
+          },
+          orderBy: { fecha: 'asc' },
+          take: 100,
+          include: {
+            usuario: { select: { nombre: true } },
+            movimientoVinculado: { select: { fecha: true } },
+          },
+        })
+      : [];
+    const turnos = await Promise.all(
+      cierres.map(async (c) => {
+        const apertura =
+          c.movimientoVinculado ??
+          (await this.prisma.movimientoCaja.findFirst({
+            where: {
+              empresaId,
+              ...(c.sedeId ? { sedeId: c.sedeId } : {}),
+              tipoMovimiento: 'APERTURA',
+              estado: 'ACTIVO',
+              fecha: { lte: c.fecha },
+            },
+            orderBy: { fecha: 'desc' },
+            select: { fecha: true },
+          }));
+        return {
+          desde: apertura?.fecha ?? c.fecha,
+          hasta: c.fechaCierre ?? c.fecha,
+          usuario: c.usuario?.nombre ?? null,
+        };
+      }),
+    );
+
+    return { comp, motivoBloqueo, turnos };
+  }
+
+  async obtenerCorreccionPago(comprobanteId: number, empresaId: number) {
+    const { comp, motivoBloqueo, turnos } = await this.cargarCorreccionPago(
+      comprobanteId,
+      empresaId,
+    );
+    return {
+      comprobanteId: comp.id,
+      numero: `${comp.serie}-${String(comp.correlativo).padStart(8, '0')}`,
+      motivoBloqueo,
+      // Para que la pantalla de edición abierta no vuelva a guardar el método viejo.
+      nota: {
+        mtoImpVenta: comp.mtoImpVenta,
+        saldo: comp.saldo,
+        medioPago: comp.medioPago,
+        paymentDetails: comp.paymentDetails,
+      },
+      pagos: comp.pagos.map((p) => {
+        const turno = turnoQueContiene(p.fecha, turnos);
+        return {
+          id: p.id,
+          monto: p.monto,
+          fecha: p.fecha,
+          medioPago: normalizarMedio(p.medioPago),
+          cuentaBancariaId: p.cuentaBancariaId,
+          cuentaBancariaLabel: etiquetaCuenta(p.cuentaBancaria),
+          referencia: referenciaReal(p.referencia, comp),
+          turnoCerrado: turno
+            ? { fechaCierre: turno.hasta, usuario: turno.usuario }
+            : null,
+        };
+      }),
+    };
+  }
+
+  /**
+   * Corrige método, cuenta y N° de operación de los cobros de una nota. No toca
+   * monto ni fecha: el cobro sigue en el turno en que entró (ver
+   * corregir-medio-pago.ts).
+   */
+  async corregirMedioPago(
+    comprobanteId: number,
+    empresaId: number,
+    usuarioId: number | undefined,
+    input: {
+      lineas?: {
+        pagoId: number;
+        medioPago: string;
+        cuentaBancariaId?: number | null;
+        referencia?: string | null;
+      }[];
+      confirmarCajaCerrada?: boolean;
+    },
+  ) {
+    const { comp, motivoBloqueo, turnos } = await this.cargarCorreccionPago(
+      comprobanteId,
+      empresaId,
+    );
+    if (motivoBloqueo) throw new BadRequestException(motivoBloqueo);
+
+    const lineas = Array.isArray(input?.lineas) ? input.lineas : [];
+    const documento = `${comp.serie}-${comp.correlativo}`;
+    const cuentasEmpresa = await this.prisma.cuentaBancaria.findMany({
+      where: { empresaId },
+    });
+
+    const cambios: {
+      pago: (typeof comp.pagos)[number];
+      medioPago: string;
+      cuentaBancariaId: number | null;
+      referencia: string;
+    }[] = [];
+    for (const linea of lineas) {
+      const pago = comp.pagos.find((p) => p.id === Number(linea.pagoId));
+      if (!pago) {
+        throw new BadRequestException('El cobro no pertenece a este comprobante.');
+      }
+      const medioPago = normalizarMedio(linea.medioPago);
+      if (!MEDIOS_CORREGIBLES.includes(medioPago)) {
+        throw new BadRequestException(`Método de pago no válido: ${linea.medioPago}`);
+      }
+
+      let cuentaBancariaId: number | null = null;
+      if (MEDIOS_CON_CUENTA.includes(medioPago)) {
+        cuentaBancariaId = linea.cuentaBancariaId
+          ? Number(linea.cuentaBancariaId)
+          : await resolverCuentaVinculada(this.prisma, empresaId, medioPago);
+        const activas = cuentasEmpresa.filter((c) => c.activo);
+        if (!cuentaBancariaId && medioPago === 'TRANSFERENCIA' && activas.length > 0) {
+          throw new BadRequestException(
+            'El pago por transferencia requiere cuenta bancaria destino',
+          );
+        }
+        // Si la cuenta no cambió se acepta aunque hoy esté inactiva: el cobro ya entró ahí.
+        if (
+          cuentaBancariaId &&
+          cuentaBancariaId !== pago.cuentaBancariaId &&
+          !activas.some((c) => c.id === cuentaBancariaId)
+        ) {
+          throw new BadRequestException(
+            'La cuenta bancaria destino no pertenece a la empresa o está inactiva',
+          );
+        }
+      }
+
+      const anterior = referenciaReal(pago.referencia, comp);
+      const referencia =
+        medioPago === 'EFECTIVO'
+          ? ''
+          : linea.referencia === undefined
+            ? anterior
+            : String(linea.referencia ?? '').trim();
+
+      if (
+        medioPago === normalizarMedio(pago.medioPago) &&
+        cuentaBancariaId === (pago.cuentaBancariaId ?? null) &&
+        referencia === anterior
+      ) {
+        continue;
+      }
+      cambios.push({ pago, medioPago, cuentaBancariaId, referencia });
+    }
+    if (cambios.length === 0) {
+      throw new BadRequestException('No hay cambios que guardar.');
+    }
+
+    const enCajaCerrada = cambios.filter((c) => turnoQueContiene(c.pago.fecha, turnos));
+    if (enCajaCerrada.length > 0 && !input?.confirmarCajaCerrada) {
+      throw new BadRequestException(
+        'Ese cobro está en un turno de caja ya cerrado. Confirma que quieres corregirlo igual.',
+      );
+    }
+
+    const usuario = usuarioId
+      ? await this.prisma.usuario.findUnique({
+          where: { id: usuarioId },
+          select: { nombre: true },
+        })
+      : null;
+    const hoy = new Date().toLocaleString('es-PE', {
+      timeZone: 'America/Lima',
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+
+    const finales = comp.pagos.map((p) => {
+      const cambio = cambios.find((c) => c.pago.id === p.id);
+      const cuentaBancariaId = cambio ? cambio.cuentaBancariaId : (p.cuentaBancariaId ?? null);
+      const referencia = cambio ? cambio.referencia : referenciaReal(p.referencia, comp);
+      return {
+        monto: p.monto,
+        medioPago: cambio ? cambio.medioPago : normalizarMedio(p.medioPago),
+        cuentaBancariaId,
+        cuentaBancariaLabel: etiquetaCuenta(
+          cuentasEmpresa.find((c) => c.id === cuentaBancariaId),
+        ),
+        referencia: referencia || null,
+      };
+    });
+    const corregido = comprobanteCorregido(comp, finales);
+
+    await this.prisma.$transaction([
+      ...cambios.map((c) => {
+        const antes = normalizarMedio(c.pago.medioPago);
+        // Queda a la vista en el historial: quién lo cambió, cuándo y de qué a qué.
+        const nota =
+          antes === c.medioPago
+            ? `Datos del pago corregidos por ${usuario?.nombre ?? 'usuario'} el ${hoy}`
+            : `Método corregido de ${antes} a ${c.medioPago} por ${usuario?.nombre ?? 'usuario'} el ${hoy}`;
+        return this.prisma.pago.update({
+          where: { id: c.pago.id },
+          data: {
+            medioPago: c.medioPago,
+            cuentaBancariaId: c.cuentaBancariaId,
+            referencia:
+              c.referencia ||
+              (referenciaReal(c.pago.referencia, comp) ? documento : c.pago.referencia) ||
+              documento,
+            observacion: [c.pago.observacion, nota].filter(Boolean).join(' · '),
+          },
+        });
+      }),
+      this.prisma.comprobante.update({
+        where: { id: comp.id },
+        data: {
+          medioPago: corregido.medioPago,
+          paymentDetails: corregido.paymentDetails,
+          vuelto: corregido.vuelto,
+          // El PDF guardado todavía dice el método anterior.
+          s3PdfUrl: null,
+        },
+      }),
+    ]);
+
+    return this.obtenerCorreccionPago(comprobanteId, empresaId);
   }
 
   async actualizarVendedorCampo(
