@@ -137,6 +137,12 @@ model Empresa {
   // seguir agregando de la misma lista (true) o limpiar y mostrar todo el
   // catálogo (false, comportamiento original pedido por Demenver)?
   posMantenerBusqueda       Boolean                       @default(false)
+  // Dólar y márgenes (Compras): cuánto tiene que moverse el TC desde la última
+  // compra en US$ para avisar, qué margen sobre el precio se busca y cuántos
+  // soles se suman al TC del día al sugerir precios (colchón).
+  tcAlertaUmbralPct         Decimal                       @default(3) @db.Decimal(5, 2)
+  margenObjetivoPct         Decimal                       @default(30) @db.Decimal(5, 2)
+  tcColchon                 Decimal                       @default(0) @db.Decimal(6, 3)
   // Resumen diario de productos en su stock mínimo o por debajo (8:00 Lima),
   // además del aviso en la campana del panel. Por correo a los administradores
   // (o a `alertaStockCorreos`) y por WhatsApp a `alertaStockCelular` desde el
