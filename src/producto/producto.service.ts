@@ -1508,9 +1508,20 @@ export class ProductoService {
                 : null,
             );
 
+            const varianteEnCamino = enCaminoPorProducto.get(variante.id) ?? null;
             return {
               ...variante,
               stock: varianteStock,
+              // Cada talla sabe lo suyo: es lo que la vendedora necesita ver.
+              enCamino: varianteEnCamino?.cantidad ?? 0,
+              enCaminoProximaEntrega: varianteEnCamino?.proximaEntrega ?? null,
+              comprometido: comprometidoPorProducto.get(variante.id) ?? 0,
+              saldoPrometible: saldoPrometible({
+                stock: varianteStock,
+                reservado: 0,
+                enCamino: varianteEnCamino?.cantidad ?? 0,
+                comprometido: comprometidoPorProducto.get(variante.id) ?? 0,
+              }),
               precioUnitario: variantePrecioUnitario,
               precioOferta: variantePrecioOferta,
               sedeStockConfig: varianteStockSede
@@ -1543,6 +1554,19 @@ export class ProductoService {
           stockBase: stockTotal,
           stockReservado: reservado,
           stockDisponibleVenta,
+          // Pedido al proveedor y aún no recibido. No es stock: no se vende
+          // contra esto. El padre agrega lo de sus variantes.
+          ...agregarDeVariantes(
+            {
+              enCamino: enCaminoProducto?.cantidad ?? 0,
+              enCaminoProximaEntrega: enCaminoProducto?.proximaEntrega ?? null,
+              comprometido: comprometidoPorProducto.get(p.id) ?? 0,
+            },
+            variantes as any,
+            stockTotal,
+            reservado,
+          ),
+          enCaminoOrdenes: enCaminoProducto?.ordenes ?? [],
           stockMinimo: stockMinimo,
           stockMaximo: stockSede?.stockMaximo ?? (p as any).stockMaximo ?? null,
           // Disponible en la sede consultada (sin sede = catálogo completo).
