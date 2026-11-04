@@ -6,6 +6,7 @@ import {
 import * as XLSX from 'xlsx';
 import { PrismaService } from '../prisma/prisma.service';
 import { pagoCompraEnSoles } from '../common/utils/moneda-compra';
+import { PAGO_DE_COMPRA_CON_DINERO } from '../compras/solo-credito-igv';
 
 /**
  * Conciliación bancaria: importa un Excel del banco (movimientos con N° de
@@ -224,6 +225,7 @@ export class ConciliacionBancariaService {
           empresaId,
           referencia: { not: null },
           ...(rango ? { fecha: rango } : {}),
+          ...PAGO_DE_COMPRA_CON_DINERO,
         },
         select: {
           fecha: true,

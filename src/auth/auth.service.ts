@@ -415,9 +415,11 @@ export class AuthService {
         sistemaNegocio: true,
         sistemaProducto: true,
         puedeAnularComprobantes: true,
+        soloImagenesProductos: true,
         sedeId: true,
         sedesAsignadas: {
           select: {
+            puedeVender: true,
             sede: {
               select: {
                 id: true,
@@ -459,6 +461,8 @@ export class AuthService {
             ticketLogoSize: true,
             usarPrecioLoteFefo: true,
             permitirVentaSinStock: true,
+            mayoristaMezclaActivo: true,
+            mayoristaMezclaCategoriaIds: true,
             offlineHabilitado: true,
             cobranzaCampo: true,
             requiereAprobacionGastos: true,
@@ -486,6 +490,7 @@ export class AuthService {
             mostrarMarcaSistema: true,
             formatoImpresionDefault: true,
             imprimirAutomatico: true,
+            permitirFechaAnteriorEnSerie: true,
             tipoEmpresa: true,
             rubroId: true,
             cuentasBancarias: {
@@ -630,7 +635,10 @@ export class AuthService {
         orderBy: [{ esPrincipal: 'desc' }, { id: 'asc' }],
       });
     } else {
-      usuario.sedes = (usuario.sedesAsignadas || []).map((us: any) => us.sede);
+      usuario.sedes = (usuario.sedesAsignadas || []).map((us: any) => ({
+        ...us.sede,
+        puedeVender: us.puedeVender,
+      }));
     }
     delete usuario.sedesAsignadas;
 
@@ -671,6 +679,8 @@ export class AuthService {
             ticketLogoSize: true,
             usarPrecioLoteFefo: true,
             permitirVentaSinStock: true,
+            mayoristaMezclaActivo: true,
+            mayoristaMezclaCategoriaIds: true,
             offlineHabilitado: true,
             cobranzaCampo: true,
             requiereAprobacionGastos: true,
@@ -698,6 +708,7 @@ export class AuthService {
             mostrarMarcaSistema: true,
             formatoImpresionDefault: true,
             imprimirAutomatico: true,
+            permitirFechaAnteriorEnSerie: true,
             directorTecnico: true,
             sunatClientId: true,
             sunatClientSecret: true,

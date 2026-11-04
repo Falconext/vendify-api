@@ -23,7 +23,11 @@ export type PlanFeatureKey =
   // ── Contabilidad ───────────────────────────────────────────────────────────
   // El SIRE es lo que distingue al plan Corporativo: que SUNAT le traiga las
   // compras al negocio en vez de digitarlas a mano.
-  | 'tieneSire';
+  | 'tieneSire'
+  // ── Mi negocio ─────────────────────────────────────────────────────────────
+  // Agenda del negocio (reuniones, tareas, pagos y recordatorios). Se enciende
+  // por plan desde Sistema → Planes.
+  | 'tieneAgenda';
 
 export interface PlanFeatureCatalogItem {
   key: PlanFeatureKey;
@@ -206,6 +210,14 @@ export const PLAN_FEATURE_CATALOG: PlanFeatureCatalogItem[] = [
       'Descarga del SIRE las compras y ventas que SUNAT tiene a nombre del RUC, sin digitarlas. Requiere que la empresa sea FORMAL y cargue sus credenciales del SIRE en su perfil.',
     group: 'operaciones',
     icon: 'solar:cloud-download-bold-duotone',
+  },
+  {
+    key: 'tieneAgenda',
+    label: 'Agenda',
+    description:
+      'Calendario del negocio en Mi negocio → Agenda: reuniones, tareas, pagos y recordatorios por semana o mes, con responsable y aviso antes de cada evento.',
+    group: 'operaciones',
+    icon: 'solar:calendar-bold-duotone',
   },
 ];
 

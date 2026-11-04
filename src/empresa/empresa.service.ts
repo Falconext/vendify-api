@@ -1282,6 +1282,9 @@ export class EmpresaService {
         updateData.formatoImpresionDefault = dto.formatoImpresionDefault;
       if (dto.imprimirAutomatico !== undefined)
         updateData.imprimirAutomatico = dto.imprimirAutomatico;
+      if (dto.permitirFechaAnteriorEnSerie !== undefined)
+        updateData.permitirFechaAnteriorEnSerie =
+          dto.permitirFechaAnteriorEnSerie;
       if (dto.cotizTerminosDefault !== undefined)
         updateData.cotizTerminosDefault = dto.cotizTerminosDefault || null;
       if (dto.cotizObservacionesDefault !== undefined)
@@ -1339,6 +1342,32 @@ export class EmpresaService {
         updateData.usarPrecioLoteFefo = dto.usarPrecioLoteFefo;
       if (dto.permitirVentaSinStock !== undefined)
         updateData.permitirVentaSinStock = dto.permitirVentaSinStock;
+      if (dto.mayoristaMezclaActivo !== undefined)
+        updateData.mayoristaMezclaActivo = Boolean(dto.mayoristaMezclaActivo);
+      if (dto.mayoristaMezclaCategoriaIds !== undefined) {
+        // Solo categorías de esta empresa: un id ajeno no debe colarse ni
+        // dejar el alcance apuntando a algo que el negocio no ve.
+        // `PUT empresa/mia` llega como Partial<> y no pasa por class-validator.
+        if (!Array.isArray(dto.mayoristaMezclaCategoriaIds)) {
+          throw new BadRequestException('Las categorías del precio por mayor deben ser una lista');
+        }
+        const pedidas = [...new Set(dto.mayoristaMezclaCategoriaIds.map(Number))].filter(
+          (n) => Number.isInteger(n) && n > 0,
+        );
+        if (pedidas.length > 200) {
+          throw new BadRequestException('Elige como máximo 200 categorías');
+        }
+        const propias = pedidas.length
+          ? await this.prisma.categoria.findMany({
+              where: { id: { in: pedidas }, empresaId: dto.id },
+              select: { id: true },
+            })
+          : [];
+        if (propias.length !== pedidas.length) {
+          throw new BadRequestException('Alguna de las categorías elegidas no existe en tu empresa');
+        }
+        updateData.mayoristaMezclaCategoriaIds = pedidas;
+      }
       if (dto.offlineHabilitado !== undefined)
         updateData.offlineHabilitado = dto.offlineHabilitado;
       if (dto.cobranzaCampo !== undefined)

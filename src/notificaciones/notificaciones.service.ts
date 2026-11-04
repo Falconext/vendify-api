@@ -12,6 +12,15 @@ export interface SunatNotifMeta {
   errorMsg?: string | null;
 }
 
+/** Aviso de la Agenda: la web lo reconoce por `origen`/`agendaEventoId` y abre `url`. */
+export interface AgendaNotifMeta {
+  origen: 'AGENDA';
+  agendaEventoId: number;
+  /** Inicio ISO de la ocurrencia avisada. */
+  ocurrencia: string;
+  url: string;
+}
+
 @Injectable()
 export class NotificacionesService {
   constructor(
@@ -145,7 +154,7 @@ export class NotificacionesService {
     tipo: 'INFO' | 'WARNING' | 'CRITICAL';
     titulo: string;
     mensaje: string;
-    metaData?: SunatNotifMeta;
+    metaData?: SunatNotifMeta | AgendaNotifMeta;
   }) {
     const notificacion = await this.prisma.notificacion.create({
       data: {

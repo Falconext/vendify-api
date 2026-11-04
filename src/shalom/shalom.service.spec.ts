@@ -95,10 +95,32 @@ describe('ShalomService (proveedor único api.shalom-api.lat)', () => {
   });
 
   it('comprobante: passthrough de { buffer, contentType } del proveedor', async () => {
-    const { svc } = build();
+    const { svc, prisma } = build();
+    prisma.empresa.findUnique.mockResolvedValue({ shalomInstanceId: 'inst-1' });
     const r = await svc.ticketImage('66479331', '3KTH', 400);
     expect(Buffer.isBuffer(r.buffer)).toBe(true);
     expect(r.contentType).toBe('image/png');
+  });
+
+  it('comprobante: envía la cuenta Pro y el ose_id, sin importar el estado de la guía', async () => {
+    const { svc, prisma, lat } = build();
+    prisma.empresa.findUnique.mockResolvedValue({ shalomInstanceId: 'inst-1' });
+    await svc.ticketImage('101510298', 'WNMH', 86, '104982094');
+    expect(lat.ticketImage).toHaveBeenCalledWith('101510298', 'WNMH', 'inst-1', '104982094');
+  });
+
+  it('comprobante: un oseId que no es numérico no se envía', async () => {
+    const { svc, prisma, lat } = build();
+    prisma.empresa.findUnique.mockResolvedValue({ shalomInstanceId: 'inst-1' });
+    await svc.ticketImage('101510298', 'WNMH', 86, '1&instanceId=otra');
+    expect(lat.ticketImage).toHaveBeenCalledWith('101510298', 'WNMH', 'inst-1', undefined);
+  });
+
+  it('comprobante: sin cuenta Pro conectada pide conectarla, sin llamar a Shalom', async () => {
+    const { svc, prisma, lat } = build();
+    prisma.empresa.findUnique.mockResolvedValue({ shalomInstanceId: null });
+    await expect(svc.ticketImage('101510298', 'WNMH', 86)).rejects.toThrow(/Conecta tu cuenta Shalom Pro/);
+    expect(lat.ticketImage).not.toHaveBeenCalled();
   });
 
   it('etiqueta: passthrough de { buffer, contentType }', async () => {
@@ -355,6 +377,85 @@ describe('ShalomService (proveedor único api.shalom-api.lat)', () => {
     await expect(svc.crearGuiaDesdeDespacho(9, 100)).rejects.toThrow(/Seleccione un producto/);
     // Lo crítico: no debe quedar marcado como generado.
     expect(prisma.envioDespacho.update).not.toHaveBeenCalled();
+  });
+
+  describe('destinatario que no cuadra con la venta (ZABDI 02-11)', () => {
+    function armarGuia(despacho: Record<string, unknown>) {
+      const { svc, prisma, lat } = build();
+      lat.getAgencias.mockResolvedValue({
+        success: true,
+        data: [agencia('7', 'Lima Centro'), agencia('582', 'Cusco Centro')],
+        total: 2,
+      });
+      prisma.empresa.findUnique.mockResolvedValue(empresaCorporativa());
+      prisma.envioDespacho.findFirst.mockResolvedValue({
+        id: 55,
+        nroOrden: null,
+        claveOrden: null,
+        agenciaDestino: 'Cusco Centro - CUSCO - CUSCO',
+        shalomAgenciaDestinoId: null,
+        celularDest: '968702413',
+        direccionDestino: null,
+        contenidoPaquete: '1 Caja',
+        nroPaquetes: 1,
+        montoCOD: null,
+        comprobante: {
+          id: 9,
+          serie: 'NV01',
+          correlativo: 47,
+          cliente: { nombre: 'DIAZ ALTAMIRANO, SOLEDAD', nroDoc: '73479180', telefono: '900542174' },
+          detalles: [],
+        },
+        ...despacho,
+      });
+      prisma.envioDespacho.update.mockResolvedValue({ id: 55, nroOrden: '66479331', claveOrden: '3KTH', claveEnvio: null, shalomGuiaCreadaEn: new Date() });
+      return { svc, lat };
+    }
+
+    it('otro nombre sin su DNI: no llega a crear la guía', async () => {
+      const { svc, lat } = armarGuia({ nombreDestinatario: 'ALFARO AVILA, ELIZABETH', dniDestinatario: '' });
+      await expect(svc.crearGuiaDesdeDespacho(9, 100)).rejects.toThrow(/dice que recibe "ALFARO AVILA, ELIZABETH".*la venta es de "DIAZ ALTAMIRANO, SOLEDAD"/);
+      expect(lat.createOrder).not.toHaveBeenCalled();
+    });
+
+    it('otro nombre con el DNI del cliente: tampoco', async () => {
+      const { svc, lat } = armarGuia({ nombreDestinatario: 'SANCHEZ CUBAS, SANDRA', dniDestinatario: '73479180' });
+      await expect(svc.crearGuiaDesdeDespacho(9, 100)).rejects.toThrow(/dice que recibe/);
+      expect(lat.createOrder).not.toHaveBeenCalled();
+    });
+
+    it('un tercero con su propio DNI sí genera la guía', async () => {
+      const { svc, lat } = armarGuia({ nombreDestinatario: 'ALFARO AVILA, ELIZABETH', dniDestinatario: '44273815' });
+      await svc.crearGuiaDesdeDespacho(9, 100);
+      expect(lat.createOrder).toHaveBeenCalledWith(expect.objectContaining({ documento: '44273815' }));
+    });
+
+    it('el propio cliente sí genera la guía', async () => {
+      const { svc, lat } = armarGuia({ nombreDestinatario: 'DIAZ ALTAMIRANO, SOLEDAD', dniDestinatario: '', celularDest: '900542174' });
+      await svc.crearGuiaDesdeDespacho(9, 100);
+      expect(lat.createOrder).toHaveBeenCalledWith(expect.objectContaining({ documento: '73479180' }));
+    });
+
+    it('sin destinatario escrito sigue tomando al cliente', async () => {
+      const { svc, lat } = armarGuia({ nombreDestinatario: '', dniDestinatario: '', celularDest: '900542174' });
+      await svc.crearGuiaDesdeDespacho(9, 100);
+      expect(lat.createOrder).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('agencia guardada con el nombre anterior', () => {
+    const carabayllo = { terId: '108', nombre: 'CARABAYLLO ESTABLO', provincia: 'LIMA', departamento: 'LIMA', distrito: 'CARABAYLLO', estado: '', aereo: false, label: 'CARABAYLLO ESTABLO - LIMA - LIMA', nombreAnterior: 'CARABAYLLO', labelAnterior: 'CARABAYLLO - LIMA - LIMA' };
+    const otra = { ...carabayllo, terId: '536', nombre: 'SANTO DOMINGO', label: 'SANTO DOMINGO - LIMA - LIMA', nombreAnterior: 'SANTO DOMINGO', labelAnterior: 'SANTO DOMINGO - LIMA - LIMA' };
+
+    it('el texto viejo sigue identificando a la agencia correcta', () => {
+      const { svc } = build();
+      expect((svc as any).resolverAgencia([otra, carabayllo], null, 'CARABAYLLO - LIMA - LIMA')?.terId).toBe('108');
+    });
+
+    it('el nombre oficial también', () => {
+      const { svc } = build();
+      expect((svc as any).resolverAgencia([otra, carabayllo], null, 'CARABAYLLO ESTABLO - LIMA - LIMA')?.terId).toBe('108');
+    });
   });
 
   describe('declaración jurada con cuenta Shalom de empresa', () => {

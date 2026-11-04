@@ -120,6 +120,110 @@ describe('ProductoService — disponibilidad por sede', () => {
     });
   });
 
+  describe('validarSedesDisponibles con el stock que deja la edición', () => {
+    it('una sede sin marcar que va a quedar con stock no se puede quitar', async () => {
+      await expect(
+        service.validarSedesDisponibles(10, 1, [1], { sedeId: 2, stock: 4 }),
+      ).rejects.toThrow('Zapallal');
+    });
+    it('dejar en 0 una sede permite quitarla en la misma edición', async () => {
+      prisma.productoStock.findMany.mockResolvedValue([{ sedeId: 2, stock: 4 }]);
+      await expect(
+        service.validarSedesDisponibles(10, 1, [1], { sedeId: 2, stock: 0 }),
+      ).resolves.toHaveLength(2);
+    });
+  });
+
+  describe('actualizar: "Disponible en" antes de escribir', () => {
+    beforeEach(() => {
+      prisma.producto.findFirst.mockResolvedValue({ id: 10, empresaId: 1, stock: 0, costoPromedio: 0 });
+      prisma.productoStock.findUnique = jest.fn();
+      prisma.productoStock.upsert.mockRejectedValue(new Error('escribió'));
+      prisma.producto.update = jest.fn().mockRejectedValue(new Error('escribió'));
+    });
+
+    it('quitar una sede con stock falla sin grabar stock ni kardex', async () => {
+      prisma.productoStock.findMany.mockResolvedValue([{ sedeId: 2, stock: 3 }]);
+      await expect(
+        service.actualizar({ id: 10, empresaId: 1, sedeId: 1, stock: 4, sedesDisponibles: [1] } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.productoStock.upsert).not.toHaveBeenCalled();
+      expect(kardex.registrarMovimiento).not.toHaveBeenCalled();
+    });
+
+    it('agregar stock en una sede sin marcar la vuelve disponible (no error)', async () => {
+      const data: any = { id: 10, empresaId: 1, sedeId: 2, stock: 4, sedesDisponibles: [1], visibleEnSede: false };
+      // Pasa la validación: el error que llega es el de la primera escritura.
+      await expect(service.actualizar(data)).rejects.toThrow('escribió');
+      expect(data.sedesDisponibles).toEqual([1, 2]);
+      expect(data.visibleEnSede).toBe(true);
+    });
+  });
+
+  describe('actualizar: la sede del stock es stockSedeId, no la sesión', () => {
+    const stockEn = (sedeId: number, stock: number) => ({ sedeId, stock });
+    beforeEach(() => {
+      prisma.producto.findFirst.mockResolvedValue({ id: 10, empresaId: 1 });
+    });
+
+    it('admin en sede 1 viendo la 2: darle stock a la 2 la vuelve disponible', async () => {
+      prisma.productoStock.findMany.mockResolvedValue([stockEn(2, 0)]);
+      const espia = jest
+        .spyOn(service, 'validarSedesDisponibles')
+        .mockRejectedValue(new BadRequestException('corte'));
+      const data: any = {
+        id: 10,
+        empresaId: 1,
+        sedeId: 1,
+        stockSedeId: 2,
+        stock: 4,
+        sedesDisponibles: [1],
+        visibleEnSede: false,
+      };
+      await expect(service.actualizar(data)).rejects.toThrow('corte');
+      expect(espia).toHaveBeenCalledWith(10, 1, [1, 2], { sedeId: 2, stock: 4 });
+      // `visibleEnSede` es de la sede de la sesión: no se toca por el stock de otra.
+      expect(data.visibleEnSede).toBe(false);
+    });
+
+    it('admin en sede 1 dejando en 0 la 2: se puede quitar la 2', async () => {
+      prisma.productoStock.findMany.mockResolvedValue([stockEn(2, 9)]);
+      await expect(
+        service.validarSedesDisponibles(10, 1, [1], { sedeId: 2, stock: 0 }),
+      ).resolves.toBeDefined();
+      const espia = jest
+        .spyOn(service, 'validarSedesDisponibles')
+        .mockRejectedValue(new BadRequestException('corte'));
+      await expect(
+        service.actualizar({
+          id: 10,
+          empresaId: 1,
+          sedeId: 1,
+          stockSedeId: 2,
+          stock: 0,
+          sedesDisponibles: [1],
+        } as any),
+      ).rejects.toThrow('corte');
+      expect(espia).toHaveBeenCalledWith(10, 1, [1], { sedeId: 2, stock: 0 });
+    });
+
+    it('sin stockSedeId (vendedor o app vieja) sigue siendo la sede de la sesión', async () => {
+      const espia = jest
+        .spyOn(service, 'validarSedesDisponibles')
+        .mockRejectedValue(new BadRequestException('corte'));
+      await expect(
+        service.actualizar({
+          id: 10,
+          empresaId: 1,
+          sedeId: 2,
+          stock: 3,
+          sedesDisponibles: [1],
+        } as any),
+      ).rejects.toThrow('corte');
+      expect(espia).toHaveBeenCalledWith(10, 1, [1, 2], { sedeId: 2, stock: 3 });
+    });
+  });
+
   describe('aplicarSedesDisponibles', () => {
     it('no permite quitar de una sede con stock', async () => {
       prisma.productoStock.findMany.mockResolvedValue([

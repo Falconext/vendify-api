@@ -9,6 +9,7 @@ import { AlertaStockService } from '../notificaciones/alerta-stock.service';
 import { ResellerService } from '../reseller/reseller.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
+import { LibroReclamacionesService } from '../libro-reclamaciones/libro-reclamaciones.service';
 
 @Injectable()
 export class SchedulerService {
@@ -29,6 +30,7 @@ export class SchedulerService {
     private readonly prisma: PrismaService,
     private readonly whatsappService: WhatsAppService,
     private readonly alertaStock: AlertaStockService,
+    private readonly libroReclamaciones: LibroReclamacionesService,
   ) {}
 
   /**
@@ -196,6 +198,23 @@ export class SchedulerService {
       );
     } catch (error) {
       this.logger.error('❌ Error al verificar suscripciones:', error);
+    }
+  }
+
+  // Libro de Reclamaciones: aviso al dueño de hojas vencidas o que vencen en
+  // ≤ 3 días hábiles. Se apaga con LIBRO_RECLAMACIONES_JOBS_ENABLED=false (un
+  // backend de desarrollo contra la base compartida mandaría los mismos avisos).
+  @Cron('30 8 * * *', {
+    name: 'avisar-libro-reclamaciones',
+    timeZone: 'America/Lima',
+  })
+  async avisarLibroReclamaciones(): Promise<void> {
+    if (process.env.LIBRO_RECLAMACIONES_JOBS_ENABLED === 'false') return;
+    try {
+      const resumenes = await this.libroReclamaciones.avisarVencimientos();
+      this.logger.log(`📕 Libro de reclamaciones: ${resumenes.length} empresa(s) avisadas.`);
+    } catch (error) {
+      this.logger.error('❌ Error en el aviso del libro de reclamaciones:', error);
     }
   }
 

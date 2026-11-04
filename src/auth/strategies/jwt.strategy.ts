@@ -38,6 +38,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         sistemaNegocio: true,
         sistemaProducto: true,
         puedeAnularComprobantes: true,
+        soloImagenesProductos: true,
+        sedesAsignadas: { where: { puedeVender: false }, select: { sedeId: true } },
         empresa: {
           select: {
             estado: true,
@@ -70,6 +72,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       sistemaNegocio: user.sistemaNegocio ?? payload.sistemaNegocio ?? null,
       sistemaProducto: user.sistemaProducto ?? payload.sistemaProducto ?? null,
       puedeAnularComprobantes: user.puedeAnularComprobantes,
+      soloImagenesProductos: user.soloImagenesProductos,
+      // Sedes asignadas donde no emite ventas (ver puede-vender-en-sede.util).
+      sedesSinVenta: user.sedesAsignadas.map((s) => s.sedeId),
     };
   }
 }

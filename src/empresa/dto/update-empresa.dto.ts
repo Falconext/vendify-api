@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsIn,
@@ -7,6 +9,28 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
+
+export class UpdateEmpresaUsuarioDto {
+  @IsOptional()
+  @IsString()
+  nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  password?: string;
+
+  @IsOptional()
+  @IsString()
+  dni?: string;
+
+  @IsOptional()
+  @IsString()
+  celular?: string;
+}
 
 export class UpdateEmpresaDto {
   @IsInt()
@@ -167,6 +191,11 @@ export class UpdateEmpresaDto {
   @IsBoolean()
   imprimirAutomatico?: boolean;
 
+  /** Permitir Factura/Boleta con fecha anterior a la del último de su serie. */
+  @IsOptional()
+  @IsBoolean()
+  permitirFechaAnteriorEnSerie?: boolean;
+
   @IsOptional()
   @IsBoolean()
   usaCodigoBarrasManual?: boolean;
@@ -183,6 +212,18 @@ export class UpdateEmpresaDto {
   @IsOptional()
   @IsBoolean()
   permitirVentaSinStock?: boolean;
+
+  /** Precio por mayor sumando las unidades de productos distintos. */
+  @IsBoolean()
+  @IsOptional()
+  mayoristaMezclaActivo?: boolean;
+
+  /** Categorías que se mezclan; vacío = todos los productos. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsInt({ each: true })
+  mayoristaMezclaCategoriaIds?: number[];
 
   // Modo offline-first de la app móvil (se activa por empresa desde el panel de sistema).
   @IsOptional()
@@ -375,26 +416,4 @@ export class UpdateEmpresaDto {
 
   @IsOptional()
   usuario?: UpdateEmpresaUsuarioDto;
-}
-
-export class UpdateEmpresaUsuarioDto {
-  @IsOptional()
-  @IsString()
-  nombre?: string;
-
-  @IsOptional()
-  @IsString()
-  email?: string;
-
-  @IsOptional()
-  @IsString()
-  password?: string;
-
-  @IsOptional()
-  @IsString()
-  dni?: string;
-
-  @IsOptional()
-  @IsString()
-  celular?: string;
 }

@@ -130,6 +130,15 @@ export class CrearCompraDto {
   @IsBoolean()
   esGasto?: boolean;
 
+  /**
+   * Factura que se registra solo por su crédito de IGV (la empresa no la
+   * pagó): no resta de la ganancia ni de la caja. Solo sin productos del
+   * catálogo. Al editar, si no viene, se conserva.
+   */
+  @IsOptional()
+  @IsBoolean()
+  soloCreditoIgv?: boolean;
+
   @IsOptional()
   @IsNumber()
   igv?: number;

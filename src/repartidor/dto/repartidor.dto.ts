@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -36,6 +37,11 @@ export class CreateRepartidorDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  /** Color de su etiqueta en la lista de ventas (#RRGGBB); "" lo quita. */
+  @IsOptional()
+  @Matches(/^(#[0-9a-fA-F]{6})?$/, { message: 'El color debe ser #RRGGBB' })
+  color?: string;
 }
 
 export class UpdateRepartidorDto extends CreateRepartidorDto {}

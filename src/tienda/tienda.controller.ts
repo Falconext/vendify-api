@@ -105,6 +105,7 @@ export class TiendaController {
     @Query('estado') estado?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('sedeId') sedeId?: string,
   ) {
     const empresaId = req.user.empresaId;
     return this.tiendaService.listarPedidos(
@@ -112,6 +113,7 @@ export class TiendaController {
       estado,
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 50,
+      sedeId,
     );
   }
 
@@ -151,14 +153,24 @@ export class TiendaController {
   async generarNotaVenta(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() body: { adelanto?: number; medioPago?: string },
+    @Body() body: { adelanto?: number; medioPago?: string; sedeId?: number },
   ) {
+    // La sede de la que sale la nota la resuelve el servicio (la del pedido,
+    // la elegida o la única), y es esa la que valida "sedes sin venta".
     return this.pedidoNotaVenta.generar(
       req.user.empresaId,
       +id,
-      { adelanto: Number(body?.adelanto ?? 0), medioPago: body?.medioPago },
+      {
+        adelanto: Number(body?.adelanto ?? 0),
+        medioPago: body?.medioPago,
+        sedeId: body?.sedeId,
+      },
       req.user.id,
-      req.user.sedeId ?? undefined,
+      {
+        sedeId: req.user.sedeId ?? null,
+        rol: req.user.rol,
+        sedesSinVenta: req.user.sedesSinVenta,
+      },
     );
   }
 

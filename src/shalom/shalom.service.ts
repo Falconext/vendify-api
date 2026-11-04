@@ -17,6 +17,9 @@ import {
   ShalomDerivado,
 } from './shalom.util';
 import { ConectarInstanciaDto, CrearGuiaDto } from './dto/shalom.dto';
+import { destinatarioNoCuadra } from './destinatario-guia';
+import { destinoDelEnvio } from '../envio-despacho/destino-envio';
+import { lineasDelRotulo } from './rotulo-datos';
 
 export type { ShalomAgencia, ShalomOrderInput } from './shalom-lat.service';
 
@@ -133,8 +136,9 @@ export function documentoParaGuia(v: string | null | undefined): string {
 /**
  * Servicio Shalom de falconext-mype. Todas las empresas usan el proveedor
  * api.shalom-api.lat (`ShalomLatService`), autenticado con una API key global:
- * tracking, agencias, comprobante, etiqueta y cotización NO requieren cuenta
- * Shalom Pro. El proveedor legacy (api.shalom-api-peru.com) quedó retirado.
+ * tracking, agencias y cotización NO requieren cuenta Shalom Pro; comprobante y
+ * etiqueta sí, porque Shalom los entrega con esa sesión. El proveedor legacy
+ * (api.shalom-api-peru.com) quedó retirado.
  *
  * Los documentos (comprobante/etiqueta) se devuelven como `{ buffer, contentType }`
  * (la API nueva puede devolver PNG o PDF).
@@ -171,10 +175,22 @@ export class ShalomService {
   async ticketImage(
     orderNumber: string,
     orderCode: string,
-    _empresaId?: number,
-    _oseId?: number | string,
+    empresaId?: number,
+    oseId?: number | string,
   ): Promise<{ buffer: Buffer; contentType: string }> {
-    return this.lat.ticketImage(orderNumber, orderCode);
+    const empresa = empresaId
+      ? await this.prisma.empresa.findUnique({
+          where: { id: empresaId },
+          select: { shalomInstanceId: true },
+        })
+      : null;
+    if (!empresa?.shalomInstanceId) {
+      throw new BadRequestException(
+        'Conecta tu cuenta Shalom Pro para descargar el comprobante.',
+      );
+    }
+    const ose = /^\d+$/.test(String(oseId ?? '')) ? String(oseId) : undefined;
+    return this.lat.ticketImage(orderNumber, orderCode, empresa.shalomInstanceId, ose);
   }
 
   async label(
@@ -183,9 +199,8 @@ export class ShalomService {
     empresaId?: number,
     _oseId?: number | string,
   ): Promise<{ buffer: Buffer; contentType: string }> {
-    // A diferencia del comprobante (/track/voucher), el rótulo (/track/label)
-    // SÍ exige `instanceId` en el querystring — verificado contra la API real:
-    // sin él responde 400 "querystring must have required property 'instanceId'".
+    // Igual que el comprobante, exige `instanceId` en el querystring: sin él
+    // responde 400 "querystring must have required property 'instanceId'".
     const empresa = empresaId
       ? await this.prisma.empresa.findUnique({
           where: { id: empresaId },
@@ -212,7 +227,7 @@ export class ShalomService {
   async datosRotulo(comprobanteId: number, empresaId: number) {
     const empresa = await this.prisma.empresa.findUnique({
       where: { id: empresaId },
-      select: { shalomClaveEnRotulo: true },
+      select: { shalomClaveEnRotulo: true, nombreComercial: true, razonSocial: true },
     });
     const envio = await this.prisma.envioDespacho.findFirst({
       where: { comprobanteId, comprobante: { empresaId } },
@@ -227,8 +242,19 @@ export class ShalomService {
         tipoEnvio: true,
         agenciaDestino: true,
         direccionDestino: true,
+        distrito: true,
         shalomAgenciaDestinoId: true,
-        comprobante: { select: { serie: true, correlativo: true, cliente: { select: { nombre: true, nroDoc: true, telefono: true } } } },
+        repartidor: { select: { nombre: true, color: true } },
+        comprobante: {
+          select: {
+            serie: true,
+            correlativo: true,
+            fechaEmision: true,
+            saldo: true,
+            cliente: { select: { nombre: true, nroDoc: true, telefono: true } },
+            detalles: { select: { descripcion: true, cantidad: true }, orderBy: { id: 'asc' } },
+          },
+        },
       },
     });
     if (!envio) {
@@ -276,6 +302,20 @@ export class ShalomService {
       ubicacion,
       agenciaNombre,
       direccion,
+      // De quién es el paquete, quién lo lleva y qué lleva (para alistar), y en
+      // Lima cuánto cobrar (el courier lo pide).
+      empresaNombre: (empresa?.nombreComercial || empresa?.razonSocial || '').trim(),
+      repartidor: envio.repartidor?.nombre ?? null,
+      repartidorColor: envio.repartidor?.color ?? null,
+      destino: destinoDelEnvio(envio),
+      distrito: envio.distrito ?? '',
+      // En una agencia (Shalom) el monto no va: solo en el reparto en Lima.
+      porCobrar:
+        destinoDelEnvio(envio) === 'LOCAL'
+          ? Math.max(0, Math.round(Number(envio.comprobante?.saldo ?? 0) * 100) / 100)
+          : null,
+      productos: lineasDelRotulo(envio.comprobante?.detalles ?? []),
+      fecha: envio.comprobante?.fechaEmision ?? null,
     };
   }
 
@@ -1009,6 +1049,23 @@ export class ShalomService {
       envio.nombreDestinatario,
       cliente?.nombre,
     );
+    // Lo escrito al generar la guía manda; lo guardado en el despacho se revisa,
+    // porque una guía con datos cruzados ya no se puede corregir desde aquí.
+    if (
+      !dto.dni &&
+      !dto.nombre &&
+      destinatarioNoCuadra({
+        nombreDestinatario: envio.nombreDestinatario,
+        dniDestinatario: envio.dniDestinatario,
+        clienteNombre: cliente?.nombre,
+        clienteDocumento: cliente?.nroDoc,
+      })
+    ) {
+      throw new BadRequestException(
+        `El despacho dice que recibe "${envio.nombreDestinatario}", pero la venta es de "${cliente?.nombre}". ` +
+          'Si es un error, corrige el destinatario y el celular. Si recibe otra persona, escribe su DNI.',
+      );
+    }
     if (!dni) {
       throw new BadRequestException(
         'Falta el DNI del destinatario (el cliente no tiene un documento válido): escríbelo en el despacho.',
@@ -1328,14 +1385,18 @@ export class ShalomService {
         (a) =>
           this.normalizar([a.nombre, a.provincia, a.departamento].join(' ')) ===
           buscado,
-      );
+      ) ??
+      // Despachos guardados como texto con el nombre que se mostraba antes.
+      agencias.find((a) => this.normalizar(a.labelAnterior) === buscado);
     if (exacta) return exacta;
     // Sin coincidencia exacta caemos a la parcial, pero SOLO si es única: hay
     // agencias distintas con el mismo nombre (p. ej. dos "HUARAL - LIMA"), y
     // elegir la primera mandaría el paquete de un cliente real al local
     // equivocado. Ante ambigüedad es mejor fallar y pedir que la re-elijan.
-    const parciales = agencias.filter((a) =>
-      this.normalizar(a.label).includes(buscado),
+    const parciales = agencias.filter(
+      (a) =>
+        this.normalizar(a.label).includes(buscado) ||
+        this.normalizar(a.labelAnterior).includes(buscado),
     );
     if (parciales.length === 1) return parciales[0];
     if (parciales.length > 1) {

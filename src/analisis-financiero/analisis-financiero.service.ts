@@ -12,6 +12,14 @@ import {
   mapCategoriaCaja,
   EGRESO_CAJA_SELECT,
 } from '../common/utils/egresos-caja.util';
+import { costoSegunCriterio } from '../finanzas/igv-ventas';
+import { COMPRA_CON_DINERO } from '../compras/solo-credito-igv';
+import {
+  filaResumenAnual,
+  totalResumenAnual,
+  type ResumenAnual,
+  type ResumenAnualMes,
+} from './resumen-anual';
 
 export interface GastoPorCategoria {
   categoria: string;
@@ -39,6 +47,17 @@ export const CRITERIO_IGV_LABEL: Record<CriterioIgvVentas, string> = {
   TODOS: 'IGV descontado en todos los documentos (incluidas notas de venta)',
   NINGUNO: 'Sin descontar IGV (ventas brutas)',
 };
+
+export interface CompraSinProducto {
+  id: number;
+  documento: string;
+  proveedor: string;
+  fecha: string;
+  /** En soles, sin IGV. */
+  neto: number;
+  igv: number;
+  soloCreditoIgv: boolean;
+}
 
 export interface PnlResponse {
   /** Criterio del IGV aplicado (configuración de la empresa). */
@@ -102,6 +121,17 @@ export interface PnlResponse {
   comprasConsumoIgv: number;
   comprasConsumoCantidad: number;
   /**
+   * Facturas registradas solo por su crédito de IGV (la empresa no las pagó):
+   * NO están en `gastosTotales` ni en `comprasConsumo`; su IGV sí está en
+   * `igvSunat.creditoCompras`.
+   */
+  comprasSoloIgv: { cantidad: number; igv: number; neto: number };
+  /**
+   * Las compras sin productos del período (consumo y "solo IGV"), una por
+   * una, para revisarlas y marcar las que la empresa no pagó.
+   */
+  comprasSinProducto: CompraSinProducto[];
+  /**
    * IGV del mes frente a SUNAT (independiente del criterio del P&L):
    * lo cobrado en facturas/boletas/NC/ND menos el crédito fiscal de TODAS las
    * compras con factura del período (inventario o consumo). Responde "¿cuánto
@@ -158,6 +188,8 @@ interface DecimalLike {
 interface ProductoCostoPnl {
   costoPromedio: DecimalLike | number | null;
   costoFijo: DecimalLike | number | null;
+  /** Para saber si el costo se compró con IGV (ver `costoSegunCriterio`). */
+  tipoAfectacionIGV?: string | null;
   descripcion?: string | null;
 }
 
@@ -755,6 +787,8 @@ export class AnalisisFinancieroService {
       where: {
         empresaId,
         esGasto: true,
+        // Las que se registran solo por su IGV no las pagó la empresa: no son gasto.
+        ...COMPRA_CON_DINERO,
         estado: { notIn: ['ANULADO', 'PENDIENTE_APROBACION'] as any },
         fechaEmision: { gte, lte },
         ...(sedeId ? { sedeId } : {}),
@@ -793,13 +827,60 @@ export class AnalisisFinancieroService {
     return { gastos, neto, igv, cantidad: compras.length };
   }
 
+  /** Compras de consumo del rango (incluye las de "solo IGV"), para listarlas. */
+  private async comprasSinProductoDelRango(
+    empresaId: number,
+    gte: Date,
+    lte: Date,
+    sedeId?: number | null,
+  ): Promise<CompraSinProducto[]> {
+    const compras = await this.prisma.compra.findMany({
+      where: {
+        empresaId,
+        OR: [{ esGasto: true }, { soloCreditoIgv: true }],
+        estado: { notIn: ['ANULADO', 'PENDIENTE_APROBACION'] as any },
+        fechaEmision: { gte, lte },
+        ...(sedeId ? { sedeId } : {}),
+      },
+      orderBy: [{ fechaEmision: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        tipoDoc: true,
+        serie: true,
+        numero: true,
+        fechaEmision: true,
+        subtotal: true,
+        igv: true,
+        moneda: true,
+        tipoCambio: true,
+        soloCreditoIgv: true,
+        proveedor: { select: { nombre: true } },
+      },
+    });
+    return compras.map((c) => {
+      const tc =
+        String(c.moneda || 'PEN').toUpperCase() === 'USD'
+          ? this.toNumber(c.tipoCambio as any) || 1
+          : 1;
+      return {
+        id: c.id,
+        documento: `${c.tipoDoc === 'FACTURA' ? '' : `${c.tipoDoc} `}${c.serie}-${c.numero}`,
+        proveedor: c.proveedor?.nombre?.trim() || 'Proveedor',
+        fecha: c.fechaEmision.toISOString(),
+        neto: this.r2(this.toNumber(c.subtotal as any) * tc),
+        igv: this.r2(this.toNumber(c.igv as any) * tc),
+        soloCreditoIgv: c.soloCreditoIgv,
+      };
+    });
+  }
+
   /** IGV (en soles) de todas las compras con FACTURA del rango: crédito fiscal. */
   private async creditoFiscalCompras(
     empresaId: number,
     gte: Date,
     lte: Date,
     sedeId?: number | null,
-  ): Promise<{ igv: number; cantidad: number }> {
+  ): Promise<{ igv: number; cantidad: number; soloIgv: { cantidad: number; igv: number; neto: number } }> {
     const compras = await this.prisma.compra.findMany({
       where: {
         empresaId,
@@ -808,17 +889,25 @@ export class AnalisisFinancieroService {
         fechaEmision: { gte, lte },
         ...(sedeId ? { sedeId } : {}),
       },
-      select: { igv: true, moneda: true, tipoCambio: true },
+      select: { igv: true, subtotal: true, moneda: true, tipoCambio: true, soloCreditoIgv: true },
     });
     let igv = 0;
+    // Las registradas solo por su IGV también dan crédito fiscal (para eso
+    // existen); se cuentan aparte para decirlo en pantalla.
+    const soloIgv = { cantidad: 0, igv: 0, neto: 0 };
     for (const c of compras) {
       const tc =
         String(c.moneda || 'PEN').toUpperCase() === 'USD'
           ? this.toNumber(c.tipoCambio as any) || 1
           : 1;
       igv += this.toNumber(c.igv as any) * tc;
+      if (c.soloCreditoIgv) {
+        soloIgv.cantidad += 1;
+        soloIgv.igv += this.toNumber(c.igv as any) * tc;
+        soloIgv.neto += this.toNumber(c.subtotal as any) * tc;
+      }
     }
-    return { igv, cantidad: compras.length };
+    return { igv, cantidad: compras.length, soloIgv };
   }
 
   private esDocumentoVenta(c: ComprobantePnl): boolean {
@@ -936,6 +1025,7 @@ export class AnalisisFinancieroService {
 
   private calcularCostoProducto(
     comprobante: ComprobantePnl,
+    criterio: CriterioIgvVentas,
     sinCosto?: Map<number, ProductoSinCosto>,
   ) {
     const signo = this.signoDocumento(comprobante.tipoDoc);
@@ -960,7 +1050,11 @@ export class AnalisisFinancieroService {
       const producto = detalle.producto;
       const costoPromedio = this.toNumber(producto.costoPromedio);
       const costoFijo = this.toNumber(producto.costoFijo);
-      costoBaseProductos += cantidad * costoPromedio;
+      // En la misma base que la venta: con IGV si a este documento no se le
+      // descuenta el IGV (nota de venta con ELECTRONICOS, todo con NINGUNO).
+      costoBaseProductos +=
+        cantidad *
+        costoSegunCriterio(costoPromedio, comprobante.tipoDoc, criterio, producto.tipoAfectacionIGV);
       costosFijosProducto += cantidad * costoFijo;
       unidadesVendidas += cantidad;
       lineasProducto += 1;
@@ -1029,6 +1123,7 @@ export class AnalisisFinancieroService {
       (acc, comprobante) => {
         const costo = this.calcularCostoProducto(
           comprobante,
+          criterio,
           productosSinCostoMap,
         );
         acc.costoBaseProductos += costo.costoBaseProductos;
@@ -1054,7 +1149,7 @@ export class AnalisisFinancieroService {
       const fecha = this.fechaLimaKey(comprobante.fechaEmision);
       if (!fecha) continue;
       const signo = this.signoDocumento(comprobante.tipoDoc);
-      const costo = this.calcularCostoProducto(comprobante);
+      const costo = this.calcularCostoProducto(comprobante, criterio);
       const current = resumenDiarioMap.get(fecha) ?? {
         fecha,
         ventasNetas: 0,
@@ -1252,6 +1347,7 @@ export class AnalisisFinancieroService {
                     descripcion: true,
                     costoPromedio: true,
                     costoFijo: true,
+                    tipoAfectacionIGV: true,
                   },
                 },
               },
@@ -1307,9 +1403,10 @@ export class AnalisisFinancieroService {
       empresaId,
       comprobantesRaw,
     );
-    const [comprasConsumo, creditoFiscal] = await Promise.all([
+    const [comprasConsumo, creditoFiscal, comprasSinProducto] = await Promise.all([
       this.comprasConsumoComoGastos(empresaId, range.gte, range.lte, sedeId),
       this.creditoFiscalCompras(empresaId, range.gte, range.lte, sedeId),
+      this.comprasSinProductoDelRango(empresaId, range.gte, range.lte, sedeId),
     ]);
 
     const otrosIngresos = ingresosManuales.reduce(
@@ -1422,6 +1519,12 @@ export class AnalisisFinancieroService {
       comprasConsumo: this.r2(comprasConsumo.neto),
       comprasConsumoIgv: this.r2(comprasConsumo.igv),
       comprasConsumoCantidad: comprasConsumo.cantidad,
+      comprasSinProducto,
+      comprasSoloIgv: {
+        cantidad: creditoFiscal.soloIgv.cantidad,
+        igv: this.r2(creditoFiscal.soloIgv.igv),
+        neto: this.r2(creditoFiscal.soloIgv.neto),
+      },
       igvSunat: {
         cobrado: this.r2(cobrado),
         creditoCompras: this.r2(credito),
@@ -1506,6 +1609,36 @@ export class AnalisisFinancieroService {
   }
 
   /**
+   * GET /resumen-anual — la ganancia de cada mes del año, en filas, y el total.
+   *
+   * Pedido de KREZKA (02-11): "enero ganancia con IGV y sin IGV, febrero…, y
+   * el total del año, para saber cuánto vamos ganando y cuánto debería haber
+   * en la cuenta". Cada mes es EXACTAMENTE el P&L de ese mes (getPnl): el
+   * mismo número que muestra Rentabilidad al elegir el mes, así cuadran.
+   * "Con IGV" es la ganancia neta más el IGV cobrado en ventas (el número de
+   * la tarjeta Ganancia Neta Real). Los meses que aún no llegan no salen.
+   */
+  async getResumenAnual(
+    empresaId: number,
+    anio: number,
+    sedeId?: number | null,
+  ): Promise<ResumenAnual> {
+    const hoy = new Date();
+    const ultimoMes =
+      anio < hoy.getFullYear() ? 12 : anio === hoy.getFullYear() ? hoy.getMonth() + 1 : 0;
+    const meses: ResumenAnualMes[] = [];
+    // De a tres: cada mes es un P&L completo; los doce a la vez saturan la base.
+    for (let desde = 1; desde <= ultimoMes; desde += 3) {
+      const tanda = [desde, desde + 1, desde + 2].filter((m) => m <= ultimoMes);
+      const pnls = await Promise.all(
+        tanda.map((mes) => this.getPnl(empresaId, { mes, anio, sedeId })),
+      );
+      pnls.forEach((p, i) => meses.push(filaResumenAnual(tanda[i], p)));
+    }
+    return { anio, meses, total: totalResumenAnual(meses) };
+  }
+
+  /**
    * GET /evolucion — P&L evolution for the last N months.
    * Fetches all comprobante/compra data in ONE query per entity, then groups in JS.
    */
@@ -1552,6 +1685,7 @@ export class AnalisisFinancieroService {
                 select: {
                   costoPromedio: true,
                   costoFijo: true,
+                  tipoAfectacionIGV: true,
                 },
               },
             },
@@ -1866,6 +2000,7 @@ export class AnalisisFinancieroService {
                 descripcion: true,
                 costoPromedio: true,
                 costoFijo: true,
+                tipoAfectacionIGV: true,
                 categoria: { select: { nombre: true } },
               },
             },
@@ -1916,8 +2051,12 @@ export class AnalisisFinancieroService {
           this.ingresoLineaSinIgv(comp.tipoDoc, det, criterio) * signo;
         const ventaLinea = this.ventaLineaConIgv(det) * signo;
         const costoUnit =
-          this.toNumber(det.producto?.costoPromedio) +
-          this.toNumber(det.producto?.costoFijo);
+          costoSegunCriterio(
+            this.toNumber(det.producto?.costoPromedio),
+            comp.tipoDoc,
+            criterio,
+            det.producto?.tipoAfectacionIGV,
+          ) + this.toNumber(det.producto?.costoFijo);
 
         if (!catMap.has(catNombre)) catMap.set(catNombre, new Map());
         const prodMap = catMap.get(catNombre)!;
@@ -2531,6 +2670,7 @@ export class AnalisisFinancieroService {
       destino: 'En agencia destino',
       entregado: 'Entregado',
       PREPARANDO: 'Preparando',
+      CONFIRMADO: 'Confirmado',
       EN_CAMINO: 'En camino',
       EN_AGENCIA: 'En agencia',
       EN_DESTINO: 'En destino',
@@ -2919,6 +3059,7 @@ export class AnalisisFinancieroService {
                 descripcion: true,
                 costoPromedio: true,
                 costoFijo: true,
+                tipoAfectacionIGV: true,
                 categoria: { select: { nombre: true } },
               },
             },
@@ -2983,8 +3124,12 @@ export class AnalisisFinancieroService {
         const cantidadFacturada = (det.cantidad ?? 0) * signo;
         const qty = cantidadFacturada * uPaquete;
         const costoUnit =
-          this.toNumber(det.producto?.costoPromedio) +
-          this.toNumber(det.producto?.costoFijo);
+          costoSegunCriterio(
+            this.toNumber(det.producto?.costoPromedio),
+            comp.tipoDoc,
+            criterio,
+            det.producto?.tipoAfectacionIGV,
+          ) + this.toNumber(det.producto?.costoFijo);
         // Ingreso sin el IGV declarado, igual que las ventas netas del P&L.
         const ingreso =
           montoEnPen(
