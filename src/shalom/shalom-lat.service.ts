@@ -9,6 +9,9 @@ export interface ShalomAgencia {
   estado: string;
   aereo: boolean;
   label: string;
+  /** Nombre y etiqueta que se mostraban antes: despachos ya guardados los traen como texto. */
+  nombreAnterior?: string;
+  labelAnterior?: string;
   direccion?: string;
   telefono?: string;
   latitud?: string;
@@ -98,17 +101,17 @@ export interface ShalomInstanciaInput {
  * Cliente del proveedor Shalom API (https://api.shalom-api.lat) — versión NUEVA.
  *
  * Autenticación: header `x-api-key` (una sola API key global, en SHALOM_LAT_API_KEY).
- * Para TRACKING, AGENCIAS, COMPROBANTE y COTIZACIÓN **no se necesita** cuenta de
+ * Para TRACKING, AGENCIAS y COTIZACIÓN **no se necesita** cuenta de
  * Shalom Pro ni credenciales del negocio: basta la API key. Crear envíos
  * (POST /account/register) requiere credenciales del cliente vía /instances, y
- * el RÓTULO (`/track/label`) exige el `instanceId` de esa cuenta en el
- * querystring (verificado: sin él responde 400 "querystring must have required
- * property 'instanceId'") — a diferencia del comprobante, que no lo necesita.
+ * el RÓTULO (`/track/label`) y el COMPROBANTE (`/track/voucher`) exigen el
+ * `instanceId` de esa cuenta en el querystring (sin él responde 400 "querystring
+ * must have required property 'instanceId'").
  *
  * Endpoints usados:
  *  - GET  /agencies                              → lista de agencias
  *  - POST /track            { orderNumber, orderCode }        → tracking + timeline
- *  - GET  /track/voucher?orderNumber=&orderCode= → comprobante (PNG/PDF)
+ *  - GET  /track/voucher?orderNumber=&orderCode=&instanceId=  → comprobante (PDF)
  *  - GET  /track/label?orderNumber=&orderCode=&instanceId=    → etiqueta (PDF)
  *  - POST /account/quote    { origin, destination }          → cotización
  *  - POST /instances        { name, username, password }     → conectar cuenta Pro
@@ -159,10 +162,12 @@ export class ShalomLatService {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      // El proveedor devuelve { error: "mensaje" }; extraerlo para el usuario.
+      // El proveedor devuelve { error: "mensaje" } o { error: "Bad Request",
+      // message: "el detalle" }: el detalle es lo único útil para el usuario.
       let mensaje = '';
       try {
-        mensaje = JSON.parse(text)?.error || '';
+        const cuerpo = JSON.parse(text);
+        mensaje = cuerpo?.message || cuerpo?.error || '';
       } catch {
         /* body no-JSON (p. ej. un PDF de error) */
       }
@@ -215,6 +220,9 @@ export class ShalomLatService {
         'Tu plan de Shalom API no permite esta operación. Contacta al administrador.'
       );
     }
+    if (s === 409) {
+      return 'La sesión de tu cuenta Shalom Pro venció. Vuelve a conectarla en Configuración para descargar el documento.';
+    }
     if (s === 401) {
       return 'La API key de Shalom no es válida o no está configurada. Contacta al administrador.';
     }
@@ -246,11 +254,14 @@ export class ShalomLatService {
         ? raw
         : (raw?.data ?? raw?.resultados ?? raw?.agencias ?? []);
       this.agenciasCache = items.map((a): ShalomAgencia => {
-        // 40 de 552 agencias traen `lugar` como cadena vacía (no null), así que
-        // `??` no alcanza: sin esto salen sin nombre en el selector.
-        const nombre = [a.lugar, a.lugar_over, a.nombre]
-          .map((v) => String(v ?? '').trim())
-          .find((v) => v !== '') ?? '';
+        // `lugar_over` es el nombre con el que Shalom registra la agencia en sus
+        // guías y rótulos (CARABAYLLO ESTABLO); `lugar` es otro texto (CARABAYLLO)
+        // que confundía entre sus 7 agencias de ese distrito.
+        // Trae espacios dobles y duros, y a veces vacíos: `??` no alcanza.
+        const primero = (...valores: unknown[]) =>
+          valores.map((v) => String(v ?? '').replace(/\s+/g, ' ').trim()).find((v) => v !== '') ?? '';
+        const nombre = primero(a.lugar_over, a.lugar, a.nombre);
+        const nombreAnterior = primero(a.lugar, a.lugar_over, a.nombre);
         const dep = String(a.departamento ?? '');
         const prov = String(a.provincia ?? '');
         const dist = String(a.zona ?? a.distrito ?? '');
@@ -263,6 +274,8 @@ export class ShalomLatService {
           estado: String(a.estado ?? ''),
           aereo: Boolean(a.aereo),
           label: [nombre, prov, dep].filter(Boolean).join(' - '),
+          nombreAnterior,
+          labelAnterior: [nombreAnterior, prov, dep].filter(Boolean).join(' - '),
           direccion: a.direccion ? String(a.direccion) : undefined,
           telefono: a.telefono ? String(a.telefono) : undefined,
           latitud: a.latitud ? String(a.latitud) : undefined,
@@ -340,16 +353,16 @@ export class ShalomLatService {
   }
 
   // ─── Documentos ──────────────────────────────────────────────────────────────
-  // GET /track/voucher → comprobante (PNG/PDF). GET /track/label → etiqueta (PDF).
+  // GET /track/voucher → comprobante (PDF). GET /track/label → etiqueta (PDF).
   private async fetchDocumento(
     path: string,
     orderNumber: string,
     orderCode: string,
     instanceId?: string,
+    oseId?: string,
   ): Promise<{ buffer: Buffer; contentType: string }> {
     const qs = new URLSearchParams({
-      orderNumber,
-      orderCode,
+      ...(oseId ? { ose_id: oseId } : { orderNumber, orderCode }),
       ...(instanceId ? { instanceId } : {}),
     }).toString();
     const res = await this.requestConReintento('GET', `${path}?${qs}`);
@@ -358,13 +371,17 @@ export class ShalomLatService {
     return { buffer, contentType };
   }
 
-  // Comprobante del envío (GET /track/voucher → PNG/PDF).
+  // Comprobante del envío (GET /track/voucher). Exige `instanceId`: Shalom lo
+  // entrega con la sesión de la cuenta Pro. `ose_id` también sirve para guías
+  // recién creadas, que aún no salen en el rastreo público.
   async ticketImage(
     orderNumber: string,
     orderCode: string,
+    instanceId: string,
+    oseId?: string,
   ): Promise<{ buffer: Buffer; contentType: string }> {
     try {
-      return await this.fetchDocumento('/track/voucher', orderNumber, orderCode);
+      return await this.fetchDocumento('/track/voucher', orderNumber, orderCode, instanceId, oseId);
     } catch (err: any) {
       if (err instanceof HttpException) throw err;
       throw new BadRequestException(this.mensajeShalom(err, 'el comprobante'));
@@ -372,7 +389,7 @@ export class ShalomLatService {
   }
 
   // Etiqueta / rótulo del envío (GET /track/label?instanceId=... → PDF).
-  // A diferencia de /track/voucher, este endpoint exige `instanceId` en el
+  // Igual que /track/voucher, este endpoint exige `instanceId` en el
   // querystring (400 "querystring must have required property 'instanceId'"
   // si se omite) — verificado contra la API real.
   async label(
