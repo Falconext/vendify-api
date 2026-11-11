@@ -8,8 +8,11 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { User } from '../common/decorators/user.decorator';
 import { AnalisisFinancieroService } from './analisis-financiero.service';
@@ -61,6 +64,42 @@ export class AnalisisFinancieroController {
       fechaFin,
       sedeId: this.resolverSedeId(user, sedeIdQuery),
     });
+  }
+
+  /**
+   * GET /analisis-financiero/utilidad-diaria/exportar — Excel día por día del
+   * mismo período y sede que /pnl. Lleva costos: no sale para quien los tiene
+   * ocultos.
+   */
+  @Get('utilidad-diaria/exportar')
+  async exportarUtilidadDiaria(
+    @User() user: any,
+    @Res() res: Response,
+    @Query('mes') mes?: string,
+    @Query('anio') anio?: string,
+    @Query('fechaInicio') fechaInicio?: string,
+    @Query('fechaFin') fechaFin?: string,
+    @Query('sedeId') sedeIdQuery?: string,
+  ) {
+    if (user?.rol === 'USUARIO_EMPRESA' && user?.ocultarPrecioCosto) {
+      throw new ForbiddenException('No tienes permiso para ver costos.');
+    }
+    const { buffer, nombre } = await this.service.exportarUtilidadDiaria(
+      user.empresaId,
+      {
+        mes: mes ? Number(mes) : undefined,
+        anio: anio ? Number(anio) : undefined,
+        fechaInicio,
+        fechaFin,
+        sedeId: this.resolverSedeId(user, sedeIdQuery),
+      },
+    );
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename=${nombre}`);
+    res.status(200).send(buffer);
   }
 
   /** GET /analisis-financiero/resumen-anual?anio=2026 — ganancia mes a mes y total del año. */

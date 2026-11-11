@@ -40,6 +40,14 @@ import {
   motivoDelConcepto,
 } from '../producto/motivo-ajuste-stock';
 import { filtroPorCategoria } from '../producto/categorias-extra.util';
+import { normalizarCriterio } from '../finanzas/igv-ventas';
+import {
+  PartidaInventario,
+  PartidaValorizada,
+  baseDeGanancia,
+  margen,
+  valorizarPartida,
+} from './valorizar-inventario';
 
 
 /** Sedes ya validadas de un traslado (nombres para los conceptos del kardex). */
@@ -769,11 +777,25 @@ export class KardexService {
   /**
    * Obtiene inventario valorizado
    */
+  private r2Inv(n: number): number {
+    return Math.round((n + Number.EPSILON) * 100) / 100;
+  }
+
   async obtenerInventarioValorizado(
     empresaId: number,
     filtros?: FiltrosReporteDto,
     sedeId?: number,
   ): Promise<InventarioValorizadoResponse> {
+    // Todas las sedes = cada local con su stock, costo y precio. Sin esto, la
+    // sede que llega (la del usuario) o, sin sede, el stock global.
+    const todasLasSedes = !!filtros?.todasLasSedes;
+    if (todasLasSedes) sedeId = undefined;
+    const empresa = await this.prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { criterioIgvVentas: true },
+    });
+    const criterio = normalizarCriterio(empresa?.criterioIgvVentas);
+    const base = baseDeGanancia(criterio);
     const whereProductos: any = {
       empresaId,
       ...(filtros?.incluirInactivos ? {} : { estado: 'ACTIVO' }),
@@ -827,6 +849,8 @@ export class KardexService {
       );
     }
 
+    let ventaBaseAcumulada = 0;
+    const ventaBaseTotal = () => ventaBaseAcumulada;
     const productosProcessados = productosAFiltrar.map((producto: any) => {
       // Use branch specific stock if requested, otherwise global stock.
       // Normalizamos con num() porque producto.stock es Decimal y `=== 0` fallaría.
@@ -848,18 +872,70 @@ export class KardexService {
       // Productos, y sin esto el Dashboard mostraba el valor dividido entre
       // 1.18 respecto de ella aunque el conteo ya coincidiera.
       const esGravado = String(producto.tipoAfectacionIGV ?? '10') === '10';
-      const costoDeBolsillo = esGravado
-        ? Number((costoPromedio * 1.18).toFixed(2))
-        : costoPromedio;
-      const valorTotal = stockUsar * costoDeBolsillo;
+      const precioBase = Number(producto.precioUnitario) || 0;
+      // El precio de la sede manda sobre el de lista, igual que en el POS.
+      const precioEnSede = (st: any) =>
+        st?.precioUnitarioOverride != null
+          ? Number(st.precioUnitarioOverride) || 0
+          : precioBase;
+
+      // Todas las sedes: cada local con SU stock, SU costo y SU precio. El
+      // Producto.stock global no siempre cuadra con la suma de las sedes.
+      const partidas: PartidaInventario[] = todasLasSedes
+        ? (producto.stocks ?? []).map((st: any) => ({
+            stock: num(st.stock),
+            costoNeto: costoDeSede(st.costoPromedio, producto.costoPromedio),
+            precioVenta: precioEnSede(st),
+            gravado: esGravado,
+          }))
+        : [
+            {
+              stock: stockUsar,
+              costoNeto: costoPromedio,
+              precioVenta:
+                sedeId && producto.stocks?.length
+                  ? precioEnSede(producto.stocks[0])
+                  : precioBase,
+              gravado: esGravado,
+            },
+          ];
+      const valorizadas = partidas.map((pt) => valorizarPartida(pt, base));
+      const suma = (k: keyof PartidaValorizada) =>
+        valorizadas.reduce((acc, v) => acc + Number(v[k] || 0), 0);
+      const stockTotal = partidas.reduce((acc, pt) => acc + pt.stock, 0);
+      const valorTotal = suma('valorCosto');
+      const valorVenta = suma('valorVenta');
+      const gananciaPotencial = suma('gananciaPotencial');
+      const ventaBaseGanancia = suma('ventaBaseGanancia');
+      const unitario = (total: number, respaldo: number) =>
+        todasLasSedes && stockTotal > 0 ? total / stockTotal : respaldo;
+      const costoDeBolsillo = unitario(
+        valorTotal,
+        valorizadas[0]?.costoDeBolsillo ?? 0,
+      );
+      ventaBaseAcumulada += ventaBaseGanancia;
 
       return {
         id: producto.id,
         codigo: producto.codigo,
         descripcion: producto.descripcion,
-        stock: stockUsar,
-        costoPromedio,
+        stock: todasLasSedes ? stockTotal : stockUsar,
+        costoPromedio: todasLasSedes
+          ? unitario(
+              partidas.reduce((acc, pt) => acc + pt.stock * pt.costoNeto, 0),
+              costoPromedio,
+            )
+          : costoPromedio,
+        costoDeBolsillo: this.r2Inv(costoDeBolsillo),
         valorTotal,
+        precioVenta: this.r2Inv(
+          unitario(valorVenta, partidas[0]?.precioVenta ?? precioBase),
+        ),
+        valorVenta,
+        gananciaPotencial,
+        margenPotencial: margen(gananciaPotencial, ventaBaseGanancia),
+        sinCosto: stockTotal > 0 && valorizadas.some((v) => v.sinCosto),
+        sinPrecio: stockTotal > 0 && valorizadas.some((v) => v.sinPrecio),
         stockMinimo: producto.stockMinimo || 0,
         stockMaximo: producto.stockMaximo || 0,
         categoria: producto.categoria
@@ -897,12 +973,142 @@ export class KardexService {
       ).length,
       productosStockCero: productosProcessados.filter((p) => p.stock === 0)
         .length,
+      valorVentaInventario: productosProcessados.reduce(
+        (sum, p) => sum + p.valorVenta,
+        0,
+      ),
+      gananciaPotencial: productosProcessados.reduce(
+        (sum, p) => sum + p.gananciaPotencial,
+        0,
+      ),
+      margenPotencial: margen(
+        productosProcessados.reduce((sum, p) => sum + p.gananciaPotencial, 0),
+        ventaBaseTotal(),
+      ),
+      baseGanancia: base,
+      criterioIgv: criterio,
+      productosSinCosto: productosProcessados.filter((p) => p.sinCosto).length,
+      productosSinPrecio: productosProcessados.filter((p) => p.sinPrecio)
+        .length,
+      productosStockNegativo: productosProcessados.filter((p) => p.stock < 0)
+        .length,
+      todasLasSedes,
     };
 
     return {
       productos: productosProcessados,
       resumen,
     };
+  }
+
+  /**
+   * Excel del inventario valorizado: una hoja por producto y otra de resumen.
+   * Sale del mismo cálculo que la pantalla, así que los totales cuadran.
+   */
+  async exportarInventarioValorizado(
+    empresaId: number,
+    filtros: FiltrosReporteDto,
+    sedeId?: number,
+  ): Promise<Buffer> {
+    const { productos, resumen } = await this.obtenerInventarioValorizado(
+      empresaId,
+      filtros,
+      sedeId,
+    );
+    const sede =
+      !resumen.todasLasSedes && sedeId
+        ? await this.prisma.sede.findFirst({
+            where: { id: sedeId, empresaId },
+            select: { nombre: true },
+          })
+        : null;
+    const alcance = resumen.todasLasSedes
+      ? 'Todas las sedes'
+      : sede?.nombre || 'Stock general';
+    const conIgv = resumen.baseGanancia === 'CON_IGV';
+    const r2 = (n: number) => this.r2Inv(Number(n) || 0);
+
+    const encabezado = [
+      'Código',
+      'Producto',
+      'Categoría',
+      'Unidad',
+      'Stock',
+      'Costo unitario (con IGV)',
+      'Valor a costo',
+      'Precio de venta',
+      'Valor a precio de venta',
+      `Ganancia potencial (${conIgv ? 'con' : 'sin'} IGV)`,
+      'Margen %',
+      'Observación',
+    ];
+    const filas = productos.map((p) => [
+      p.codigo || '',
+      p.descripcion || '',
+      p.categoria?.nombre || '',
+      p.unidadMedida?.nombre || p.unidadMedida?.codigo || '',
+      Number(p.stock) || 0,
+      r2(p.costoDeBolsillo),
+      r2(p.valorTotal),
+      r2(p.precioVenta),
+      r2(p.valorVenta),
+      r2(p.gananciaPotencial),
+      r2(p.margenPotencial),
+      [
+        p.stock < 0 ? 'Stock negativo' : '',
+        p.sinCosto ? 'Sin costo: no suma ganancia' : '',
+        p.sinPrecio ? 'Sin precio: no suma ganancia' : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    ]);
+    const totales = [
+      '',
+      'TOTAL',
+      '',
+      '',
+      productos.reduce((acc, p) => acc + (Number(p.stock) || 0), 0),
+      '',
+      r2(resumen.valorTotalInventario),
+      '',
+      r2(resumen.valorVentaInventario),
+      r2(resumen.gananciaPotencial),
+      r2(resumen.margenPotencial),
+      '',
+    ];
+    const hoja = XLSX.utils.aoa_to_sheet([encabezado, ...filas, totales]);
+    hoja['!cols'] = [12, 42, 18, 10, 10, 14, 14, 14, 16, 18, 10, 30].map(
+      (wch) => ({ wch }),
+    );
+
+    const hojaResumen = XLSX.utils.aoa_to_sheet([
+      ['Inventario valorizado'],
+      ['Alcance', alcance],
+      [
+        'Fecha',
+        new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' }),
+      ],
+      [],
+      ['Productos', resumen.totalProductos],
+      ['Invertido en stock (a costo, con IGV)', r2(resumen.valorTotalInventario)],
+      ['Valor a precio de venta', r2(resumen.valorVentaInventario)],
+      [
+        `Ganancia potencial (${conIgv ? 'con' : 'sin'} IGV)`,
+        r2(resumen.gananciaPotencial),
+      ],
+      ['Margen potencial %', r2(resumen.margenPotencial)],
+      [],
+      ['Productos sin costo (no suman ganancia)', resumen.productosSinCosto],
+      ['Productos sin precio (no suman ganancia)', resumen.productosSinPrecio],
+      ['Productos con stock negativo', resumen.productosStockNegativo],
+      ['Productos sin stock', resumen.productosStockCero],
+    ]);
+    hojaResumen['!cols'] = [{ wch: 42 }, { wch: 22 }];
+
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hojaResumen, 'Resumen');
+    XLSX.utils.book_append_sheet(libro, hoja, 'Productos');
+    return XLSX.write(libro, { bookType: 'xlsx', type: 'buffer' });
   }
 
   /**

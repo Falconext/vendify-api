@@ -179,9 +179,68 @@ export class KardexController {
 
     return this.kardexService.obtenerInventarioValorizado(
       empresaId,
-      filtros,
-      req.user.sedeId,
+      this.filtrosInventarioPorRol(filtros, req.user),
+      this.sedeInventarioPorRol(filtros, req.user),
     );
+  }
+
+  /**
+   * El admin elige la sede (o todas); el usuario de sede fija ve la suya, como
+   * en el resto del kardex. Sin sede elegida, la del token: así el Dashboard de
+   * Inventario y Rentabilidad siguen mostrando lo de siempre.
+   */
+  private sedeInventarioPorRol(filtros: FiltrosReporteDto, user: any) {
+    const isAdmin = ['ADMIN_EMPRESA', 'ADMIN_SISTEMA'].includes(user?.rol);
+    return isAdmin && filtros?.sedeId ? Number(filtros.sedeId) : user?.sedeId;
+  }
+
+  private filtrosInventarioPorRol(
+    filtros: FiltrosReporteDto,
+    user: any,
+  ): FiltrosReporteDto {
+    const isAdmin = ['ADMIN_EMPRESA', 'ADMIN_SISTEMA'].includes(user?.rol);
+    return { ...filtros, todasLasSedes: isAdmin && !!filtros?.todasLasSedes };
+  }
+
+  /**
+   * Excel del inventario valorizado: costo, precio de venta y ganancia por
+   * producto. Lleva costos, así que no sale para quien los tiene ocultos.
+   */
+  @Get('inventario-valorizado/exportar')
+  async exportarInventarioValorizado(
+    @Query(ValidationPipe) filtros: FiltrosReporteDto,
+    @Request() req,
+    @Res() res: Response,
+  ) {
+    const empresaId = req.user.empresaId;
+    if (!empresaId) {
+      throw new BadRequestException('Usuario sin empresa asignada');
+    }
+    if (req.user.rol === 'USUARIO_EMPRESA' && req.user.ocultarPrecioCosto) {
+      throw new ForbiddenException('No tienes permiso para ver costos.');
+    }
+    const buffer = await this.kardexService.exportarInventarioValorizado(
+      empresaId,
+      this.filtrosInventarioPorRol(filtros, req.user),
+      this.sedeInventarioPorRol(filtros, req.user),
+    );
+    const fecha = new Date()
+      .toLocaleDateString('es-PE', {
+        timeZone: 'America/Lima',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+      .replace(/\//g, '-');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=inventario_valorizado_${fecha}.xlsx`,
+    );
+    res.status(200).send(buffer);
   }
 
   /**
