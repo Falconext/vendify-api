@@ -645,6 +645,10 @@ model Producto {
   localizacion        String?
   porcentajeVenta     Int                  @default(100)
   porcentajeProvision Int                  @default(0)
+  /// Órganos y sistemas sobre los que actúa ("Hígado, Colon"), separados por
+  /// coma. Naturistas: la tienda busca y filtra por ellos.
+  organos             String?
+  sistemas            String?
   detalleCompras      DetalleCompra[]
   detallesOrdenCompra DetalleOrdenCompra[]
   detalleComprobantes DetalleComprobante[]

@@ -1,13 +1,13 @@
 import { filtroBusquedaTienda } from './busqueda-tienda.util';
 
 const campos = (palabra: string) => ({
-  OR: ['descripcion', 'descripcionLarga', 'codigo'].map((campo) => ({
+  OR: ['descripcion', 'descripcionLarga', 'codigo', 'organos', 'sistemas'].map((campo) => ({
     [campo]: { contains: palabra, mode: 'insensitive' },
   })),
 });
 
 describe('filtroBusquedaTienda', () => {
-  it('busca cada palabra en el nombre, la descripción y el código', () => {
+  it('busca cada palabra en el nombre, la descripción, el código, los órganos y los sistemas', () => {
     expect(filtroBusquedaTienda('lavanda')).toEqual([campos('lavanda')]);
   });
 

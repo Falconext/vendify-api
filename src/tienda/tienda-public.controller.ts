@@ -41,6 +41,8 @@ export class TiendaPublicController {
     @Query('brand') brand = '',
     @Query('wholesale') wholesale = '',
     @Query('sede') sede?: string,
+    @Query('organo') organo = '',
+    @Query('sistema') sistema = '',
   ) {
     const min =
       minPrice && !isNaN(Number(minPrice)) ? Number(minPrice) : undefined;
@@ -59,6 +61,8 @@ export class TiendaPublicController {
       brand,
       isWholesale,
       sede,
+      organo,
+      sistema,
     );
   }
 
@@ -73,6 +77,12 @@ export class TiendaPublicController {
   @Get(':slug/brands')
   async obtenerMarcas(@Param('slug') slug: string, @Query('sede') sede?: string) {
     return this.tiendaService.obtenerMarcasTienda(slug, sede);
+  }
+
+  /** Chips del filtro "Órganos" y "Sistemas" (solo los que tiene el catálogo). */
+  @Get(':slug/organos-sistemas')
+  async obtenerOrganosSistemas(@Param('slug') slug: string, @Query('sede') sede?: string) {
+    return this.tiendaService.obtenerOrganosSistemasTienda(slug, sede);
   }
 
   @Get(':slug/price-range')

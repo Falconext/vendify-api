@@ -1,3 +1,4 @@
+import { valoresParaGuardar } from '../tienda/organos-sistemas';
 import { num, round3 } from '../common/utils/stock';
 import {
   esEan13Valido,
@@ -420,6 +421,9 @@ export class ProductoService {
       disponibilidad?: DisponibilidadProducto;
       /** Empuje frente a equivalentes: 4 muy alta, 3 alta, 2 media, 1 baja. */
       prioridadVenta?: number;
+      /** Órganos y sistemas sobre los que actúa ("Hígado, Colon"). */
+      organos?: string | null;
+      sistemas?: string | null;
     },
     empresaId: number,
     sedeId?: number,
@@ -475,6 +479,8 @@ export class ProductoService {
       ubicacionSede,
       disponibilidad,
       prioridadVenta,
+      organos,
+      sistemas,
     } = data;
 
     const porcentajes = this.normalizarPorcentajes(
@@ -592,6 +598,8 @@ export class ProductoService {
           stockMaximo: stockMaximo != null ? stockMaximo : undefined,
           disponibilidad: disponibilidad ?? undefined,
           prioridadVenta: prioridadVenta ?? undefined,
+          organos: valoresParaGuardar(organos) ?? undefined,
+          sistemas: valoresParaGuardar(sistemas) ?? undefined,
           categoriaId:
             categoriaId && Number(categoriaId) > 0
               ? Number(categoriaId)
@@ -699,6 +707,8 @@ export class ProductoService {
           stockMaximo: stockMaximo != null ? stockMaximo : undefined,
           disponibilidad: disponibilidad ?? undefined,
           prioridadVenta: prioridadVenta ?? undefined,
+          organos: valoresParaGuardar(organos) ?? undefined,
+          sistemas: valoresParaGuardar(sistemas) ?? undefined,
           categoriaId:
             categoriaId && Number(categoriaId) > 0
               ? Number(categoriaId)
@@ -3028,6 +3038,9 @@ export class ProductoService {
       disponibilidad?: DisponibilidadProducto | null;
       /** Empuje frente a equivalentes: 4 muy alta, 3 alta, 2 media, 1 baja. */
       prioridadVenta?: number | null;
+      /** Órganos y sistemas sobre los que actúa ("Hígado, Colon"). */
+      organos?: string | null;
+      sistemas?: string | null;
 
       sedeId?: number; // Nueva propiedad opcional para identificar dónde se ajusta el stock
       /** Sede donde se escribe el stock; null = "Todas las sedes". */
@@ -3437,6 +3450,8 @@ export class ProductoService {
           ? Number(data.unidadMedidaId)
           : undefined,
         tipoAfectacionIGV: data.tipoAfectacionIGV,
+        organos: valoresParaGuardar(data.organos),
+        sistemas: valoresParaGuardar(data.sistemas),
         moneda: data.moneda !== undefined ? data.moneda : undefined,
         valorUnitario:
           data.valorUnitario !== undefined

@@ -48,7 +48,8 @@ import {
 } from './stock-tienda';
 import type { DisponibilidadCarritoDto } from './dto/disponibilidad-carrito.dto';
 import { envioPublico } from './envio-tienda.util';
-import { filtroBusquedaTienda } from './busqueda-tienda.util';
+import { filtroBusquedaTienda, sinTildes } from './busqueda-tienda.util';
+import { contarOrganosSistemas, filtroOrganosSistemas } from './organos-sistemas';
 
 const ESTADOS_ENVIO_NOTIFICABLES = new Set([
   'EN_CAMINO',
@@ -1224,6 +1225,41 @@ export class TiendaService {
     return result;
   }
 
+  /**
+   * Palabras con tilde del catálogo (órganos, sistemas y nombres) para buscar
+   * sin tildes: "colageno" también encuentra "Colágeno". Cinco minutos en
+   * memoria por empresa: es el mismo catálogo en cada búsqueda.
+   */
+  private vocabularioCache = new Map<number, { hasta: number; palabras: string[] }>();
+  private async vocabularioOrganosSistemas(empresaId: number): Promise<string[]> {
+    const guardado = this.vocabularioCache.get(empresaId);
+    if (guardado && guardado.hasta > Date.now()) return guardado.palabras;
+    const filas = await this.prisma.producto.findMany({
+      where: { empresaId, estado: 'ACTIVO' },
+      select: { descripcion: true, organos: true, sistemas: true },
+    });
+    const palabras = new Set<string>();
+    for (const f of filas) {
+      for (const w of `${f.descripcion} ${f.organos ?? ''} ${f.sistemas ?? ''}`.split(/[^\p{L}]+/u)) {
+        if (w.length > 2 && sinTildes(w) !== w) palabras.add(w.toLowerCase());
+      }
+    }
+    const lista = [...palabras];
+    this.vocabularioCache.set(empresaId, { hasta: Date.now() + 5 * 60_000, palabras: lista });
+    return lista;
+  }
+
+  /** Órganos y sistemas del catálogo publicado, con cuántos productos tiene cada uno. */
+  async obtenerOrganosSistemasTienda(slug: string, sede?: unknown) {
+    const { ctx } = await this.contextoPublico(slug, sede);
+    const base = await this.whereCatalogoPublico(ctx);
+    const productos = await this.prisma.producto.findMany({
+      where: { ...base, AND: [...base.AND, { OR: [{ organos: { not: null } }, { sistemas: { not: null } }] }] },
+      select: { organos: true, sistemas: true },
+    });
+    return contarOrganosSistemas(productos);
+  }
+
   async obtenerMarcasTienda(slug: string, sede?: unknown) {
     const { ctx } = await this.contextoPublico(slug, sede);
 
@@ -1306,6 +1342,8 @@ export class TiendaService {
     brand = '',
     wholesale = false,
     sede?: unknown,
+    organo = '',
+    sistema = '',
   ) {
     try {
       // Sin tienda en el plan, la tienda no existe (404 neutro).
@@ -1403,6 +1441,8 @@ export class TiendaService {
         codigo: true,
         descripcion: true,
         descripcionLarga: true,
+        organos: true,
+        sistemas: true,
         videoUrl: true,
         precioUnitario: true,
         precioOferta: true,
@@ -1443,7 +1483,11 @@ export class TiendaService {
       // Productos de la tienda (publicados, o todos si no publicó ninguno) con
       // el filtro de stock de la sede; encima, los filtros del comprador.
       const where: any = await this.whereCatalogoPublico(ctx);
-      where.AND.push(...filtroBusquedaTienda(search));
+      // Con texto, las palabras con tilde del catálogo sirven de vocabulario
+      // para que "higado" encuentre "Hígado" (ver busqueda-tienda.util.ts).
+      const vocabulario = search.trim() ? await this.vocabularioOrganosSistemas(ctx.empresaId) : [];
+      where.AND.push(...filtroBusquedaTienda(search, vocabulario));
+      where.AND.push(...filtroOrganosSistemas(organo, sistema));
 
       // Filtro por rango de precios
       if (minPrice !== undefined || maxPrice !== undefined) {
@@ -1639,6 +1683,8 @@ export class TiendaService {
       codigo: true,
       descripcion: true,
       descripcionLarga: true,
+      organos: true,
+      sistemas: true,
       videoUrl: true,
       precioUnitario: true,
       precioOferta: true,
