@@ -49,6 +49,10 @@ export class ActualizarConfigEnvioDto {
   envioGratisDesdeSoles?: number;
 
   @IsOptional()
+  @IsBoolean()
+  envioACoordinar?: boolean;
+
+  @IsOptional()
   @IsDecimal()
   @Type(() => Number)
   minimoCompra?: number;

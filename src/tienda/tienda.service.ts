@@ -46,6 +46,7 @@ import {
   type ContextoStockTienda,
 } from './stock-tienda';
 import type { DisponibilidadCarritoDto } from './dto/disponibilidad-carrito.dto';
+import { envioPublico } from './envio-tienda.util';
 
 const ESTADOS_ENVIO_NOTIFICABLES = new Set([
   'EN_CAMINO',
@@ -498,6 +499,7 @@ export class TiendaService {
         // Devolver también campos de envío/recojo para que el frontend los persista
         costoEnvioFijo: true,
         envioGratisDesdeSoles: true,
+        envioACoordinar: true,
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
@@ -575,6 +577,7 @@ export class TiendaService {
         // Campos de envío/recojo
         costoEnvioFijo: true,
         envioGratisDesdeSoles: true,
+        envioACoordinar: true,
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
@@ -1050,6 +1053,7 @@ export class TiendaService {
           colorSecundario: true,
           // Campos de envío/recojo visibles en tienda pública
           costoEnvioFijo: true,
+          envioACoordinar: true,
           aceptaRecojo: true,
           aceptaEnvio: true,
           // Si el negocio trabaja por encargo, la tienda deja de pintar
@@ -1146,7 +1150,7 @@ export class TiendaService {
         tiendaSedesIds,
       });
       return {
-        ...publico,
+        ...envioPublico(publico),
         stockTienda: {
           modo: ctxStock.modo,
           sedeDefaultId: ctxStock.sedeDefaultId,
@@ -2295,6 +2299,7 @@ export class TiendaService {
       select: {
         costoEnvioFijo: true,
         envioGratisDesdeSoles: true,
+        envioACoordinar: true,
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
@@ -2309,7 +2314,7 @@ export class TiendaService {
       throw new NotFoundException('Tienda no encontrada');
     }
 
-    return empresa;
+    return envioPublico(empresa);
   }
 
   /**
@@ -2445,6 +2450,7 @@ export class TiendaService {
       select: {
         id: true,
         costoEnvioFijo: true,
+        envioACoordinar: true,
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
@@ -2496,8 +2502,11 @@ export class TiendaService {
       );
     }
 
+    // Si el negocio coordina el envío aparte, el pedido no lo cobra.
     const costoEnvio =
-      tipoEntrega === 'ENVIO' ? Number(empresa.costoEnvioFijo || 0) : 0;
+      tipoEntrega === 'ENVIO' && !empresa.envioACoordinar
+        ? Number(empresa.costoEnvioFijo || 0)
+        : 0;
 
     let subtotal = 0;
     const itemsData: {
@@ -3448,6 +3457,7 @@ export class TiendaService {
       select: {
         costoEnvioFijo: true,
         envioGratisDesdeSoles: true,
+        envioACoordinar: true,
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
@@ -3480,6 +3490,7 @@ export class TiendaService {
       select: {
         costoEnvioFijo: true,
         envioGratisDesdeSoles: true,
+        envioACoordinar: true,
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
@@ -3799,6 +3810,7 @@ export class TiendaService {
             razonSocial: true,
             whatsappTienda: true,
             direccionRecojo: true,
+            envioACoordinar: true,
           },
         },
         // Dónde recoger (pedido con sede).

@@ -315,6 +315,8 @@ model Empresa {
   esWhiteLabel              Boolean                       @default(false) // Cliente bajo la marca blanca del reseller vs. marca estándar.
   costoEnvioFijo            Decimal?                      @default(0)
   envioGratisDesdeSoles     Decimal?                      @default(0)
+  /// El negocio coordina el envío aparte: la tienda no cobra envío ni lo anuncia gratis.
+  envioACoordinar           Boolean                       @default(false)
   minimoCompra              Decimal?                      @default(0)
   direccionRecojo           String?
   tiempoPreparacionMin      Int?                          @default(30)
