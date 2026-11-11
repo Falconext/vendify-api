@@ -47,6 +47,7 @@ import {
 } from './stock-tienda';
 import type { DisponibilidadCarritoDto } from './dto/disponibilidad-carrito.dto';
 import { envioPublico } from './envio-tienda.util';
+import { filtroBusquedaTienda } from './busqueda-tienda.util';
 
 const ESTADOS_ENVIO_NOTIFICABLES = new Set([
   'EN_CAMINO',
@@ -1464,15 +1465,7 @@ export class TiendaService {
       // Productos de la tienda (publicados, o todos si no publicó ninguno) con
       // el filtro de stock de la sede; encima, los filtros del comprador.
       const where: any = await this.whereCatalogoPublico(ctx);
-      const term = (search || '').trim();
-      if (term) {
-        where.AND.push({
-          OR: [
-            { descripcion: { contains: term, mode: 'insensitive' } },
-            { codigo: { contains: term, mode: 'insensitive' } },
-          ],
-        });
-      }
+      where.AND.push(...filtroBusquedaTienda(search));
 
       // Filtro por rango de precios
       if (minPrice !== undefined || maxPrice !== undefined) {
