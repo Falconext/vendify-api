@@ -40,6 +40,21 @@ function ruleFor(path: string): { limit: number; onlyFailed: boolean } {
   return { limit: 15, onlyFailed: false };
 }
 
+// Tope por cuenta, además del de IP: frena probar claves de un mismo correo desde
+// muchas IP. Alto a propósito y solo con 401: un usuario que se equivoca no llega,
+// y aun bajo ataque solo se detiene esa cuenta, nunca a los demás.
+const LOGIN_POR_CUENTA_LIMITE = 30;
+
+function claveDeCuenta(req: Request): string | null {
+  if (req.method !== 'POST' || !(req.path || '').startsWith('/api/auth/login')) return null;
+  const email = (req.body as { email?: unknown } | undefined)?.email;
+  if (typeof email !== 'string' || !email.trim()) return null;
+  return `cuenta:${email.trim().toLowerCase()}`;
+}
+
+// La IP sale del primer x-forwarded-for. El proxy público de Railway reemplaza lo
+// que manda el cliente, y `trust proxy` con otro salto podría juntar a todos los
+// usuarios en una sola IP y bloquearlos a la vez: no cambiar sin probarlo en Railway.
 function clientIp(req: Request): string {
   const forwarded = req.headers['x-forwarded-for'];
   if (Array.isArray(forwarded)) return forwarded[0] ?? req.ip ?? 'unknown';
@@ -47,8 +62,8 @@ function clientIp(req: Request): string {
   return req.ip || req.socket.remoteAddress || 'unknown';
 }
 
-// En desarrollo local (loopback) no aplicamos el límite. En producción, detrás
-// de un proxy, clientIp devuelve la IP real vía x-forwarded-for.
+// En desarrollo local (loopback) no aplicamos el límite. Se mira la conexión real,
+// no la cabecera: quien mande `x-forwarded-for: 127.0.0.1` no se salta el límite.
 function isLoopback(ip: string): boolean {
   return (
     ip === '127.0.0.1' ||
@@ -90,7 +105,7 @@ export function authRateLimit() {
     if (!isSensitive) return next();
 
     const ip = clientIp(req);
-    if (RATE_LIMIT_DISABLED || isLoopback(ip)) return next();
+    if (RATE_LIMIT_DISABLED || isLoopback(req.socket?.remoteAddress ?? '')) return next();
 
     const now = Date.now();
     cleanup(now);
@@ -117,12 +132,26 @@ export function authRateLimit() {
       });
     }
 
+    const cuenta = claveDeCuenta(req);
+    if (cuenta) {
+      const previo = buckets.get(cuenta);
+      if (previo && previo.resetAt > now && previo.count >= LOGIN_POR_CUENTA_LIMITE) {
+        res.setHeader('Retry-After', Math.ceil((previo.resetAt - now) / 1000));
+        return res.status(429).json({
+          code: 0,
+          message: 'Demasiados intentos fallidos. Intenta nuevamente en unos minutos.',
+          error: 'TooManyRequests',
+        });
+      }
+    }
+
     // Contar el intento al terminar la respuesta:
     //  - onlyFailed → solo si la respuesta fue un error (>= 400).
     //  - si no → siempre.
     res.on('finish', () => {
       const failed = res.statusCode >= 400;
       if (!onlyFailed || failed) bump(key, Date.now());
+      if (cuenta && res.statusCode === 401) bump(cuenta, Date.now());
     });
 
     next();
