@@ -70,6 +70,7 @@ export const CAMPOS_QUE_DECIDE_EL_ADMIN = [
   'noPermitirVentaProductosGratuitos',
   'restringirTransferenciasASuSede',
   'bloquearCrearEliminarProductos',
+  'bloquearDescuentos',
   'soloImagenesProductos',
   'puedeAnularComprobantes',
 ] as const;

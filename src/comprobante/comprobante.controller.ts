@@ -44,6 +44,7 @@ import {
 import { numeroALetras } from './utils/numero-a-letras';
 import { verificarPuedeAnularComprobante } from './puede-anular-comprobante.util';
 import { verificarPuedeVenderEnSede } from '../usuarios/puede-vender-en-sede.util';
+import { verificarSinDescuentos } from '../usuarios/sin-descuentos.util';
 import { IdempotenciaPanelInterceptor } from '../integraciones/idempotencia/idempotencia-panel.interceptor';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -649,6 +650,7 @@ export class ComprobanteController {
     @Body() dto: CrearComprobanteDto,
     @User() user: any,
   ) {
+    verificarSinDescuentos(user, dto);
     const effectiveSedeId = user.sedeId ?? (dto as any)?.sedeId ?? undefined;
     return this.service.editarNotaVenta(
       id,
@@ -669,6 +671,7 @@ export class ComprobanteController {
     if (dto.tipoDoc !== 'COT') {
       throw new BadRequestException('Solo se pueden editar cotizaciones');
     }
+    verificarSinDescuentos(user, dto);
     return this.service.actualizarCotizacion(id, dto, user.empresaId);
   }
 
@@ -678,6 +681,7 @@ export class ComprobanteController {
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearBoleta(@User() user: any, @Body() dto: CrearComprobanteDto) {
     verificarPuedeVenderEnSede(user, undefined, dto?.sedeId);
+    verificarSinDescuentos(user, dto);
     let comp;
     try {
       console.log(
@@ -756,6 +760,7 @@ export class ComprobanteController {
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearFactura(@User() user: any, @Body() dto: CrearComprobanteDto) {
     verificarPuedeVenderEnSede(user, undefined, dto?.sedeId);
+    verificarSinDescuentos(user, dto);
     let comp;
     try {
       console.log(
@@ -892,6 +897,7 @@ export class ComprobanteController {
     @Body() dto: CrearComprobanteDto,
   ) {
     verificarPuedeVenderEnSede(user, dto?.tipoDoc, dto?.sedeId);
+    verificarSinDescuentos(user, dto);
     const effectiveSedeId = user.sedeId ?? dto?.sedeId ?? undefined;
     const comp = await this.service.crearInformal(
       dto,
@@ -1138,6 +1144,7 @@ export class ComprobanteController {
   @Post('ot')
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearOT(@User() user: any, @Body() dto: any) {
+    verificarSinDescuentos(user, dto);
     const effectiveSedeId = user.sedeId ?? dto?.sedeId ?? undefined;
     return this.service.crearOT(dto, user.empresaId, user.id, effectiveSedeId);
   }

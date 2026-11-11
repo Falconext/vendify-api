@@ -415,6 +415,7 @@ export class AuthService {
         sistemaNegocio: true,
         sistemaProducto: true,
         puedeAnularComprobantes: true,
+        bloquearDescuentos: true,
         soloImagenesProductos: true,
         sedeId: true,
         sedesAsignadas: {

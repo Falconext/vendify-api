@@ -521,6 +521,8 @@ model Usuario {
   // comprobantes queda reservado a ADMIN_EMPRESA salvo que se active aquí.
   puedeAnularComprobantes         Boolean                 @default(false)
   /// Solo gestiona las fotos de los productos: no ve ni toca precios, costos ni datos.
+  /// No da descuentos (por línea ni global) al vender o cotizar.
+  bloquearDescuentos              Boolean                 @default(false)
   soloImagenesProductos           Boolean                 @default(false)
   actasInspeccion                 ActaInspeccion[]
   listasPrecio                    ListaPrecioUsuario[]

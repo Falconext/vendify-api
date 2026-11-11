@@ -63,6 +63,11 @@ export class UpdateUserDto {
   @IsOptional()
   puedeAnularComprobantes?: boolean;
 
+  /** No da descuentos por línea ni globales. */
+  @IsBoolean()
+  @IsOptional()
+  bloquearDescuentos?: boolean;
+
   @IsBoolean()
   @IsOptional()
   soloImagenesProductos?: boolean;

@@ -1,0 +1,1 @@
+ALTER TABLE "Usuario" ADD COLUMN IF NOT EXISTS "bloquearDescuentos" BOOLEAN NOT NULL DEFAULT false;

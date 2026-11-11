@@ -128,6 +128,7 @@ export class UsersService {
             ? dto.comisionGlobalVenta
             : null,
         puedeAnularComprobantes: dto.puedeAnularComprobantes ?? false,
+        bloquearDescuentos: dto.bloquearDescuentos ?? false,
         soloImagenesProductos: dto.soloImagenesProductos ?? false,
         sedeId: sedeDefaultId || null,
       },
@@ -145,6 +146,7 @@ export class UsersService {
         comisionGlobalFija: true,
         comisionGlobalVenta: true,
         puedeAnularComprobantes: true,
+        bloquearDescuentos: true,
         soloImagenesProductos: true,
         sedeId: true,
       },
@@ -223,6 +225,7 @@ export class UsersService {
           comisionGlobalFija: true,
           comisionGlobalVenta: true,
           puedeAnularComprobantes: true,
+          bloquearDescuentos: true,
           soloImagenesProductos: true,
           sedeId: true,
           sedesAsignadas: {
@@ -358,6 +361,7 @@ export class UsersService {
         comisionGlobalVenta:
           comisionGlobalVenta !== undefined ? comisionGlobalVenta : undefined,
         puedeAnularComprobantes: dto.puedeAnularComprobantes,
+        bloquearDescuentos: dto.bloquearDescuentos,
         soloImagenesProductos: dto.soloImagenesProductos,
         sedeId: sedeDefaultId !== undefined ? sedeDefaultId || null : undefined,
       },
@@ -375,6 +379,7 @@ export class UsersService {
         comisionGlobalFija: true,
         comisionGlobalVenta: true,
         puedeAnularComprobantes: true,
+        bloquearDescuentos: true,
         soloImagenesProductos: true,
         sedeId: true,
       },
@@ -459,6 +464,7 @@ export class UsersService {
         comisionGlobalFija: true,
         comisionGlobalVenta: true,
         puedeAnularComprobantes: true,
+        bloquearDescuentos: true,
         soloImagenesProductos: true,
         sedeId: true,
         sedesAsignadas: {
