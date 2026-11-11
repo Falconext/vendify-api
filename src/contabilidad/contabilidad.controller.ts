@@ -630,7 +630,7 @@ export class ContabilidadController {
       TIPO: mov.tipo,
       DOCUMENTO: mov.documento,
       CLIENTE: mov.cliente,
-      FECHA: new Date(mov.fecha).toISOString().split('T')[0],
+      FECHA: toFechaLima(new Date(mov.fecha)),
       CONCEPTO: mov.concepto,
       'MEDIO PAGO': mov.medioPago,
       MONTO: Number(mov.monto),
