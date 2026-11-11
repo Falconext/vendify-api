@@ -8,6 +8,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import {
+  esAdmin,
+  exigirPermisosQueTiene,
+  exigirPuedeGestionar,
+  parsearPermisos,
+  sinCamposDelAdmin,
+} from './usuario-delegado';
+
+type Editor = { id?: number; rol?: string; permisos?: string[] };
 
 @Injectable()
 export class UsersService {
@@ -23,7 +32,33 @@ export class UsersService {
     return where;
   }
 
-  async create(dto: CreateUserDto, empresaIdFromToken: number) {
+  /**
+   * En Vendify el token no trae los permisos: para el delegado se leen de la
+   * base. A un admin no hace falta (puede otorgar cualquiera).
+   */
+  private async permisosDelEditor(editor?: Editor): Promise<string[] | undefined> {
+    if (!editor || esAdmin(editor.rol)) return editor?.permisos;
+    if (Array.isArray(editor.permisos)) return editor.permisos;
+    if (!editor.id) return [];
+    const fila = await this.prisma.usuario.findUnique({
+      where: { id: editor.id },
+      select: { permisos: true },
+    });
+    return parsearPermisos(fila?.permisos);
+  }
+
+  async create(
+    dto: CreateUserDto,
+    empresaIdFromToken: number,
+    editor?: Editor,
+  ) {
+    if (editor && !esAdmin(editor.rol)) {
+      exigirPermisosQueTiene(
+        editor.rol,
+        await this.permisosDelEditor(editor),
+        dto.permisos,
+      );
+    }
     const {
       nombre,
       email,
@@ -231,13 +266,43 @@ export class UsersService {
     return { total, page, limit, items: itemsConSedes };
   }
 
-  async changeState(id: number, estado: 'ACTIVO' | 'INACTIVO') {
+  async changeState(
+    id: number,
+    estado: 'ACTIVO' | 'INACTIVO',
+    empresaId: number,
+    editorRol?: string,
+  ) {
     const exists = await this.prisma.usuario.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException('Usuario no encontrado');
+    if (exists.empresaId !== empresaId)
+      throw new ForbiddenException('Empresa no identificada');
+    exigirPuedeGestionar(editorRol, exists.rol);
     return this.prisma.usuario.update({ where: { id }, data: { estado } });
   }
 
-  async update(dto: UpdateUserDto, empresaId: number) {
+  async update(dtoPedido: UpdateUserDto, empresaId: number, editor?: Editor) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: dtoPedido.id },
+    });
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    if (usuario.empresaId !== empresaId)
+      throw new ForbiddenException('Empresa no identificada');
+    exigirPuedeGestionar(editor?.rol, usuario.rol);
+    const dto = sinCamposDelAdmin(
+      editor?.rol,
+      editor?.id,
+      usuario.id,
+      dtoPedido,
+    );
+    if (editor && !esAdmin(editor.rol)) {
+      exigirPermisosQueTiene(
+        editor.rol,
+        await this.permisosDelEditor(editor),
+        dto.permisos,
+        parsearPermisos(usuario.permisos),
+      );
+    }
+
     const {
       id,
       nombre,
@@ -253,11 +318,6 @@ export class UsersService {
       comisionGlobalFija,
       comisionGlobalVenta,
     } = dto;
-
-    const usuario = await this.prisma.usuario.findUnique({ where: { id } });
-    if (!usuario) throw new NotFoundException('Usuario no encontrado');
-    if (usuario.empresaId !== empresaId)
-      throw new ForbiddenException('Empresa no identificada');
 
     if (sedeDefaultId) {
       const sedeIdsEfectivos =
