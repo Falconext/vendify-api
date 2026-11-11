@@ -14,4 +14,6 @@ export class DespachoConfigDto {
   @IsOptional() @IsString() @MaxLength(1000) mensajeEntregadoAgencia?: string;
   @IsOptional() @IsBoolean() notificarEnCamino?: boolean;
   @IsOptional() @IsBoolean() notificarEntregado?: boolean;
+  /** Mandar la clave de retiro en los avisos. Apagada, el negocio la da aparte. */
+  @IsOptional() @IsBoolean() claveEnAvisos?: boolean;
 }

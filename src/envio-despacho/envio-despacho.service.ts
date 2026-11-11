@@ -491,6 +491,7 @@ export class EnvioDespachoService {
       mensajeEntregadoAgencia: null,
       notificarEnCamino: true,
       notificarEntregado: true,
+      claveEnAvisos: true,
     };
     return {
       ...base,
@@ -869,7 +870,13 @@ export class EnvioDespachoService {
       .replace(/\{\{repartidor\}\}/g, repartidorNombre ?? 'Sin asignar')
       .replace(/\{\{empresa\}\}/g, empresa?.razonSocial ?? '')
       .replace(/\{\{agencia\}\}/g, agencia)
-      .replace(/\{\{clave\}\}/g, envio?.claveEnvio ?? '');
+      // Helou Shop, 06-11: trabaja contra entrega y da la clave cuando le
+      // pagan. Apagada, {{clave}} queda vacío.
+      .replace(
+        /\{\{clave\}\}/g,
+        config?.claveEnAvisos === false ? '' : (envio?.claveEnvio ?? ''),
+      )
+      .trim();
 
     await avisar(mensaje);
   }

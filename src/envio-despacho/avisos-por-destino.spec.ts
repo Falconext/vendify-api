@@ -91,6 +91,16 @@ describe('avisos de despacho: Lima vs provincia', () => {
     );
   });
 
+  it('clave apagada: {{clave}} queda vacío en el aviso de provincia', async () => {
+    const { vista } = armar({
+      envio: ENVIO_SHALOM,
+      config: { claveEnAvisos: false },
+    });
+    expect(await vista(EstadoDespacho.EN_CAMINO)).toBe(
+      'Provincia: Ana, tu pedido NV01-00000007 va a Shalom Cusco Centro. Clave',
+    );
+  });
+
   it('el envío real manda el texto de provincia a WhatsApp', async () => {
     const { servicio, whatsapp } = armar({ envio: ENVIO_SHALOM });
     await (servicio as any).notificarCambioEstado(
