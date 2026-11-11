@@ -308,6 +308,8 @@ export class VentasService {
     fechaEnvio?: string;
     sedeId?: number;
     usuarioId?: number;
+    /** Tope de filas, las más recientes. Sin él, trae todo el rango. */
+    limite?: number;
   }) {
     // Campos del despacho que muestra la fila; los mismos para el despacho
     // compartido de una nota que va en el paquete de otra.
@@ -330,7 +332,7 @@ export class VentasService {
               repartidorId: true,
               repartidor: { select: { nombre: true, color: true } },
             } as const;
-    const { empresaId, fecha, sedeId, usuarioId } = params;
+    const { empresaId, fecha, sedeId, usuarioId, limite } = params;
 
     const inicioLima = new Date(`${fecha}T00:00:00-05:00`);
     const finLima = new Date(`${params.fechaFin || fecha}T23:59:59-05:00`);
@@ -372,6 +374,7 @@ export class VentasService {
           estadoEnvioSunat: { not: 'ANULADO' },
         },
         orderBy: { fechaEmision: 'desc' },
+        ...(limite ? { take: limite } : {}),
         select: {
           id: true,
           tipoDoc: true,
@@ -448,6 +451,7 @@ export class VentasService {
           comprobanteId: null,
         },
         orderBy: { creadoEn: 'desc' },
+        ...(limite ? { take: limite } : {}),
         select: {
           id: true,
           codigoSeguimiento: true,
@@ -692,13 +696,21 @@ export class VentasService {
       };
     });
 
-    const data = [...comprobantesNorm, ...pedidosNorm].sort(
+    const ordenadas = [...comprobantesNorm, ...pedidosNorm].sort(
       (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime(),
     );
+    const data = limite ? ordenadas.slice(0, limite) : ordenadas;
 
     return {
       data,
       total: data.length,
+      // Hay ventas más antiguas que el tope: el panel lo avisa.
+      truncado: Boolean(
+        limite &&
+          (comprobantesRaw.length >= limite ||
+            pedidosRaw.length >= limite ||
+            ordenadas.length > limite),
+      ),
       resumen: {
         porCobrarGlobal,
       },
