@@ -24,10 +24,10 @@ describe('filtrar por una categoría trae también sus subcategorías', () => {
 
 describe('tienda: subcategoría con su madre', () => {
   const insensible = (equals: string) => ({ equals, mode: 'insensitive' });
+  const rama = { nombre: insensible('Honda'), padre: { nombre: insensible('Sliders') } };
 
-  it('"Sliders > Honda" filtra por esa rama, principal o adicional', () => {
-    const rama = { nombre: insensible('Honda'), padre: { nombre: insensible('Sliders') } };
-    const conds = condicionesCategoriaPorNombre(['Sliders > Honda']) as any[];
+  it.each(['Sliders › Honda', 'Sliders > Honda', 'Sliders>Honda'])('"%s" filtra por esa rama, principal o adicional', (ruta) => {
+    const conds = condicionesCategoriaPorNombre([ruta]) as any[];
     expect(conds).toContainEqual({ categoria: rama });
     expect(conds).toContainEqual({ categoriasExtra: { some: { categoria: rama } } });
   });
@@ -40,35 +40,35 @@ describe('tienda: subcategoría con su madre', () => {
 describe('menú de categorías de la tienda', () => {
   const sliders = { nombre: 'Sliders', imagenUrl: 's.jpg' };
   const cascos = { nombre: 'Cascos', imagenUrl: null };
+  const honda = { nombre: 'Honda', imagenUrl: null };
 
-  it('la madre sale aunque sus productos estén todos en la hija', () => {
-    expect(categoriasParaMenu([{ nombre: 'Honda', imagenUrl: null, padre: sliders }])).toEqual([
-      { nombre: 'Honda', imagenUrl: null, padre: 'Sliders', padres: ['Sliders'], principal: false },
-      { nombre: 'Sliders', imagenUrl: 's.jpg', padre: null, padres: [], principal: true },
+  it('solo principales; la madre sale aunque sus productos estén todos en la hija', () => {
+    expect(categoriasParaMenu([{ ...honda, padre: sliders }])).toEqual([
+      { nombre: 'Sliders', imagenUrl: 's.jpg', subcategorias: [honda] },
     ]);
   });
 
-  it('el mismo nombre bajo dos madres es una sola fila con las dos', () => {
+  it('el mismo nombre bajo dos madres queda en cada una, sin repetirse', () => {
     const menu = categoriasParaMenu([
-      { nombre: 'Honda', imagenUrl: null, padre: sliders },
-      { nombre: 'Honda', imagenUrl: null, padre: cascos },
-      { nombre: 'Honda', imagenUrl: null, padre: sliders },
+      { ...honda, padre: sliders },
+      { ...honda, padre: cascos },
+      { ...honda, padre: sliders },
     ]);
-    expect(menu.filter((c) => c.nombre === 'Honda')).toEqual([
-      { nombre: 'Honda', imagenUrl: null, padre: 'Sliders', padres: ['Sliders', 'Cascos'], principal: false },
+    expect(menu.map((c) => [c.nombre, c.subcategorias.map((h) => h.nombre)])).toEqual([
+      ['Sliders', ['Honda']],
+      ['Cascos', ['Honda']],
     ]);
   });
 
-  it('un nombre que es principal y también hija queda marcado como ambos', () => {
-    const [honda] = categoriasParaMenu([
-      { nombre: 'Honda', imagenUrl: null, padre: sliders },
-      { nombre: 'Honda', imagenUrl: null },
-    ]);
-    expect(honda).toMatchObject({ padres: ['Sliders'], principal: true });
+  it('un nombre que es principal y también hija sale en los dos lugares', () => {
+    const menu = categoriasParaMenu([{ ...honda, padre: sliders }, honda]);
+    expect(menu.map((c) => c.nombre)).toEqual(['Sliders', 'Honda']);
+    expect(menu[0].subcategorias).toEqual([honda]);
   });
 
-  it('ignora productos sin categoría', () => {
-    expect(categoriasParaMenu([null, undefined])).toEqual([]);
+  it('ordena las hijas e ignora productos sin categoría', () => {
+    const menu = categoriasParaMenu([null, undefined, { nombre: 'Z', imagenUrl: null, padre: sliders }, { nombre: 'A', imagenUrl: null, padre: sliders }]);
+    expect(menu[0].subcategorias.map((h) => h.nombre)).toEqual(['A', 'Z']);
   });
 });
 

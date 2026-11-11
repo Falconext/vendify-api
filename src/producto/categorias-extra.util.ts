@@ -15,13 +15,18 @@ export const MAX_CATEGORIAS_EXTRA = 10;
 
 /** Select reutilizable para devolver las adicionales junto al producto. */
 export const SELECT_CATEGORIAS_EXTRA = {
-  select: { categoria: { select: { id: true, nombre: true } } },
+  select: {
+    categoria: {
+      select: { id: true, nombre: true, padre: { select: { nombre: true } } },
+    },
+  },
   orderBy: { categoria: { nombre: 'asc' } },
 } satisfies Prisma.Producto$categoriasExtraArgs;
 
 export interface CategoriaResumen {
   id: number;
   nombre: string;
+  padre?: { nombre: string } | null;
 }
 
 /** `[{ categoria: {id, nombre} }]` (fila de la tabla puente) → `[{id, nombre}]`. */
@@ -163,7 +168,7 @@ export async function quitarPrincipalDeExtras(
 /**
  * Condiciones (para un `OR`) de "está en alguna de estas categorías", por
  * NOMBRE y sin distinguir mayúsculas: así filtra la tienda pública
- * (`?category=Polos,Ofertas`). "Sliders > Honda" pide solo esa subcategoría, y
+ * (`?category=Polos,Ofertas`). "Sliders › Honda" pide solo esa subcategoría, y
  * no la Honda que cuelgue de otra madre.
  */
 export function condicionesCategoriaPorNombre(
@@ -171,7 +176,7 @@ export function condicionesCategoriaPorNombre(
 ): Prisma.ProductoWhereInput[] {
   return nombres.flatMap((nombre) => {
     const igual = { equals: nombre, mode: 'insensitive' as const };
-    const [madre, hija] = separarRutaCategoria(nombre);
+    const [madre, hija] = separarRutaCategoria(nombre.replace(/›/g, '>'));
     const enRama = hija
       ? {
           nombre: { equals: hija, mode: 'insensitive' as const },
@@ -201,10 +206,9 @@ type CategoriaDeProducto = {
 } | null | undefined;
 
 /**
- * Menú de categorías de la tienda: una fila por nombre, como siempre, más
- * `padres` (de qué madres cuelga) y `principal` (si también va suelta arriba).
- * Un nombre repetido bajo dos madres sigue siendo una fila: las plantillas que
- * pintan la lista plana no deben verlo duplicado.
+ * Menú de categorías de la tienda: solo las principales, cada una con sus
+ * `subcategorias`. Así el inicio, la cabecera y la ficha de todas las plantillas
+ * muestran las principales sin tocar cada una; el catálogo abre las hijas.
  */
 export function categoriasParaMenu(categorias: CategoriaDeProducto[]) {
   const menu = new Map<
@@ -212,15 +216,13 @@ export function categoriasParaMenu(categorias: CategoriaDeProducto[]) {
     {
       nombre: string;
       imagenUrl: string | null;
-      padre: string | null;
-      padres: string[];
-      principal: boolean;
+      hijas: Map<string, { nombre: string; imagenUrl: string | null }>;
     }
   >();
   const fila = (nombre: string, imagenUrl: string | null) => {
     let actual = menu.get(nombre);
     if (!actual) {
-      actual = { nombre, imagenUrl, padre: null, padres: [], principal: false };
+      actual = { nombre, imagenUrl, hijas: new Map() };
       menu.set(nombre, actual);
     }
     return actual;
@@ -228,18 +230,23 @@ export function categoriasParaMenu(categorias: CategoriaDeProducto[]) {
 
   for (const categoria of categorias) {
     if (!categoria?.nombre) continue;
-    const actual = fila(categoria.nombre, categoria.imagenUrl);
     const madre = categoria.padre;
     if (!madre?.nombre) {
-      actual.principal = true;
+      fila(categoria.nombre, categoria.imagenUrl);
       continue;
     }
-    if (!actual.padres.includes(madre.nombre)) actual.padres.push(madre.nombre);
-    actual.padre ??= madre.nombre;
     // La madre sale en el menú aunque sus productos estén todos en hijas.
-    fila(madre.nombre, madre.imagenUrl).principal = true;
+    fila(madre.nombre, madre.imagenUrl).hijas.set(categoria.nombre, {
+      nombre: categoria.nombre,
+      imagenUrl: categoria.imagenUrl,
+    });
   }
-  return Array.from(menu.values());
+  return Array.from(menu.values()).map(({ hijas, ...resto }) => ({
+    ...resto,
+    subcategorias: Array.from(hijas.values()).sort((a, b) =>
+      a.nombre.localeCompare(b.nombre),
+    ),
+  }));
 }
 
 /**

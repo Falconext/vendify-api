@@ -1207,7 +1207,7 @@ export class TiendaService {
 
     // Sign URLs if needed
     await Promise.all(
-      result.map(async (cat) => {
+      result.flatMap((c) => [c, ...c.subcategorias]).map(async (cat) => {
         if (cat.imagenUrl && cat.imagenUrl.includes('amazonaws.com')) {
           const parts = cat.imagenUrl.split('amazonaws.com/');
           if (parts.length > 1) {
@@ -1416,7 +1416,9 @@ export class TiendaService {
         ratingCount: true,
         atributosTecnicos: true,
         opcionesAtributos: true,
-        categoria: { select: { id: true, nombre: true } },
+        categoria: {
+          select: { id: true, nombre: true, padre: { select: { nombre: true } } },
+        },
         categoriasExtra: SELECT_CATEGORIAS_EXTRA,
         unidadMedida: { select: { codigo: true, nombre: true } },
         marca: { select: { id: true, nombre: true } },
@@ -1651,6 +1653,7 @@ export class TiendaService {
       atributosTecnicos: true,
       categoria: {
         select: {
+          padre: { select: { nombre: true } },
           id: true,
           nombre: true,
         },
