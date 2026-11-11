@@ -1262,12 +1262,17 @@ model CuentaBancaria {
   /// depósitos de caja (solo el efectivo). Máx. una cuenta activa por medio
   /// por empresa (validado en servicio).
   medioPagoVinculado         String?
+  /// Lo que había en la cuenta al empezar `saldoInicialFecha`. El saldo cuenta
+  /// desde ahí: lo anterior ya está dentro de este monto.
+  saldoInicial               Decimal?         @db.Decimal(12, 2)
+  saldoInicialFecha          DateTime?
   creadoEn                   DateTime         @default(now())
   empresa                    Empresa          @relation(fields: [empresaId], references: [id])
   pagos                      Pago[]
   pagosCompra                PagoCompra[]
   gastosOperativos           GastoOperativo[]
   movimientosCajaDepositados MovimientoCaja[]
+  depositosRepartidos        DepositoCajaReparto[]
 
   @@index([empresaId])
 }
@@ -1379,6 +1384,10 @@ model MovimientoCaja {
   numeroOperacionDeposito String?
   depositadoPorUsuarioId  Int?
   depositadoPor           Usuario?        @relation("DepositoCajaRealizadoPor", fields: [depositadoPorUsuarioId], references: [id])
+  // Depósito repartido entre varias cuentas: los cierres depositados juntos
+  // comparten este lote y quedan con cuentaBancariaId en null; cuánto fue a
+  // cada cuenta está en DepositoCajaReparto (mismo lote).
+  depositoLote            String?
 
   // uuid de la operación offline que lo originó (null = registrado online).
   origenSyncUuid String?
@@ -1386,6 +1395,25 @@ model MovimientoCaja {
   @@index([usuarioId, fecha])
   @@index([empresaId, fecha])
   @@index([tipoMovimiento])
+  @@index([depositoLote])
+}
+
+// Una parte de un depósito de efectivo de caja repartido entre cuentas (una
+// empresa que lleva lo facturado a una cuenta y el resto a otra). Agrupa por
+// `lote` los cierres que se depositaron juntos.
+model DepositoCajaReparto {
+  id               Int            @id @default(autoincrement())
+  empresaId        Int
+  lote             String
+  cuentaBancariaId Int
+  cuentaBancaria   CuentaBancaria @relation(fields: [cuentaBancariaId], references: [id])
+  monto            Decimal        @db.Decimal(12, 2)
+  numeroOperacion  String?
+  fecha            DateTime
+  creadoEn         DateTime       @default(now())
+
+  @@index([empresaId, lote])
+  @@index([cuentaBancariaId, fecha])
 }
 
 model PedidoTienda {

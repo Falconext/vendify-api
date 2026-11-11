@@ -60,6 +60,7 @@ describe('DashboardService.ventasPorCanalPen', () => {
       sumRedes: 9.9,
       sumEfectivo: 103,
       sumOtros: 0,
+      sumCredito: 0,
     });
   });
 
@@ -78,6 +79,7 @@ describe('DashboardService.ventasPorCanalPen', () => {
       sumRedes: 9.3,
       sumEfectivo: 20,
       sumOtros: 0,
+      sumCredito: 0,
     });
   });
 
@@ -94,6 +96,7 @@ describe('DashboardService.ventasPorCanalPen', () => {
       sumRedes: 0,
       sumEfectivo: 20,
       sumOtros: 0,
+      sumCredito: 0,
     });
   });
 
@@ -103,7 +106,7 @@ describe('DashboardService.ventasPorCanalPen', () => {
     expect(r.sumOtros).toBe(20);
   });
 
-  it('venta a crédito cobrada a medias: lo cobrado va a su canal, el saldo a Otros', async () => {
+  it('MIXTO sin marca de crédito cobrado a medias: lo cobrado va a su canal, el saldo a Otros', async () => {
     const s = crear([comp(100, [{ monto: 60, medioPago: 'YAPE' }])]);
     const r = await s.ventasPorCanalPen([pen('MIXTO', 100)], {});
     expect(redondear(r)).toEqual({
@@ -112,6 +115,7 @@ describe('DashboardService.ventasPorCanalPen', () => {
       sumRedes: 60,
       sumEfectivo: 0,
       sumOtros: 40,
+      sumCredito: 0,
     });
   });
 
@@ -129,6 +133,7 @@ describe('DashboardService.ventasPorCanalPen', () => {
       sumRedes: 50,
       sumEfectivo: 50,
       sumOtros: 0,
+      sumCredito: 0,
     });
   });
 
@@ -174,6 +179,7 @@ describe('DashboardService.ventasPorCanalPen', () => {
       sumRedes: 0,
       sumEfectivo: 40,
       sumOtros: 60,
+      sumCredito: 0,
     });
   });
 
@@ -200,6 +206,29 @@ describe('DashboardService.ventasPorCanalPen', () => {
       sumRedes: 0,
       sumEfectivo: 228,
       sumOtros: 0,
+      sumCredito: 0,
+    });
+  });
+
+  it('crédito: se reparte por sus pagos y lo pendiente es "Crédito por cobrar" (IRBA NV01-44)', async () => {
+    const s = crear([
+      { ...comp(969, [{ monto: 969, medioPago: 'TRANSFERENCIA' }]), formaPagoTipo: 'CREDITO' },
+      { ...comp(200, [{ monto: 50, medioPago: 'YAPE' }]), formaPagoTipo: 'Credito' },
+    ]);
+    const r = await s.ventasPorCanalPen(
+      [
+        { ...pen('EFECTIVO', 1169), formaPagoTipo: 'CREDITO' },
+        { ...pen('EFECTIVO', 30), formaPagoTipo: 'CONTADO' },
+      ],
+      {},
+    );
+    expect(redondear(r)).toEqual({
+      sumTarjeta: 0,
+      sumTransferencia: 969,
+      sumRedes: 50,
+      sumEfectivo: 30,
+      sumOtros: 0,
+      sumCredito: 150,
     });
   });
 });

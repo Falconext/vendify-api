@@ -44,11 +44,21 @@ export class ArqueoService {
           estadoPago: true,
           cliente: { select: { nombre: true, nroDoc: true } },
           usuario: { select: { nombre: true, email: true } },
+          _count: { select: { pagos: true } },
         },
         orderBy: { fechaEmision: 'desc' },
       });
 
-    // 2. Obtener comprobantes formales CON PAGOS AL CONTADO
+    // Las que tienen filas en `pagos` se contabilizan en el paso 3: sumarlas
+    // también aquí duplicaba el ingreso de cada nota de venta y ticket. Una
+    // antigua sin pago registrado sigue entrando por su comprobante.
+    const informalesSinPago = comprobantesInformalesCompletos.filter(
+      (comp) => comp._count.pagos === 0,
+    );
+
+    // 2. Obtener comprobantes formales al contado SIN registro de pago propio.
+    //    Las que sí tienen filas en `pagos` se contabilizan en el paso 3 para
+    //    no duplicar el ingreso (antes se sumaba el comprobante Y su pago).
     const comprobantesFormales = await this.prisma.comprobante.findMany({
       where: {
         empresaId,
@@ -59,6 +69,7 @@ export class ArqueoService {
         NOT: {
           formaPagoTipo: { equals: 'CREDITO', mode: 'insensitive' } as any,
         },
+        pagos: { none: {} },
       },
       select: {
         id: true,
@@ -102,22 +113,23 @@ export class ArqueoService {
 
     // 4. Calcular ingresos por medio de pago
     const ingresosPorMedioPago = this.calcularIngresosPorMedioPago(
-      comprobantesInformalesCompletos,
+      informalesSinPago,
       comprobantesFormales,
       pagos,
     );
 
     // 5. Calcular resumen de arqueo
     const resumenArqueo = this.calcularResumenArqueo(
-      comprobantesInformalesCompletos,
+      informalesSinPago,
       comprobantesFormales,
       pagos,
       ingresosPorMedioPago,
+      comprobantesInformalesCompletos.length + comprobantesFormales.length,
     );
 
     // 6. Obtener movimientos de caja detallados
     const movimientosCaja = this.obtenerMovimientosCaja(
-      comprobantesInformalesCompletos,
+      informalesSinPago,
       comprobantesFormales,
       pagos,
     );
@@ -189,6 +201,7 @@ export class ArqueoService {
     comprobantesFormales: any[],
     pagos: any[],
     ingresosPorMedioPago: any,
+    totalComprobantes: number,
   ) {
     const totalComprobantesInformales = comprobantesInformales.reduce(
       (sum, comp) => sum + Number(comp.mtoImpVenta || 0),
@@ -220,8 +233,7 @@ export class ArqueoService {
       totalEfectivo: Number(totalEfectivo.toFixed(2)),
       totalDigital: Number(totalDigital.toFixed(2)),
       totalTarjetas: Number(totalTarjetas.toFixed(2)),
-      totalComprobantes:
-        comprobantesInformales.length + comprobantesFormales.length,
+      totalComprobantes,
       totalPagos: pagos.length,
       fechaInicio: '',
       fechaFin: '',

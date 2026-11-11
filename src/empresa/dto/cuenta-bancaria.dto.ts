@@ -1,8 +1,12 @@
 import {
   IsBoolean,
   IsIn,
+  IsNumber,
   IsOptional,
   IsString,
+  Matches,
+  Max,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -60,6 +64,17 @@ export class CreateCuentaBancariaDto {
   @IsString()
   @IsIn(MEDIOS_VINCULABLES)
   medioPagoVinculado?: string;
+
+  // null quita el saldo inicial; @IsOptional también deja pasar null.
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(9999999999)
+  saldoInicial?: number | null;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  saldoInicialFecha?: string | null;
 }
 
 export class UpdateCuentaBancariaDto {
@@ -108,4 +123,15 @@ export class UpdateCuentaBancariaDto {
   @IsString()
   @IsIn(MEDIOS_VINCULABLES)
   medioPagoVinculado?: string | null;
+
+  // null quita el saldo inicial; @IsOptional también deja pasar null.
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(9999999999)
+  saldoInicial?: number | null;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  saldoInicialFecha?: string | null;
 }

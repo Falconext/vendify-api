@@ -255,10 +255,16 @@ export class DashboardService {
    * de un medio, ej. parte efectivo + parte Yape) no tienen un medio único:
    * el monto real por medio vive en `Pago`, así que se consulta y reparte
    * ahí en vez de amontonar todo el comprobante en "Otros".
+   *
+   * Las ventas a CRÉDITO tampoco: su `medioPago` es el que quedó por defecto
+   * al emitir (IRBA, 09-11: NV01-44 cobrada por transferencia salía como
+   * efectivo). Se reparten por sus pagos y lo que falta cobrar va a
+   * `sumCredito` ("Crédito por cobrar").
    */
   private async ventasPorCanalPen(
     ventasCanalRows: Array<{
       medioPago: string | null;
+      formaPagoTipo?: string | null;
       tipoMoneda: string | null;
       tipoCambio: any;
       _sum: { mtoImpVenta: any };
@@ -270,17 +276,20 @@ export class DashboardService {
     sumRedes: number;
     sumEfectivo: number;
     sumOtros: number;
+    sumCredito: number;
   }> {
     let sumTarjeta = 0;
     let sumTransferencia = 0;
     let sumRedes = 0;
     let sumEfectivo = 0;
     let sumOtros = 0;
+    let sumCredito = 0;
     let sumMixtoLump = 0;
     for (const r of ventasCanalRows) {
       const m = (r.medioPago || '').toString().toUpperCase();
       const t = montoEnPen(r._sum?.mtoImpVenta, r.tipoMoneda, r.tipoCambio);
-      if (m === 'TARJETA') sumTarjeta += t;
+      if ((r.formaPagoTipo || '').toString().toUpperCase() === 'CREDITO') sumMixtoLump += t;
+      else if (m === 'TARJETA') sumTarjeta += t;
       else if (m === 'TRANSFERENCIA') sumTransferencia += t;
       else if (m === 'YAPE' || m === 'PLIN') sumRedes += t;
       else if (m === 'EFECTIVO') sumEfectivo += t;
@@ -294,6 +303,7 @@ export class DashboardService {
           mtoImpVenta: true,
           tipoMoneda: true,
           tipoCambio: true,
+          formaPagoTipo: true,
           pagos: { select: { monto: true, medioPago: true } },
           // Una nota de venta ya cobrada que se convierte en boleta/factura
           // deja sus filas de `Pago` en la nota: no se copian al formal a
@@ -345,15 +355,23 @@ export class DashboardService {
           repartido += monto;
         }
         sumMixtoDistribuido += repartido;
+        const porCobrar = total - repartido;
+        if (
+          ((c as any).formaPagoTipo || '').toString().toUpperCase() === 'CREDITO' &&
+          porCobrar > 0.01
+        ) {
+          sumCredito += porCobrar;
+          sumMixtoDistribuido += porCobrar;
+        }
       }
       // Lo que ni el formal ni su origen explican no se inventa ni se pierde:
-      // queda en "Otros". Cubre la venta a crédito a medio cobrar, la nota
+      // queda en "Otros". Cubre el MIXTO a medio cobrar, la nota
       // vieja marcada como pagada sin filas de Pago, y el comprobante que el
       // groupBy contó pero esta consulta no trajo.
       const faltante = sumMixtoLump - sumMixtoDistribuido;
       if (faltante > 0.01) sumOtros += faltante;
     }
-    return { sumTarjeta, sumTransferencia, sumRedes, sumEfectivo, sumOtros };
+    return { sumTarjeta, sumTransferencia, sumRedes, sumEfectivo, sumOtros, sumCredito };
   }
 
   private toFechaLima(d: Date): string {
@@ -1086,7 +1104,7 @@ export class DashboardService {
       .sort((a, b) => a.date.localeCompare(b.date));
 
     const ventasCanalRows = await this.prisma.comprobante.groupBy({
-      by: ['medioPago', 'tipoMoneda', 'tipoCambio'],
+      by: ['medioPago', 'formaPagoTipo', 'tipoMoneda', 'tipoCambio'],
       // Excluir notas de crédito (07): su mtoImpVenta está guardado en positivo y
       // antes inflaba los importes por canal en vez de representar ventas reales.
       where: {
@@ -1097,15 +1115,18 @@ export class DashboardService {
       _sum: { mtoImpVenta: true },
     });
 
-    const { sumTarjeta, sumTransferencia, sumRedes, sumEfectivo, sumOtros } =
+    const { sumTarjeta, sumTransferencia, sumRedes, sumEfectivo, sumOtros, sumCredito } =
       await this.ventasPorCanalPen(ventasCanalRows, {
         ...baseComprobanteWhere,
         tipoDoc: { not: '07' },
         fechaEmision: currentRange,
-        medioPago: 'MIXTO',
+        OR: [
+          { medioPago: 'MIXTO' },
+          { formaPagoTipo: { equals: 'CREDITO', mode: 'insensitive' } },
+        ],
       });
     const totalCanales =
-      sumTarjeta + sumTransferencia + sumRedes + sumEfectivo + sumOtros;
+      sumTarjeta + sumTransferencia + sumRedes + sumEfectivo + sumOtros + sumCredito;
     const chartCanales =
       totalCanales === 0
         ? []
@@ -1134,6 +1155,11 @@ export class DashboardService {
               name: 'Otros',
               value: sumOtros,
               percentage: (sumOtros / totalCanales) * 100,
+            },
+            {
+              name: 'Crédito por cobrar',
+              value: sumCredito,
+              percentage: (sumCredito / totalCanales) * 100,
             },
           ].filter((x) => x.value > 0);
 

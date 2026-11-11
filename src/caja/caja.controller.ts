@@ -427,6 +427,23 @@ export class CajaController {
     );
   }
 
+  // `?cierreIds=1,2,3`: cuánto del efectivo se cobró con factura/boleta.
+  @Get('depositos/sugerencia-reparto')
+  @Roles('ADMIN_EMPRESA')
+  async sugerenciaRepartoDeposito(
+    @User() user: any,
+    @Query('cierreIds') cierreIds?: string,
+  ) {
+    const ids = (cierreIds || '')
+      .split(',')
+      .map((x) => Number(x))
+      .filter((x) => Number.isInteger(x) && x > 0);
+    return await this.cajaService.sugerenciaRepartoDeposito(
+      user.empresaId,
+      ids,
+    );
+  }
+
   @Post('depositos')
   @Roles('ADMIN_EMPRESA')
   async marcarCierresDepositados(
