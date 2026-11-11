@@ -406,7 +406,9 @@ export class EmpresaController {
 
   // OJO: 'saldos' debe ir antes de rutas con ':id' para no ser capturado como id.
   @Get('cuentas-bancarias/saldos')
-  @UseGuards(JwtAuthGuard)
+  // Igual que la pestaña Bancos de Caja: solo el dueño ve saldos y movimientos.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN_EMPRESA')
   async saldosCuentasBancarias(
     @User() user: any,
     @Res({ passthrough: true }) res: Response,
@@ -419,7 +421,9 @@ export class EmpresaController {
   }
 
   @Get('cuentas-bancarias/:id/movimientos')
-  @UseGuards(JwtAuthGuard)
+  // Igual que la pestaña Bancos de Caja: solo el dueño ve saldos y movimientos.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN_EMPRESA')
   async movimientosCuentaBancaria(
     @User() user: any,
     @Param('id', ParseIntPipe) id: number,
