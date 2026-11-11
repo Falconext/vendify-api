@@ -6,13 +6,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  OlvaAgencia,
-  OlvaApiService,
-  OlvaPersona,
-  OlvaPunto,
-  OlvaServicio,
-} from './olva-api.service';
+import { createHash } from 'crypto';
+import { OlvaAgencia, OlvaApiService } from './olva-api.service';
+import { armarEnvioOlva, celularOlva, tallaOlvaParaPeso } from './armar-envio';
 import {
   derivarEstadoOlva,
   extraerGuiaOlva,
@@ -193,7 +189,12 @@ export class OlvaService {
     return this.prisma.envioDespacho
       .findFirst({
         where: {
-          nroOrden: String(trackingNumber),
+          // La guía generada se guarda con el año ("2965869-26") y acá llega sin él:
+          // sin esto el snapshot no se guardaba y el panel seguía sin estado.
+          OR: [
+            { nroOrden: String(trackingNumber) },
+            { nroOrden: { startsWith: `${trackingNumber}-` } },
+          ],
           transportista: 'OLVA',
           ...(empresaId ? { comprobante: { empresaId } } : {}),
         },
@@ -321,11 +322,6 @@ export class OlvaService {
         ruc: true,
         razonSocial: true,
         nombreComercial: true,
-        direccion: true,
-        departamento: true,
-        provincia: true,
-        distrito: true,
-        ubigeo: true,
         whatsappTienda: true,
         olvaAgenciaOrigenCodigo: true,
         olvaAgenciaOrigenNombre: true,
@@ -372,7 +368,7 @@ export class OlvaService {
                 nombre: true,
                 nroDoc: true,
                 telefono: true,
-                direccion: true,
+                email: true,
               },
             },
             detalles: { select: { descripcion: true, cantidad: true } },
@@ -405,10 +401,16 @@ export class OlvaService {
       );
     }
 
+    // Olva solo cobra en destino si se retira en agencia: a domicilio exige pago
+    // con tarjeta (Niubiz) al registrar, y ese checkout todavía no existe aquí.
     const tipoEnvio = String(
       dto.tipoEnvio ?? envio.tipoEnvio ?? 'AGENCIA',
     ).toUpperCase();
-    const aDomicilio = tipoEnvio === 'DOMICILIO';
+    if (tipoEnvio === 'DOMICILIO') {
+      throw new BadRequestException(
+        'Por ahora la guía de Olva solo se genera con retiro en agencia. Para domicilio, regístrala en Olva y pega el N° de guía.',
+      );
+    }
 
     const cliente = envio.comprobante?.cliente;
     const documento = (
@@ -428,106 +430,80 @@ export class OlvaService {
         'Falta el nombre o el documento del destinatario para generar la guía.',
       );
     }
-    const direccion = (
-      dto.direccion ??
-      envio.direccionDestino ??
-      cliente?.direccion ??
-      ''
-    ).trim();
-
-    // Destino: a domicilio va la dirección; a agencia, el código del catálogo.
-    let destino: OlvaPunto;
-    let agenciaDestino: OlvaAgencia | null = null;
-    if (aDomicilio) {
-      if (!direccion) {
-        throw new BadRequestException(
-          'Para entrega a domicilio necesitas la dirección del destinatario.',
-        );
-      }
-      destino = {
-        address: direccion.slice(0, 200),
-        department: dto.departamento ?? undefined,
-        province: dto.provincia ?? undefined,
-        district: dto.distrito ?? undefined,
-        ...(dto.referencia ? { reference: dto.referencia.slice(0, 200) } : {}),
-      };
-    } else {
-      agenciaDestino = this.resolverAgencia(
-        agencias,
-        dto.destinoCodigo ?? envio.olvaAgenciaDestinoCodigo,
-        dto.destinoNombre ?? envio.agenciaDestino,
+    if (documento.length !== 8 && documento.length !== 11) {
+      throw new BadRequestException(
+        'Olva solo acepta DNI o RUC como documento del destinatario.',
       );
-      if (!agenciaDestino) {
-        throw new BadRequestException(
-          'No se pudo identificar la agencia Olva de destino. Vuelve a elegirla en el despacho.',
-        );
-      }
-      destino = { agencyCode: agenciaDestino.codigo };
+    }
+    const celular = celularOlva(
+      dto.telefono ?? envio.celularDest ?? cliente?.telefono,
+    );
+    if (celular.length !== 9) {
+      throw new BadRequestException(
+        'Olva exige el celular del destinatario (9 dígitos) para generar la guía.',
+      );
     }
 
-    const remitente: OlvaPersona = {
-      name: (empresa.nombreComercial || empresa.razonSocial).slice(0, 120),
-      document: empresa.ruc,
-      documentType: 'RUC',
-      ...(empresa.whatsappTienda
-        ? { phone: String(empresa.whatsappTienda).slice(0, 20) }
-        : {}),
-      address: empresa.direccion?.slice(0, 200),
-    };
-
-    const destinatario: OlvaPersona = {
-      name: nombre.slice(0, 120),
-      document: documento,
-      documentType: this.tipoDocumento(documento),
-      ...((dto.telefono ?? envio.celularDest ?? cliente?.telefono)
-        ? {
-            phone: String(
-              dto.telefono ?? envio.celularDest ?? cliente?.telefono,
-            ).slice(0, 20),
-          }
-        : {}),
-      ...(direccion ? { address: direccion.slice(0, 200) } : {}),
-    };
+    const agenciaDestino = this.resolverAgencia(
+      agencias,
+      dto.destinoCodigo ?? envio.olvaAgenciaDestinoCodigo,
+      dto.destinoNombre ?? envio.agenciaDestino,
+    );
+    if (!agenciaDestino) {
+      throw new BadRequestException(
+        'No se pudo identificar la agencia Olva de destino. Vuelve a elegirla en el despacho.',
+      );
+    }
 
     // Olva exige el peso; sin dato usamos 1 kg (el mínimo facturable habitual).
     const pesoKg = Number(dto.pesoKg ?? envio.pesoKg ?? 1) || 1;
-    const cantidad = Math.max(1, Number(envio.nroPaquetes) || 1);
+    const talla = tallaOlvaParaPeso(pesoKg);
+    if (!talla) {
+      throw new BadRequestException(
+        'Olva registra por API paquetes de hasta 10 kg. Para más peso, regístralo en Olva y pega el N° de guía.',
+      );
+    }
     const contenido =
       (dto.contenido ?? envio.contenidoPaquete ?? '').trim() ||
       this.describirContenido(envio);
 
-    // COD: si el despacho cobra en destino, el servicio cambia; en cualquier otro
-    // caso el envío ya está pagado por el negocio.
-    const servicio: OlvaServicio =
-      Number(envio.montoCOD) > 0 ? 'PAGO_EN_DESTINO' : 'REGULAR';
-
-    const respuesta = await this.api.crearEnvio({
-      sender: remitente,
-      recipient: destinatario,
-      origin: { agencyCode: origen.codigo },
-      destination: destino,
-      package: {
-        weightKg: pesoKg,
-        description: contenido.slice(0, 200),
-        quantity: cantidad,
-        declaredValue: Number(
-          dto.valorDeclarado ?? envio.comprobante?.mtoImpVenta ?? 0,
-        ),
-      },
-      service: servicio,
-      ...((dto.observaciones ?? envio.observaciones)
-        ? {
-            observations: String(
-              dto.observaciones ?? envio.observaciones,
-            ).slice(0, 300),
-          }
-        : {}),
-      reference:
-        `${envio.comprobante?.serie ?? ''}-${envio.comprobante?.correlativo ?? ''}`.slice(
-          0,
-          60,
-        ),
+    // Empresa no guarda correo: el aviso de Olva le llega al dueño de la cuenta.
+    const dueno = await this.prisma.usuario.findFirst({
+      where: { empresaId, rol: 'ADMIN_EMPRESA' },
+      orderBy: { id: 'asc' },
+      select: { email: true },
     });
+
+    const cuerpo = armarEnvioOlva({
+      ruc: empresa.ruc,
+      razonSocial: empresa.razonSocial,
+      celularRemitente: empresa.whatsappTienda,
+      correoRemitente: dueno?.email,
+      documentoDestinatario: documento,
+      nombreDestinatario: nombre,
+      celularDestinatario: celular,
+      correoDestinatario: cliente?.email,
+      sedeOrigenId: origen.sedeId,
+      agenciaOrigen: origen.codigo,
+      agenciaDestino: agenciaDestino.codigo,
+      talla,
+      contenido,
+      valorDeclarado: Number(
+        dto.valorDeclarado ?? envio.comprobante?.mtoImpVenta ?? 0,
+      ),
+      clave: envio.claveEnvio,
+    });
+
+    // La clave depende del contenido: corregir un dato rechazado debe poder
+    // reintentarse, pero el mismo pedido no crea dos guías. `forzar` sí crea otra.
+    const huella = createHash('sha1')
+      .update(JSON.stringify(cuerpo))
+      .digest('hex')
+      .slice(0, 16);
+    const respuesta = await this.api.crearEnvio(
+      cuerpo,
+      `despacho-${envio.id}-${huella}${dto.forzar ? `-${Date.now()}` : ''}`,
+    );
 
     const guia = extraerGuiaOlva(respuesta);
     if (!guia.trackingNumber) {
@@ -542,8 +518,9 @@ export class OlvaService {
         ...(guia.trackingNumber
           ? { nroOrden: guia.trackingNumber, codigoGuia: guia.trackingNumber }
           : {}),
-        ...(agenciaDestino
-          ? { olvaAgenciaDestinoCodigo: agenciaDestino.codigo }
+        olvaAgenciaDestinoCodigo: agenciaDestino.codigo,
+        ...(respuesta?.data?.securityPin
+          ? { claveEnvio: String(respuesta.data.securityPin) }
           : {}),
         olvaRespuestaJson: respuesta ?? undefined,
         olvaGuiaCreadaEn: new Date(),
@@ -553,6 +530,7 @@ export class OlvaService {
         id: true,
         nroOrden: true,
         codigoGuia: true,
+        claveEnvio: true,
         olvaAgenciaDestinoCodigo: true,
         olvaGuiaCreadaEn: true,
       },
@@ -586,14 +564,6 @@ export class OlvaService {
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
-
-  /** DNI (8) / RUC (11) / CE en cualquier otro caso. */
-  private tipoDocumento(doc: string): 'DNI' | 'RUC' | 'CE' {
-    const limpio = String(doc ?? '').replace(/\D/g, '');
-    if (limpio.length === 11) return 'RUC';
-    if (limpio.length === 8) return 'DNI';
-    return 'CE';
-  }
 
   /** Descripción del contenido (fallback: los ítems del comprobante). */
   private describirContenido(envio: any): string {
