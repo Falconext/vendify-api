@@ -131,6 +131,7 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "moduleNameMapper": {
+      "^archiver$": "<rootDir>/../test/stubs/archiver.js",
       "^src/(.*)$": "<rootDir>/$1",
       "^archiver$": "<rootDir>/../test/stubs/archiver.js"
     },
@@ -141,6 +142,10 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^archiver$": "<rootDir>/../test/stubs/archiver.js",
+      "^src/(.*)$": "<rootDir>/$1"
+    }
   }
 }

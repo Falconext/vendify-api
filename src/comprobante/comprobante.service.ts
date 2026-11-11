@@ -7107,12 +7107,22 @@ export class ComprobanteService {
     });
   }
 
+  /** Para rutas que reciben solo el id: un comprobante ajeno responde igual que uno inexistente. */
+  async asegurarDeLaEmpresa(comprobanteId: number, empresaId: number) {
+    const comp = await this.prisma.comprobante.findFirst({
+      where: { id: comprobanteId, empresaId },
+      select: { id: true },
+    });
+    if (!comp) throw new NotFoundException('Comprobante no encontrado');
+  }
+
   async actualizarEstadoOT(
     comprobanteId: number,
     input: { estadoOT: string; fechaRecojo?: string },
+    empresaId: number,
   ) {
-    const comp = await this.prisma.comprobante.findUnique({
-      where: { id: comprobanteId },
+    const comp = await this.prisma.comprobante.findFirst({
+      where: { id: comprobanteId, empresaId },
     });
     if (!comp) throw new NotFoundException('Comprobante no encontrado');
 
