@@ -16,6 +16,7 @@ import { GeminiService } from '../gemini/gemini.service';
 import { S3Service } from '../s3/s3.service';
 import { COMPRA_OCUPA_NUMERO } from './numero-ocupado';
 import { resolverSoloCreditoIgv } from './solo-credito-igv';
+import { resolverCuentaVinculada } from '../common/utils/cuenta-vinculada.util';
 
 @Injectable()
 export class ComprasService {
@@ -461,7 +462,16 @@ export class ComprasService {
     const soloCreditoIgv = resolverSoloCreditoIgv(data.soloCreditoIgv, data.detalles);
 
     // Uno o varios pagos (pago mixto al contado). Ver pagos-iniciales.ts.
-    const pagosDeEntrada = pagosIniciales(data, total, esPendiente);
+    // Yape y Plin salen de su cuenta vinculada, igual que al cobrar una venta.
+    const pagosDeEntrada = await Promise.all(
+      pagosIniciales(data, total, esPendiente).map(async (p) => ({
+        ...p,
+        cuentaBancariaId:
+          p.cuentaBancariaId ??
+          (await resolverCuentaVinculada(this.prisma, empresaId, p.metodo)) ??
+          undefined,
+      })),
+    );
     const montoPagadoInicial = this.roundMoney(
       pagosDeEntrada.reduce((a, p) => a + p.monto, 0),
     );
@@ -1245,7 +1255,7 @@ export class ComprasService {
       include: {
         detalles: { orderBy: { id: 'asc' } },
         pagos: {
-          select: { id: true, monto: true, tipoCambio: true },
+          select: { id: true, monto: true, tipoCambio: true, metodoPago: true },
           orderBy: { id: 'asc' },
         },
       },
@@ -1443,6 +1453,15 @@ export class ComprasService {
       (data.referenciaInicial !== undefined ||
         data.metodoPagoInicial !== undefined ||
         data.cuentaBancariaIdInicial !== undefined);
+    const cuentaPagoInicial = !debeActualizarPagoInicial
+      ? null
+      : data.metodoPagoInicial === 'TRANSFERENCIA'
+        ? data.cuentaBancariaIdInicial || null
+        : await resolverCuentaVinculada(
+            this.prisma,
+            empresaId,
+            data.metodoPagoInicial ?? pagoInicial.metodoPago,
+          );
 
     // 3) Reemplazar cabecera + detalles en una transacción.
     const compra = await this.prisma.$transaction(async (tx) => {
@@ -1476,10 +1495,7 @@ export class ComprasService {
             ...(data.metodoPagoInicial
               ? { metodoPago: data.metodoPagoInicial }
               : {}),
-            cuentaBancariaId:
-              data.metodoPagoInicial === 'TRANSFERENCIA'
-                ? data.cuentaBancariaIdInicial || null
-                : null,
+            cuentaBancariaId: cuentaPagoInicial,
           },
         });
       }
@@ -1791,10 +1807,13 @@ export class ComprasService {
     // Moneda del documento: el abono se registra en la misma moneda que el saldo
     // y se valoriza en soles con el TC del día del pago.
     const valor = this.valorizarPago(compra, monto, data.tipoCambio);
+    const cuentaDelPago = data.cuentaBancariaId
+      ? Number(data.cuentaBancariaId)
+      : await resolverCuentaVinculada(this.prisma, empresaId, data.medioPago);
     // Documento en soles pagado desde cuenta en dólares: TC para el ledger USD.
-    if (valor.moneda === 'PEN' && data.cuentaBancariaId) {
+    if (valor.moneda === 'PEN' && cuentaDelPago) {
       valor.tipoCambio = await this.tipoCambioParaCuenta(
-        data.cuentaBancariaId,
+        cuentaDelPago,
         'PEN',
         data.tipoCambio,
       );
@@ -1846,9 +1865,7 @@ export class ComprasService {
           diferenciaCambio: this.dec(valor.diferenciaCambio),
           metodoPago: data.medioPago || 'EFECTIVO', // Frontend sends 'medioPago', backend uses 'metodoPago'
           referencia: data.referencia,
-          cuentaBancariaId: data.cuentaBancariaId
-            ? Number(data.cuentaBancariaId)
-            : undefined,
+          cuentaBancariaId: cuentaDelPago ?? undefined,
         },
       });
 
