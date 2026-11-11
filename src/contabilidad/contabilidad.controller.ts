@@ -29,6 +29,19 @@ function toFechaLima(d: Date): string {
   return new Date(d.getTime() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+/**
+ * Sede con la que se filtra el Registro de Compras: el dueño (o el admin de la
+ * plataforma) lo ve con todas las sedes porque es uno por RUC; un usuario común
+ * sigue viendo solo la suya.
+ */
+function sedeIdParaListado(user: any): number | undefined {
+  if (user?.rol === 'ADMIN_EMPRESA' || user?.rol === 'ADMIN_SISTEMA') {
+    return undefined;
+  }
+  const propia = Number(user?.sedeId);
+  return Number.isFinite(propia) && propia > 0 ? propia : undefined;
+}
+
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('contabilidad')
 export class ContabilidadController {
@@ -725,6 +738,12 @@ export class ContabilidadController {
     );
   }
 
+  /**
+   * El Registro de Compras es uno por RUC: el dueño lo ve con todas las
+   * sedes. Antes iba clavado en
+   * `user.sedeId` y quedaba a medias en empresas con varias sedes. Un usuario
+   * común sigue viendo solo su sede.
+   */
   @Get('sire/compras-resumen')
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async sireComprasResumen(
@@ -737,7 +756,7 @@ export class ContabilidadController {
       user.empresaId,
       m,
       a,
-      user.sedeId,
+      sedeIdParaListado(user),
     );
   }
 
@@ -828,7 +847,7 @@ export class ContabilidadController {
       user.empresaId,
       m,
       a,
-      user.sedeId,
+      sedeIdParaListado(user),
     );
   }
 
@@ -881,7 +900,7 @@ export class ContabilidadController {
       user.empresaId,
       m,
       a,
-      user.sedeId,
+      sedeIdParaListado(user),
     );
   }
 
@@ -902,7 +921,7 @@ export class ContabilidadController {
       mes: m,
       anio: a,
       contenido,
-      sedeId: user.sedeId,
+      sedeId: sedeIdParaListado(user),
     });
   }
 
@@ -1009,7 +1028,7 @@ export class ContabilidadController {
       user.empresaId,
       m,
       a,
-      user.sedeId,
+      sedeIdParaListado(user),
     );
     const nombre = await this.sireService.nombreArchivoTxtSire(
       user.empresaId,
@@ -1038,7 +1057,7 @@ export class ContabilidadController {
       user.empresaId,
       m,
       a,
-      user.sedeId,
+      sedeIdParaListado(user),
     );
     const periodo = `${a}${String(m).padStart(2, '0')}`;
     res.setHeader(
@@ -1069,7 +1088,7 @@ export class ContabilidadController {
       anio,
       empresaId: user.empresaId,
       destinatario,
-      sedeId: user.sedeId,
+      sedeId: sedeIdParaListado(user),
     });
     return { message: `Registro de compras enviado a ${destinatario}` };
   }
