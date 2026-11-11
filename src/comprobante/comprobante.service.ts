@@ -27,6 +27,7 @@ import {
   normalizarDetalleAdicional,
 } from './detalle-adicional';
 import { NOTA_SIN_CONVERTIR } from './convertidos';
+import { saldoPorDevolver } from '../kardex/stock-no-descontado';
 import { repartirPago } from './cobro-varias';
 import { excesosSobreSaldo, lineasPorConvertir, totalDeLineas } from './saldo-por-convertir';
 import {
@@ -3326,6 +3327,37 @@ export class ComprobanteService {
     }
   }
 
+  /**
+   * Lo ya devuelto de una venta: sus propios INGRESO (ediciones) y los
+   * movimientos de sus notas de crédito, incluida la SALIDA con que se deshace
+   * la devolución de una nota descartada.
+   */
+  private async devolucionesPrevias(comprobanteId?: number, empresaId?: number) {
+    const origen = await this.prisma.comprobante.findUnique({
+      where: { id: comprobanteId },
+      select: { serie: true, correlativo: true },
+    });
+    // `numDocAfectado` se guarda con el correlativo con o sin ceros a la izquierda.
+    const refs = origen
+      ? [String(origen.correlativo), String(origen.correlativo).padStart(8, '0')].map(
+          (corr) => `${origen.serie}-${corr}`,
+        )
+      : [];
+    return this.prisma.movimientoKardex.findMany({
+      where: {
+        empresaId,
+        OR: [
+          { comprobanteId, tipoMovimiento: 'INGRESO' },
+          {
+            tipoMovimiento: { in: ['INGRESO', 'SALIDA'] },
+            comprobante: { empresaId, tipoDoc: '07', numDocAfectado: { in: refs } },
+          },
+        ],
+      },
+      select: { productoId: true, tipoMovimiento: true, cantidad: true },
+    });
+  }
+
   private async revertirStock(
     detalles: any[],
     data?: {
@@ -3364,6 +3396,16 @@ export class ComprobanteService {
       return;
     }
 
+    // Solo vuelve lo que la venta descontó y aún no se devolvió. Una venta sin
+    // stock no descontó nada: devolver lo vendido inventaba unidades.
+    const saldoDevolucion = saldoPorDevolver(
+      movimientosOriginales,
+      await this.devolucionesPrevias(
+        data?.origenComprobanteId ?? data?.comprobanteId,
+        data?.empresaId,
+      ),
+    );
+
     for (const item of detalles) {
       if (item.productoId) {
         const producto = await this.prisma.producto.findUnique({
@@ -3380,6 +3422,12 @@ export class ComprobanteService {
           continue;
         }
 
+        const pedido = Number(item.cantidad);
+        const saldo = saldoDevolucion.get(item.productoId) ?? 0;
+        const cantidadADevolver = Math.max(0, Math.min(pedido, saldo));
+        if (!(cantidadADevolver > 0)) continue;
+        saldoDevolucion.set(item.productoId, saldo - cantidadADevolver);
+
         if (producto) {
           // Registrar movimiento de kardex GLOBAL (siempre se hace para subir el stock del producto)
           if (data && this.kardexService) {
@@ -3392,10 +3440,15 @@ export class ComprobanteService {
                   empresaId: data.empresaId,
                   tipoMovimiento: 'INGRESO',
                   concepto: data.concepto,
-                  cantidad: item.cantidad,
+                  cantidad: cantidadADevolver,
                   comprobanteId: data.comprobanteId,
                   costoUnitario: costoUnitario,
                   usuarioId: data.usuarioId,
+                  ...(cantidadADevolver < pedido
+                    ? {
+                        observacion: `De ${pedido} solo se devuelven ${cantidadADevolver}: el resto no se había descontado o ya se devolvió.`,
+                      }
+                    : {}),
                   sedeId:
                     movimientosOriginales.find(
                       (m) => m.productoId === item.productoId,
