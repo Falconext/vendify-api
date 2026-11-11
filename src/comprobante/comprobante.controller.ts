@@ -565,7 +565,11 @@ export class ComprobanteController {
     @User() user: any,
   ) {
     verificarPuedeAnularComprobante(user);
-    return this.service.anularComprobante(comprobanteId, input?.motivo);
+    return this.service.anularComprobante(
+      comprobanteId,
+      input?.motivo,
+      user.empresaId,
+    );
   }
 
   // Notas de venta → elegir varias del mismo cliente → Cobrar.

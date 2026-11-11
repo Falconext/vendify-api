@@ -1289,12 +1289,18 @@ export class ComprobanteService {
     };
   }
 
-  async anularComprobante(comprobanteId: number, motivo?: string) {
+  async anularComprobante(
+    comprobanteId: number,
+    motivo?: string,
+    empresaId?: number,
+  ) {
     const comp = await this.prisma.comprobante.findUnique({
       where: { id: comprobanteId },
       include: { detalles: true },
     });
     if (!comp) throw new NotFoundException('Comprobante no encontrado');
+    if (empresaId !== undefined && comp.empresaId !== empresaId)
+      throw new NotFoundException('Comprobante no encontrado');
     const isInformal = ['TICKET', 'NV', 'RH', 'CP', 'NP', 'OT'].includes(
       comp.tipoDoc,
     );
