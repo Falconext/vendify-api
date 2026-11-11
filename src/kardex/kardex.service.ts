@@ -40,6 +40,7 @@ import {
   motivoDelConcepto,
 } from '../producto/motivo-ajuste-stock';
 import { filtroPorCategoria } from '../producto/categorias-extra.util';
+import { exigirDeLaEmpresa } from '../common/utils/pertenece-a-empresa';
 
 
 /** Sedes ya validadas de un traslado (nombres para los conceptos del kardex). */
@@ -235,6 +236,14 @@ export class KardexService {
     fecha?: Date;
     origenSyncUuid?: string;
   }) {
+    // Última barrera: ningún flujo mueve el stock ni el costo de otra empresa.
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      [data.productoId],
+      data.empresaId,
+      'El producto no pertenece a la empresa',
+    );
     // Obtener el producto stock en la sede
     let productoStock = await this.prisma.productoStock.findUnique({
       where: {

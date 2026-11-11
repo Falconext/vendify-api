@@ -76,6 +76,7 @@ import {
 } from '../compras/stock-en-camino';
 import { agruparAtributos, parsearFiltroVariante } from './filtro-variante';
 import { conStockDeSede } from './stock-variante-sede';
+import { exigirDeLaEmpresa } from '../common/utils/pertenece-a-empresa';
 @Injectable()
 export class ProductoService {
   constructor(
@@ -476,6 +477,27 @@ export class ProductoService {
       disponibilidad,
       prioridadVenta,
     } = data;
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      [data.productoPadreId],
+      empresaId,
+      'El producto padre no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'categoria',
+      [categoriaId],
+      empresaId,
+      'La categoría no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'marca',
+      [marcaId],
+      empresaId,
+      'La marca no pertenece a la empresa',
+    );
 
     const porcentajes = this.normalizarPorcentajes(
       porcentajeVenta,
@@ -3035,6 +3057,27 @@ export class ProductoService {
     },
     usuarioId?: number,
   ) {
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      [data.productoPadreId],
+      data.empresaId,
+      'El producto padre no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'categoria',
+      [data.categoriaId],
+      data.empresaId,
+      'La categoría no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'marca',
+      [data.marcaId],
+      data.empresaId,
+      'La marca no pertenece a la empresa',
+    );
     const producto = await this.prisma.producto.findFirst({
       where: { id: data.id, empresaId: data.empresaId },
     });

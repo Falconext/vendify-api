@@ -33,6 +33,7 @@ import {
   RecibirOrdenCompraDto,
 } from './dto/orden-compra.dto';
 import { repartirEntrega, type LlegadaDeLinea } from './entregas-parciales';
+import { exigirDeLaEmpresa } from '../common/utils/pertenece-a-empresa';
 
 const IGV_RATE = 0.18;
 
@@ -109,6 +110,13 @@ export class OrdenCompraService {
     if (!dto.detalles?.length) {
       throw new BadRequestException('La orden debe tener al menos un ítem');
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      dto.detalles.map((d) => d.productoId),
+      empresaId,
+      'Uno de los productos no existe o no pertenece a la empresa',
+    );
     const proveedor = await this.prisma.cliente.findFirst({
       where: { id: dto.proveedorId, empresaId },
       select: { id: true },
@@ -499,6 +507,13 @@ export class OrdenCompraService {
       select: { id: true, estado: true },
     });
     if (!orden) throw new NotFoundException('Orden de compra no encontrada');
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      (dto.detalles || []).map((d) => d.productoId),
+      empresaId,
+      'Uno de los productos no existe o no pertenece a la empresa',
+    );
     if (orden.estado === 'RECIBIDA' || orden.estado === 'ANULADA' || orden.estado === 'PARCIAL') {
       throw new BadRequestException(
         `No se puede editar una orden ${

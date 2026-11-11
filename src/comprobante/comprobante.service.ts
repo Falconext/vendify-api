@@ -98,6 +98,7 @@ import {
 } from './ventas-por-producto';
 import { debeRevisarDobleSubmit } from '../integraciones/idempotencia/anti-doble-submit';
 import { afectacionDeLinea } from '../producto/afectacion-igv';
+import { exigirDeLaEmpresa } from '../common/utils/pertenece-a-empresa';
 
 const CAMPOS_DESPACHO_LISTA = {
   id: true,
@@ -3819,6 +3820,20 @@ export class ComprobanteService {
     } else if (!finalClienteId) {
       throw new BadRequestException('clienteId es requerido');
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [finalClienteId],
+      empresaId,
+      'El cliente no existe o no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      (detalles || []).map((d: any) => d.productoId),
+      empresaId,
+      'Uno de los productos no existe o no pertenece a la empresa',
+    );
 
     // Descuento global en factura/boleta: SUNAT no admite un descuento global "suelto" sin
     // AllowanceCharge, así que se prorratea bajando el valor unitario de cada línea (igual
@@ -5006,6 +5021,13 @@ export class ComprobanteService {
     } else if (!finalClienteId) {
       throw new BadRequestException('clienteId es requerido');
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [finalClienteId],
+      empresaId,
+      'El cliente no existe o no pertenece a la empresa',
+    );
 
     // 4) Cargar comprobante afectado (factura o boleta)
     if (!tipDocAfectado || !numDocAfectado) {
@@ -5555,6 +5577,20 @@ export class ComprobanteService {
     } else if (!finalClienteId) {
       throw new BadRequestException('clienteId es requerido');
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [finalClienteId],
+      empresaId,
+      'El cliente no existe o no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      (detalles || []).map((d: any) => d.productoId),
+      empresaId,
+      'Uno de los productos no existe o no pertenece a la empresa',
+    );
     const {
       detalleFinal,
       mtoOperGravadas,
@@ -5940,6 +5976,20 @@ export class ComprobanteService {
     } else if (!finalClienteId) {
       throw new BadRequestException('clienteId es requerido');
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [finalClienteId],
+      empresaId,
+      'El cliente no existe o no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      (detalles || []).map((d: any) => d.productoId),
+      empresaId,
+      'Uno de los productos no existe o no pertenece a la empresa',
+    );
 
     const {
       detalleFinal,
@@ -6246,8 +6296,8 @@ export class ComprobanteService {
     } = input;
 
     // Validar producto
-    const producto = await this.prisma.producto.findUnique({
-      where: { id: productoId },
+    const producto = await this.prisma.producto.findFirst({
+      where: { id: productoId, OR: [{ empresaId }, { empresaId: null }] },
     });
     if (!producto) {
       throw new BadRequestException('Producto no encontrado');
@@ -6273,6 +6323,13 @@ export class ComprobanteService {
     } else if (!finalClienteId) {
       throw new BadRequestException('clienteId es requerido');
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [finalClienteId],
+      empresaId,
+      'El cliente no existe o no pertenece a la empresa',
+    );
 
     // Calcular totales
     const subTotalSinDescuento = this.round2(cantidad * precioUnitario);
@@ -6479,7 +6536,23 @@ export class ComprobanteService {
       if (cv) finalClienteId = cv.id;
     } else if (clienteId) {
       finalClienteId = Number(clienteId);
+      if (finalClienteId !== comp.clienteId) {
+        await exigirDeLaEmpresa(
+          this.prisma,
+          'cliente',
+          [finalClienteId],
+          empresaId,
+          'El cliente no existe o no pertenece a la empresa',
+        );
+      }
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      (detalles || []).map((d: any) => d.productoId),
+      empresaId,
+      'Uno de los productos no existe o no pertenece a la empresa',
+    );
 
     // Una NP (o una OT de `crearOT`) puede no haber descontado nunca: entonces
     // lo anterior no cuenta, y lo nuevo solo si se marcó "Descontar del stock

@@ -16,6 +16,7 @@ import { GeminiService } from '../gemini/gemini.service';
 import { S3Service } from '../s3/s3.service';
 import { COMPRA_OCUPA_NUMERO } from './numero-ocupado';
 import { resolverSoloCreditoIgv } from './solo-credito-igv';
+import { exigirDeLaEmpresa } from '../common/utils/pertenece-a-empresa';
 
 @Injectable()
 export class ComprasService {
@@ -386,6 +387,20 @@ export class ComprasService {
 
     // Distribución por sede: las líneas pueden entrar a una sede distinta a la
     // de la cabecera (misma factura repartida entre almacenes).
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [data.proveedorId],
+      empresaId,
+      'El proveedor no existe o no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      data.detalles.map((d) => d.productoId),
+      empresaId,
+      'Uno de los productos no existe o no pertenece a la empresa',
+    );
     await this.validarSedesDeLineas(empresaId, data.detalles);
 
     // Moneda del documento: los montos (detalle, subtotal, total, saldo) se
@@ -462,6 +477,13 @@ export class ComprasService {
 
     // Uno o varios pagos (pago mixto al contado). Ver pagos-iniciales.ts.
     const pagosDeEntrada = pagosIniciales(data, total, esPendiente);
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cuentaBancaria',
+      pagosDeEntrada.map((p) => p.cuentaBancariaId),
+      empresaId,
+      'La cuenta bancaria no pertenece a la empresa',
+    );
     const montoPagadoInicial = this.roundMoney(
       pagosDeEntrada.reduce((a, p) => a + p.monto, 0),
     );
@@ -1272,6 +1294,27 @@ export class ComprasService {
         'Esta compra tiene mercadería por llegar (orden de compra con entregas parciales). Recibe lo que falta desde la orden, o anúlala y regístrala de nuevo.',
       );
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [data.proveedorId],
+      empresaId,
+      'El proveedor no existe o no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      (data.detalles || []).map((d) => d.productoId),
+      empresaId,
+      'Uno de los productos no existe o no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cuentaBancaria',
+      [data.cuentaBancariaIdInicial],
+      empresaId,
+      'La cuenta bancaria no pertenece a la empresa',
+    );
     await this.assertSinSeriesUsadas(id, empresaId);
 
     // Igual que al crear: decide que la compra pese como gasto del mes y que
@@ -1791,6 +1834,13 @@ export class ComprasService {
     // Moneda del documento: el abono se registra en la misma moneda que el saldo
     // y se valoriza en soles con el TC del día del pago.
     const valor = this.valorizarPago(compra, monto, data.tipoCambio);
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cuentaBancaria',
+      [data.cuentaBancariaId],
+      empresaId,
+      'La cuenta bancaria no pertenece a la empresa',
+    );
     // Documento en soles pagado desde cuenta en dólares: TC para el ledger USD.
     if (valor.moneda === 'PEN' && data.cuentaBancariaId) {
       valor.tipoCambio = await this.tipoCambioParaCuenta(
