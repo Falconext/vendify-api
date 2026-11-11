@@ -3653,13 +3653,20 @@ export class ProductoService {
     }
     const stocks = await this.prisma.productoStock.findMany({
       where: { productoId },
-      select: { sedeId: true, stock: true },
+      select: { sedeId: true, stock: true, visibleEnSede: true },
     });
     const stockPorSede = new Map(stocks.map((s) => [s.sedeId, num(s.stock)]));
+    // Solo se "quita" una sede que hoy está disponible. Una que ya estaba
+    // oculta con stock (dato heredado) no debe trabar cada guardado: DEMENVER
+    // no podía ni sumar stock en Zapallal porque Ancón figuraba oculta con 25.
+    const ocultas = new Set(
+      stocks.filter((s) => s.visibleEnSede === false).map((s) => s.sedeId),
+    );
     if (stockNuevo) stockPorSede.set(stockNuevo.sedeId, stockNuevo.stock);
     for (const sede of sedes) {
       const stockSede = stockPorSede.get(sede.id) ?? 0;
-      if (!marcadas.has(sede.id) && stockSede > 0) {
+      const yaOculta = ocultas.has(sede.id) && sede.id !== stockNuevo?.sedeId;
+      if (!marcadas.has(sede.id) && stockSede > 0 && !yaOculta) {
         throw new BadRequestException(
           `No puedes quitar el producto de ${sede.nombre}: aún tiene ${stockSede} en stock. Traslada o ajusta el stock primero.`,
         );
