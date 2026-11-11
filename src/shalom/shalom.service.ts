@@ -125,6 +125,38 @@ function primeroNoVacio(...valores: Array<string | null | undefined>): string {
  * Shalom devolvía un error interno que se leía "Shalom no está disponible"
  * (JAIMITO EL CARTERO, demo.ropa, 21-10).
  */
+/**
+ * Nombres y apellidos sin RENIEC (carné de extranjería, o RENIEC caído). El
+ * sistema guarda "APELLIDOS, NOMBRES"; si no hay coma se asume el orden con que
+ * se escribe a mano, "Nombres Paterno Materno". Antes, sin coma, todo quedaba en
+ * nombres y Shalom recibía los apellidos vacíos (clienta con CE, 09-11).
+ */
+export function partirNombreSinReniec(nombreCompleto: string): {
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+} {
+  const limpio = String(nombreCompleto ?? '').replace(/\s+/g, ' ').trim();
+  if (limpio.includes(',')) {
+    const [apeRaw, ...resto] = limpio.split(',');
+    const apellidos = apeRaw.trim().split(' ').filter(Boolean);
+    return {
+      nombres: resto.join(' ').trim(),
+      apellidoPaterno: apellidos[0] ?? '',
+      apellidoMaterno: apellidos.slice(1).join(' '),
+    };
+  }
+  const p = limpio.split(' ').filter(Boolean);
+  if (p.length >= 3) {
+    return {
+      nombres: p.slice(0, -2).join(' '),
+      apellidoPaterno: p[p.length - 2],
+      apellidoMaterno: p[p.length - 1],
+    };
+  }
+  return { nombres: p[0] ?? '', apellidoPaterno: p[1] ?? '', apellidoMaterno: '' };
+}
+
 export function documentoParaGuia(v: string | null | undefined): string {
   const t = String(v ?? '').trim().toUpperCase();
   if (/^\d{8}$/.test(t)) return /^(\d)\1{7}$/.test(t) || /^10{7}$/.test(t) ? '' : t;
@@ -1319,7 +1351,10 @@ export class ShalomService {
     apellidoPaterno: string;
     apellidoMaterno: string;
   }> {
-    const reniec = await this.lat.consultarDni(dni).catch(() => null);
+    // RENIEC solo conoce DNI: con carné/pasaporte la consulta siempre falla.
+    const reniec = /^\d{8}$/.test(dni)
+      ? await this.lat.consultarDni(dni).catch(() => null)
+      : null;
     const d = reniec?.data ?? reniec;
     const nombres = String(d?.nombres ?? '').trim();
     const paterno = String(d?.apellidoPaterno ?? '').trim();
@@ -1331,15 +1366,7 @@ export class ShalomService {
       };
     }
 
-    // Fallback sin RENIEC: el sistema guarda "APELLIDOS, NOMBRES".
-    const [apeRaw, nomRaw] = nombreCompleto.split(',');
-    const apellidos = (nomRaw ? apeRaw : '').trim().split(/\s+/).filter(Boolean);
-    const soloNombres = (nomRaw ?? apeRaw ?? '').trim();
-    return {
-      nombres: soloNombres,
-      apellidoPaterno: apellidos[0] ?? '',
-      apellidoMaterno: apellidos.slice(1).join(' '),
-    };
+    return partirNombreSinReniec(nombreCompleto);
   }
 
   /** Descripción del contenido para Shalom (fallback: los ítems del comprobante). */

@@ -1,4 +1,4 @@
-import { ShalomService, documentoParaGuia } from './shalom.service';
+import { ShalomService, documentoParaGuia, partirNombreSinReniec } from './shalom.service';
 
 /**
  * QA del servicio Shalom: toda falconext-mype usa el proveedor api.shalom-api.lat
@@ -297,6 +297,16 @@ describe('ShalomService (proveedor único api.shalom-api.lat)', () => {
     }
   });
 
+  it('partirNombreSinReniec: con coma APELLIDOS, NOMBRES; sin coma Nombres Paterno Materno', () => {
+    expect(partirNombreSinReniec('BRITO VISCAYA, MIGDALIA COROMOTO')).toEqual({
+      nombres: 'MIGDALIA COROMOTO', apellidoPaterno: 'BRITO', apellidoMaterno: 'VISCAYA',
+    });
+    expect(partirNombreSinReniec(' Migdalia  Coromoto Brito viscaya ')).toEqual({
+      nombres: 'Migdalia Coromoto', apellidoPaterno: 'Brito', apellidoMaterno: 'viscaya',
+    });
+    expect(partirNombreSinReniec('Ana Pérez')).toEqual({ nombres: 'Ana', apellidoPaterno: 'Pérez', apellidoMaterno: '' });
+  });
+
   it('desconectar elimina la instancia en el proveedor para liberar el cupo', async () => {
     const { svc, prisma, lat } = build();
     prisma.empresa.findUnique.mockResolvedValue(empresaCorporativa());
@@ -440,6 +450,26 @@ describe('ShalomService (proveedor único api.shalom-api.lat)', () => {
       const { svc, lat } = armarGuia({ nombreDestinatario: '', dniDestinatario: '', celularDest: '900542174' });
       await svc.crearGuiaDesdeDespacho(9, 100);
       expect(lat.createOrder).toHaveBeenCalledTimes(1);
+    });
+
+    // Clienta venezolana con carné de extranjería (09-11): el panel solo dejaba
+    // 8 dígitos. RENIEC no lo conoce, así que el nombre se parte a mano.
+    it('carné de extranjería: genera la guía sin consultar RENIEC y con apellidos', async () => {
+      const { svc, lat } = armarGuia({
+        nombreDestinatario: 'Migdalia Coromoto Brito Viscaya',
+        dniDestinatario: '007847630',
+        celularDest: '955863262',
+      });
+      await svc.crearGuiaDesdeDespacho(9, 100);
+      expect(lat.consultarDni).not.toHaveBeenCalled();
+      expect(lat.createOrder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          documento: '007847630',
+          name: 'Migdalia Coromoto',
+          firstname: 'Brito',
+          lastname: 'Viscaya',
+        }),
+      );
     });
   });
 

@@ -26,6 +26,7 @@ import { DespachoConfigDto } from './dto/despacho-config.dto';
 import { RepartidorService } from '../repartidor/repartidor.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { planPermiteShalomPro } from '../shalom/shalom.util';
+import { documentoParaGuia } from '../shalom/shalom.service';
 import { parseFechaSoloDia } from '../common/utils/fecha';
 
 /** Mensaje que saldría al cliente, armado sin enviarlo (vista previa). */
@@ -1209,9 +1210,12 @@ export class EnvioDespachoService {
     celular?: string,
   ) {
     if (!clienteId) return;
-    const dniLimpio = String(dni ?? '').replace(/\D/g, '');
+    // DNI, o carné de extranjería / pasaporte (Shalom acepta ambos). Un RUC no
+    // es de quien recibe un paquete: no se toca la ficha.
+    const dniLimpio = documentoParaGuia(dni);
     const nombreLimpio = String(nombre ?? '').trim();
-    if (dniLimpio.length !== 8 || !nombreLimpio) return;
+    const esDni = /^\d{8}$/.test(dniLimpio);
+    if (!dniLimpio || /^\d{11}$/.test(dniLimpio) || !nombreLimpio) return;
     const cliente = await this.prisma.cliente.findFirst({
       where: { id: clienteId, empresaId },
       select: { id: true, nroDoc: true, nombre: true, telefono: true },
@@ -1221,13 +1225,16 @@ export class EnvioDespachoService {
     const tieneDocValido =
       /^\d{8}$/.test(docActual) || /^\d{11}$/.test(docActual);
     if (tieneDocValido && docActual !== dniLimpio) return;
+    // Catálogo 06 SUNAT: 1 = DNI, 4 = carné de extranjería, 7 = pasaporte.
     const tipoDni = await this.prisma.tipoDocumento.findFirst({
-      where: {
-        OR: [
-          { codigo: '1' },
-          { descripcion: { contains: 'DNI', mode: 'insensitive' } },
-        ],
-      },
+      where: esDni
+        ? {
+            OR: [
+              { codigo: '1' },
+              { descripcion: { contains: 'DNI', mode: 'insensitive' } },
+            ],
+          }
+        : { codigo: /^\d+$/.test(dniLimpio) ? '4' : '7' },
       select: { id: true },
     });
     const celularLimpio = String(celular ?? '').replace(/\D/g, '');
@@ -1528,7 +1535,10 @@ export class EnvioDespachoService {
       : nombreManual || (esGenerico(nombreCliente) ? '' : nombreCliente);
     const distrito = String(e.distrito || '').trim();
     const agencia = String(e.agenciaDestino || '').trim();
-    const dni = String(e.dniDestinatario || '').replace(/\D/g, '');
+    // Con letras: un pasaporte las tiene (el carné y el DNI son solo números).
+    const dni = String(e.dniDestinatario || '')
+      .replace(/[^0-9A-Za-z]/g, '')
+      .toUpperCase();
     const faltan: string[] = [];
     if (modo === 'AGENCIA') {
       // Lo que exige `crearGuiaDesdeDespacho` para registrar la guía: sin esto
@@ -1536,7 +1546,7 @@ export class EnvioDespachoService {
       // de pago son de la plantilla del motorizado y aquí no aplican — pedirlos
       // marcaría como incompleto a todo envío por agencia.
       if (!nombre) faltan.push('nombre');
-      if (!/^\d{8}$/.test(dni)) faltan.push('DNI');
+      if (!documentoParaGuia(dni)) faltan.push('DNI');
       if (!/^9\d{8}$/.test(telefono)) faltan.push('teléfono');
       if (!agencia) faltan.push('agencia destino');
     } else {
