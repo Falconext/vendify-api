@@ -13,6 +13,7 @@ import { ComprobanteService } from '../comprobante/comprobante.service';
 import { CajaService } from '../caja/caja.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { CrearComprobanteDto } from '../comprobante/dto/crear-comprobante.dto';
+import { verificarSinDescuentos } from '../usuarios/sin-descuentos.util';
 import {
   AperturaCajaDto,
   CierreCajaDto,
@@ -34,6 +35,7 @@ interface UsuarioToken {
   rol: string;
   sedeId?: number | null;
   puedeAnularComprobantes?: boolean;
+  bloquearDescuentos?: boolean;
 }
 
 /**
@@ -205,6 +207,8 @@ export class OperacionesMovilService {
             'Los comprobantes electrónicos no se sincronizan en esta versión (Fase 2).',
           );
         }
+        // La venta offline también respeta "No permitir dar descuentos".
+        verificarSinDescuentos(user, payload);
         const comp: any = await this.comprobantes.crearInformal(
           payload,
           user.empresaId,
