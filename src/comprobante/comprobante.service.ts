@@ -114,6 +114,7 @@ const CAMPOS_DESPACHO_LISTA = {
   creadoEn: true,
 } as const;
 
+import { ESTADOS_OT, esEstadoOT, filtroEstadoOT } from './utils/estado-ot';
 @Injectable()
 export class ComprobanteService {
   private readonly logger = new Logger(ComprobanteService.name);
@@ -357,6 +358,7 @@ export class ComprobanteService {
     estado?: string;
     tipoDoc?: string;
     estadoPago?: string;
+    estadoOT?: string;
     soloPendientesSunat?: string | boolean;
   }) {
     const {
@@ -507,6 +509,12 @@ export class ComprobanteService {
             }
           : {}),
       };
+      // Filtro "Fabricación": solo órdenes de trabajo en ese estado.
+      const condicionOT = filtroEstadoOT(params.estadoOT);
+      if (condicionOT && tiposPermitidos.includes('OT')) {
+        where.tipoDoc = 'OT';
+        where.AND = [...(where.AND ?? []), condicionOT];
+      }
 
       const [rawItems, totalDb] = await Promise.all([
         this.prisma.comprobante.findMany({
@@ -7187,11 +7195,13 @@ export class ComprobanteService {
       );
     }
 
-    const estadosValidos = ['EN_PROCESO', 'LISTO', 'ENTREGADO'];
-    if (!estadosValidos.includes(input.estadoOT)) {
+    if (!esEstadoOT(input.estadoOT)) {
       throw new BadRequestException(
-        `Estado debe ser uno de: ${estadosValidos.join(', ')}`,
+        `Estado debe ser uno de: ${ESTADOS_OT.join(', ')}`,
       );
+    }
+    if (comp.estadoPago === 'ANULADO') {
+      throw new BadRequestException('La orden de trabajo está anulada');
     }
 
     if (input.estadoOT === 'ENTREGADO' && (comp.saldo ?? 0) > 0) {
