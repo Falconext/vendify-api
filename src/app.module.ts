@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { AlertasModule } from './alertas/alertas.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './usuarios/usuarios.module';
 import { EmpresaModule } from './empresa/empresa.module';
@@ -64,6 +65,7 @@ import { AgendaModule } from './agenda/agenda.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    AlertasModule,
     AuthModule,
     UsersModule,
     EmpresaModule,

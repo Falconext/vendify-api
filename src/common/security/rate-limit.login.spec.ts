@@ -1,4 +1,5 @@
 import { authRateLimit } from './rate-limit.middleware';
+import { registrarAvisador } from '../../alertas/alertas';
 
 /** Llama al middleware como express: `status` es lo que respondería el login. */
 function login(
@@ -42,7 +43,9 @@ describe('Límite de login', () => {
       expect(login(mw, { ip: `198.51.100.${i}`, email })).toBe(401);
     }
     expect(login(mw, { ip: '198.51.100.200', email })).toBe(429);
-    expect(login(mw, { ip: '198.51.100.201', email: 'VICTIMA@tienda.pe ' })).toBe(429);
+    expect(
+      login(mw, { ip: '198.51.100.201', email: 'VICTIMA@tienda.pe ' }),
+    ).toBe(429);
   });
 
   it('una cuenta bajo ataque no afecta a las demás', () => {
@@ -50,22 +53,30 @@ describe('Límite de login', () => {
     for (let i = 0; i < 31; i += 1) {
       login(mw, { ip: `198.51.101.${i}`, email: 'atacada@tienda.pe' });
     }
-    expect(login(mw, { ip: '198.51.101.200', email: 'otra@tienda.pe', status: 200 })).toBe(200);
+    expect(
+      login(mw, { ip: '198.51.101.200', email: 'otra@tienda.pe', status: 200 }),
+    ).toBe(200);
   });
 
   it('entrar bien nunca cuenta, por más veces que entre', () => {
     const mw = authRateLimit();
     for (let i = 0; i < 100; i += 1) {
-      expect(login(mw, { ip: '198.51.102.1', email: 'caja@tienda.pe', status: 200 })).toBe(200);
+      expect(
+        login(mw, { ip: '198.51.102.1', email: 'caja@tienda.pe', status: 200 }),
+      ).toBe(200);
     }
   });
 
   it('varios usuarios tras la misma IP se siguen limitando como hoy, en 15 fallos', () => {
     const mw = authRateLimit();
     for (let i = 0; i < 15; i += 1) {
-      expect(login(mw, { ip: '198.51.103.1', email: `u${i}@tienda.pe` })).toBe(401);
+      expect(login(mw, { ip: '198.51.103.1', email: `u${i}@tienda.pe` })).toBe(
+        401,
+      );
     }
-    expect(login(mw, { ip: '198.51.103.1', email: 'nuevo@tienda.pe' })).toBe(429);
+    expect(login(mw, { ip: '198.51.103.1', email: 'nuevo@tienda.pe' })).toBe(
+      429,
+    );
   });
 
   it('decir que se viene de 127.0.0.1 no salta el límite', () => {
@@ -79,7 +90,44 @@ describe('Límite de login', () => {
   it('en desarrollo, con conexión local de verdad, no se limita', () => {
     const mw = authRateLimit();
     for (let i = 0; i < 40; i += 1) {
-      expect(login(mw, { ip: '198.51.104.1', email: 'dev@tienda.pe', conexion: '::1' })).toBe(401);
+      expect(
+        login(mw, {
+          ip: '198.51.104.1',
+          email: 'dev@tienda.pe',
+          conexion: '::1',
+        }),
+      ).toBe(401);
     }
+  });
+});
+
+describe('Aviso al equipo cuando el límite bloquea', () => {
+  afterEach(() => registrarAvisador(null));
+
+  it('una IP bloqueada avisa una sola vez', () => {
+    const avisos: string[] = [];
+    registrarAvisador((a) => avisos.push(a.clave));
+    const mw = authRateLimit();
+    for (let i = 0; i < 20; i += 1)
+      login(mw, { ip: '203.0.113.9', email: `u${i}@tienda.pe` });
+    expect(avisos).toEqual(['bloqueo:ip:203.0.113.9']);
+  });
+
+  it('una cuenta atacada desde muchas IP avisa una sola vez', () => {
+    const avisos: string[] = [];
+    registrarAvisador((a) => avisos.push(a.clave));
+    const mw = authRateLimit();
+    for (let i = 0; i < 40; i += 1)
+      login(mw, { ip: `203.0.114.${i}`, email: 'objetivo@tienda.pe' });
+    expect(avisos).toEqual(['bloqueo:cuenta:objetivo@tienda.pe']);
+  });
+
+  it('quien entra bien no genera avisos', () => {
+    const avisos: string[] = [];
+    registrarAvisador((a) => avisos.push(a.clave));
+    const mw = authRateLimit();
+    for (let i = 0; i < 50; i += 1)
+      login(mw, { ip: '203.0.115.1', email: 'caja@tienda.pe', status: 200 });
+    expect(avisos).toEqual([]);
   });
 });

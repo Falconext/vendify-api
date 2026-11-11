@@ -4,30 +4,53 @@ import {
   Get,
   Headers,
   HttpCode,
+  Optional,
   Post,
+  Req,
   Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { AlertasService } from '../alertas/alertas.service';
+import { clientIp } from '../common/security/rate-limit.middleware';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { User } from '../common/decorators/user.decorator';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    // Opcional: los specs arman el controlador solo con AuthService.
+    @Optional() private readonly alertas?: AlertasService,
+  ) {}
 
   @Post('login')
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
     @Headers('origin') origin: string,
+    @Req() req?: Request,
   ) {
-    const result = await this.authService.login(dto, origin);
+    const ip = req ? clientIp(req) : undefined;
+    const ua = req?.headers?.['user-agent'];
+    let result: Awaited<ReturnType<AuthService['login']>>;
+    try {
+      result = await this.authService.login(dto, origin);
+    } catch (e) {
+      if (e instanceof UnauthorizedException)
+        void this.alertas?.claveEquivocada(dto?.email, ip);
+      throw e;
+    }
+    // Avisa si un administrador del sistema entró desde un equipo nuevo. No se
+    // espera: el aviso no demora el inicio de sesión.
+    if ((result as any)?.accessToken && (result as any)?.usuario)
+      void this.alertas?.entradaCorrecta((result as any).usuario, ua, ip);
     res.locals.message = 'Inicio de sesión exitoso';
     return result;
   }

@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
+import { alertaDeError, avisarAlEquipo } from '../../alertas/alertas';
 
 /**
  * Traduce errores conocidos de Prisma a mensajes amables + status HTTP.
@@ -84,6 +85,24 @@ export class HttpExceptionFilter implements ExceptionFilter {
       : exception instanceof HttpException
         ? ((exception.getResponse() as any)?.message ?? exception.message)
         : 'Internal server error';
+
+    // Error del servidor: aviso al equipo (con freno para no repetir). Se manda
+    // el mensaje real del error, no el genérico que ve el cliente.
+    if (status >= 500) {
+      const request = ctx.getRequest();
+      const real = (exception as any)?.message ?? message;
+      avisarAlEquipo(
+        alertaDeError({
+          metodo: request?.method,
+          url: request?.originalUrl ?? request?.url,
+          status,
+          mensaje: String(Array.isArray(real) ? real.join(', ') : real),
+          nombre: (exception as any)?.name,
+          empresaId: request?.user?.empresaId,
+          usuarioId: request?.user?.id ?? request?.user?.sub,
+        }),
+      );
+    }
 
     const rawObj: any = exception instanceof HttpException ? exception.getResponse() : null;
     response.status(status).json({

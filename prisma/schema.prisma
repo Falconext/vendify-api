@@ -3628,3 +3628,17 @@ model AgendaRecordatorioEnviado {
 
   @@unique([eventoId, ocurrencia])
 }
+
+/// Equipos desde los que entró un administrador del sistema. Si entra desde
+/// uno que no está aquí, se avisa al equipo de la plataforma (`src/alertas`).
+/// `huella` = navegador + sistema + red de la IP, en hash.
+model EquipoConocido {
+  id          Int      @id @default(autoincrement())
+  usuarioId   Int
+  huella      String
+  descripcion String
+  creadoEn    DateTime @default(now())
+  ultimoUso   DateTime @default(now())
+
+  @@unique([usuarioId, huella])
+}
