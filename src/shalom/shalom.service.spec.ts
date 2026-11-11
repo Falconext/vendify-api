@@ -1,4 +1,5 @@
 import { ShalomService, documentoParaGuia, partirNombreSinReniec } from './shalom.service';
+import { BadRequestException } from '@nestjs/common';
 
 /**
  * QA del servicio Shalom: toda falconext-mype usa el proveedor api.shalom-api.lat
@@ -516,6 +517,25 @@ describe('ShalomService (proveedor único api.shalom-api.lat)', () => {
       expect(lat.createOrder.mock.calls[1][0]).not.toHaveProperty('declaracion_jurada');
       expect(lat.createOrder.mock.calls[1][0].clave).toBe(lat.createOrder.mock.calls[0][0].clave);
       expect(r.nroOrden).toBe('77');
+    });
+
+    it('también cuando Shalom la rechaza con un 400 (así responde desde nov-2026)', async () => {
+      const { svc, lat } = armar();
+      lat.createOrder
+        .mockRejectedValueOnce(new BadRequestException('La declaración jurada solo es para persona natural.'))
+        .mockResolvedValueOnce({ success: true, data: { orderNumber: '77', orderCode: 'ABCD' } });
+      const r = await svc.crearGuiaDesdeDespacho(9, 1, { clave: '8080' });
+      expect(lat.createOrder).toHaveBeenCalledTimes(2);
+      expect(lat.createOrder.mock.calls[1][0]).not.toHaveProperty('declaracion_jurada');
+      expect(r.nroOrden).toBe('77');
+    });
+
+    it('si el reintento también falla con 400, se muestra el mensaje de Shalom tal cual', async () => {
+      const { svc, lat } = armar();
+      lat.createOrder
+        .mockRejectedValueOnce(new BadRequestException('La declaración jurada solo es para persona natural.'))
+        .mockRejectedValueOnce(new BadRequestException('Ingrese un producto válido'));
+      await expect(svc.crearGuiaDesdeDespacho(9, 1, { clave: '8080' })).rejects.toThrow('Ingrese un producto válido');
     });
 
     it('a una cuenta de persona natural se le sigue mandando', async () => {

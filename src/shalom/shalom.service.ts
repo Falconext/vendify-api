@@ -1197,7 +1197,12 @@ export class ShalomService {
     // persona natural". En su API es opcional, así que si la rechaza se
     // registra sin ella.
     let declarar = true;
-    const registrar = (claveRetiro: string) =>
+    // Shalom dejó de responder estos rechazos con 200 { success:false } y ahora
+    // manda 400 { message }, que createOrder lanza como excepción: sin pasarlo
+    // a la forma vieja, los reintentos de abajo nunca corrían (TIENDA MINERA,
+    // 10-11). Se guarda la excepción original para lanzarla tal cual si
+    // ningún reintento la salva.
+    const registrar = (claveRetiro: string): Promise<any> =>
       this.lat.createOrder({
         instanceId: empresa.shalomInstanceId!,
         origen: Number(origen.terId),
@@ -1214,6 +1219,9 @@ export class ShalomService {
           ? { declaracion_jurada: declararContenido(envio.tipoMercaderia, envio.contenidoPaquete) }
           : {}),
         ...(Number(envio.pesoKg) > 0 ? { peso: String(Number(envio.pesoKg)) } : {}),
+      }).catch((error: any) => {
+        if (!(error instanceof BadRequestException)) throw error;
+        return { success: false, message: error.message, error };
       });
     let claveUsada = clave;
     let claveReemplazada: { solicitada: string; usada: string; motivo: string } | null = null;
@@ -1257,6 +1265,7 @@ export class ShalomService {
     // registro (p. ej. "Seleccione un producto"): sin esto se guardaba como éxito
     // una guía que nunca existió.
     if (respuesta?.success === false) {
+      if (respuesta.error) throw respuesta.error;
       let motivo = String(respuesta?.message ?? '').trim();
       // Cuando el producto no es de la cuenta, Shalom adjunta el catálogo válido:
       // mostrarlo ahorra tener que adivinar cuál corresponde.
