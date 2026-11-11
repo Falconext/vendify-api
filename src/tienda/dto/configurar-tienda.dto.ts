@@ -102,6 +102,10 @@ export class ConfigurarTiendaDto {
   envioGratisDesdeSoles?: number;
 
   @IsOptional()
+  @IsBoolean()
+  envioACoordinar?: boolean;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)

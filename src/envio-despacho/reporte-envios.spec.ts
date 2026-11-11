@@ -139,6 +139,12 @@ describe('Reporte de envíos — filtro por courier y modo agencia', () => {
       expect(f.envio.CARGA).toContain('DNI');
     });
 
+    it('un carné de extranjería cuenta como documento (Shalom lo acepta)', () => {
+      const f = fila(envioAgencia({ dniDestinatario: '007847630' }));
+      expect(f.envio.CARGA).not.toContain('DNI');
+      expect(f.envio.DNI).toBe('007847630');
+    });
+
     it('el destino es la agencia en Shalom y el distrito en reparto propio', () => {
       expect(fila(envioAgencia()).meta.destino).toBe('SHALOM CUSCO CENTRO');
       // Bug detectado en QA contra BD real: en modo TODOS una fila de reparto

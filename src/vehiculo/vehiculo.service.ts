@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
 import { UpdateVehiculoDto } from './dto/update-vehiculo.dto';
 import { CreateActaDto } from './dto/create-acta.dto';
+import { exigirDeLaEmpresa } from '../common/utils/pertenece-a-empresa';
 
 @Injectable()
 export class VehiculoService {
@@ -137,6 +138,20 @@ export class VehiculoService {
   }
 
   async create(empresaId: number, dto: CreateVehiculoDto, sedeId?: number) {
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [dto.clienteId],
+      empresaId,
+      'El cliente no existe o no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'sede',
+      [dto.sedeId],
+      empresaId,
+      'La sede no pertenece a la empresa',
+    );
     const placa = dto.placa.toUpperCase().trim();
 
     const exists = await this.prisma.vehiculo.findUnique({
@@ -193,6 +208,21 @@ export class VehiculoService {
       }
       dto.placa = placa;
     }
+
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [dto.clienteId],
+      empresaId,
+      'El cliente no existe o no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'sede',
+      [dto.sedeId],
+      empresaId,
+      'La sede no pertenece a la empresa',
+    );
 
     return this.prisma.vehiculo.update({
       where: { id },

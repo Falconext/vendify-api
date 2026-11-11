@@ -26,7 +26,9 @@ import {
   lineasDetalleAdicional,
   normalizarDetalleAdicional,
 } from './detalle-adicional';
+import { fechaLima, vencimientoCobro } from './utils/vencimiento-cobro';
 import { NOTA_SIN_CONVERTIR } from './convertidos';
+import { saldoPorDevolver } from '../kardex/stock-no-descontado';
 import { repartirPago } from './cobro-varias';
 import { excesosSobreSaldo, lineasPorConvertir, totalDeLineas } from './saldo-por-convertir';
 import {
@@ -98,6 +100,7 @@ import {
 } from './ventas-por-producto';
 import { debeRevisarDobleSubmit } from '../integraciones/idempotencia/anti-doble-submit';
 import { afectacionDeLinea } from '../producto/afectacion-igv';
+import { exigirDeLaEmpresa } from '../common/utils/pertenece-a-empresa';
 
 const CAMPOS_DESPACHO_LISTA = {
   id: true,
@@ -113,6 +116,7 @@ const CAMPOS_DESPACHO_LISTA = {
   creadoEn: true,
 } as const;
 
+import { ESTADOS_OT, esEstadoOT, filtroEstadoOT } from './utils/estado-ot';
 @Injectable()
 export class ComprobanteService {
   private readonly logger = new Logger(ComprobanteService.name);
@@ -356,6 +360,7 @@ export class ComprobanteService {
     estado?: string;
     tipoDoc?: string;
     estadoPago?: string;
+    estadoOT?: string;
     soloPendientesSunat?: string | boolean;
   }) {
     const {
@@ -506,6 +511,12 @@ export class ComprobanteService {
             }
           : {}),
       };
+      // Filtro "Fabricación": solo órdenes de trabajo en ese estado.
+      const condicionOT = filtroEstadoOT(params.estadoOT);
+      if (condicionOT && tiposPermitidos.includes('OT')) {
+        where.tipoDoc = 'OT';
+        where.AND = [...(where.AND ?? []), condicionOT];
+      }
 
       const [rawItems, totalDb] = await Promise.all([
         this.prisma.comprobante.findMany({
@@ -978,19 +989,23 @@ export class ComprobanteService {
       OT: 'ORDEN DE TRABAJO',
     };
 
-    const ahora = Date.now();
-    const DIA_MS = 24 * 60 * 60 * 1000;
+    const hoy = fechaLima(new Date());
     let totalPorCobrar = 0;
     let vencidos = 0;
+    let porVencer = 0;
 
     const comprobantes = rawItems.map((it) => {
       const saldo = Number(it.saldo ?? 0);
       totalPorCobrar += saldo;
-      const dias = it.fechaEmision
-        ? Math.floor((ahora - new Date(it.fechaEmision).getTime()) / DIA_MS)
-        : 0;
-      if (dias > 30) vencidos += 1;
-      return { ...it, comprobante: tipoLabels[it.tipoDoc] || it.tipoDoc } as any;
+      // Por la fecha real de la cuota o del crédito: ver vencimiento-cobro.ts.
+      const vencimiento = vencimientoCobro(it, hoy);
+      if (vencimiento.situacion === 'VENCIDO') vencidos += 1;
+      if (vencimiento.situacion === 'POR_VENCER') porVencer += 1;
+      return {
+        ...it,
+        comprobante: tipoLabels[it.tipoDoc] || it.tipoDoc,
+        vencimiento,
+      } as any;
     });
 
     return {
@@ -999,6 +1014,7 @@ export class ComprobanteService {
         cantidad: comprobantes.length,
         totalPorCobrar: Number(totalPorCobrar.toFixed(2)),
         vencidos,
+        porVencer,
       },
     };
   }
@@ -1273,12 +1289,18 @@ export class ComprobanteService {
     };
   }
 
-  async anularComprobante(comprobanteId: number, motivo?: string) {
+  async anularComprobante(
+    comprobanteId: number,
+    motivo?: string,
+    empresaId?: number,
+  ) {
     const comp = await this.prisma.comprobante.findUnique({
       where: { id: comprobanteId },
       include: { detalles: true },
     });
     if (!comp) throw new NotFoundException('Comprobante no encontrado');
+    if (empresaId !== undefined && comp.empresaId !== empresaId)
+      throw new NotFoundException('Comprobante no encontrado');
     const isInformal = ['TICKET', 'NV', 'RH', 'CP', 'NP', 'OT'].includes(
       comp.tipoDoc,
     );
@@ -3338,6 +3360,37 @@ export class ComprobanteService {
     }
   }
 
+  /**
+   * Lo ya devuelto de una venta: sus propios INGRESO (ediciones) y los
+   * movimientos de sus notas de crédito, incluida la SALIDA con que se deshace
+   * la devolución de una nota descartada.
+   */
+  private async devolucionesPrevias(comprobanteId?: number, empresaId?: number) {
+    const origen = await this.prisma.comprobante.findUnique({
+      where: { id: comprobanteId },
+      select: { serie: true, correlativo: true },
+    });
+    // `numDocAfectado` se guarda con el correlativo con o sin ceros a la izquierda.
+    const refs = origen
+      ? [String(origen.correlativo), String(origen.correlativo).padStart(8, '0')].map(
+          (corr) => `${origen.serie}-${corr}`,
+        )
+      : [];
+    return this.prisma.movimientoKardex.findMany({
+      where: {
+        empresaId,
+        OR: [
+          { comprobanteId, tipoMovimiento: 'INGRESO' },
+          {
+            tipoMovimiento: { in: ['INGRESO', 'SALIDA'] },
+            comprobante: { empresaId, tipoDoc: '07', numDocAfectado: { in: refs } },
+          },
+        ],
+      },
+      select: { productoId: true, tipoMovimiento: true, cantidad: true },
+    });
+  }
+
   private async revertirStock(
     detalles: any[],
     data?: {
@@ -3376,6 +3429,16 @@ export class ComprobanteService {
       return;
     }
 
+    // Solo vuelve lo que la venta descontó y aún no se devolvió. Una venta sin
+    // stock no descontó nada: devolver lo vendido inventaba unidades.
+    const saldoDevolucion = saldoPorDevolver(
+      movimientosOriginales,
+      await this.devolucionesPrevias(
+        data?.origenComprobanteId ?? data?.comprobanteId,
+        data?.empresaId,
+      ),
+    );
+
     for (const item of detalles) {
       if (item.productoId) {
         const producto = await this.prisma.producto.findUnique({
@@ -3392,6 +3455,12 @@ export class ComprobanteService {
           continue;
         }
 
+        const pedido = Number(item.cantidad);
+        const saldo = saldoDevolucion.get(item.productoId) ?? 0;
+        const cantidadADevolver = Math.max(0, Math.min(pedido, saldo));
+        if (!(cantidadADevolver > 0)) continue;
+        saldoDevolucion.set(item.productoId, saldo - cantidadADevolver);
+
         if (producto) {
           // Registrar movimiento de kardex GLOBAL (siempre se hace para subir el stock del producto)
           if (data && this.kardexService) {
@@ -3404,10 +3473,15 @@ export class ComprobanteService {
                   empresaId: data.empresaId,
                   tipoMovimiento: 'INGRESO',
                   concepto: data.concepto,
-                  cantidad: item.cantidad,
+                  cantidad: cantidadADevolver,
                   comprobanteId: data.comprobanteId,
                   costoUnitario: costoUnitario,
                   usuarioId: data.usuarioId,
+                  ...(cantidadADevolver < pedido
+                    ? {
+                        observacion: `De ${pedido} solo se devuelven ${cantidadADevolver}: el resto no se había descontado o ya se devolvió.`,
+                      }
+                    : {}),
                   sedeId:
                     movimientosOriginales.find(
                       (m) => m.productoId === item.productoId,
@@ -3831,6 +3905,20 @@ export class ComprobanteService {
     } else if (!finalClienteId) {
       throw new BadRequestException('clienteId es requerido');
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [finalClienteId],
+      empresaId,
+      'El cliente no existe o no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      (detalles || []).map((d: any) => d.productoId),
+      empresaId,
+      'Uno de los productos no existe o no pertenece a la empresa',
+    );
 
     // Descuento global en factura/boleta: SUNAT no admite un descuento global "suelto" sin
     // AllowanceCharge, así que se prorratea bajando el valor unitario de cada línea (igual
@@ -5018,6 +5106,13 @@ export class ComprobanteService {
     } else if (!finalClienteId) {
       throw new BadRequestException('clienteId es requerido');
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [finalClienteId],
+      empresaId,
+      'El cliente no existe o no pertenece a la empresa',
+    );
 
     // 4) Cargar comprobante afectado (factura o boleta)
     if (!tipDocAfectado || !numDocAfectado) {
@@ -5567,6 +5662,20 @@ export class ComprobanteService {
     } else if (!finalClienteId) {
       throw new BadRequestException('clienteId es requerido');
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [finalClienteId],
+      empresaId,
+      'El cliente no existe o no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      (detalles || []).map((d: any) => d.productoId),
+      empresaId,
+      'Uno de los productos no existe o no pertenece a la empresa',
+    );
     const {
       detalleFinal,
       mtoOperGravadas,
@@ -5952,6 +6061,20 @@ export class ComprobanteService {
     } else if (!finalClienteId) {
       throw new BadRequestException('clienteId es requerido');
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [finalClienteId],
+      empresaId,
+      'El cliente no existe o no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      (detalles || []).map((d: any) => d.productoId),
+      empresaId,
+      'Uno de los productos no existe o no pertenece a la empresa',
+    );
 
     const {
       detalleFinal,
@@ -6258,8 +6381,8 @@ export class ComprobanteService {
     } = input;
 
     // Validar producto
-    const producto = await this.prisma.producto.findUnique({
-      where: { id: productoId },
+    const producto = await this.prisma.producto.findFirst({
+      where: { id: productoId, OR: [{ empresaId }, { empresaId: null }] },
     });
     if (!producto) {
       throw new BadRequestException('Producto no encontrado');
@@ -6285,6 +6408,13 @@ export class ComprobanteService {
     } else if (!finalClienteId) {
       throw new BadRequestException('clienteId es requerido');
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cliente',
+      [finalClienteId],
+      empresaId,
+      'El cliente no existe o no pertenece a la empresa',
+    );
 
     // Calcular totales
     const subTotalSinDescuento = this.round2(cantidad * precioUnitario);
@@ -6491,7 +6621,23 @@ export class ComprobanteService {
       if (cv) finalClienteId = cv.id;
     } else if (clienteId) {
       finalClienteId = Number(clienteId);
+      if (finalClienteId !== comp.clienteId) {
+        await exigirDeLaEmpresa(
+          this.prisma,
+          'cliente',
+          [finalClienteId],
+          empresaId,
+          'El cliente no existe o no pertenece a la empresa',
+        );
+      }
     }
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      (detalles || []).map((d: any) => d.productoId),
+      empresaId,
+      'Uno de los productos no existe o no pertenece a la empresa',
+    );
 
     // Una NP (o una OT de `crearOT`) puede no haber descontado nunca: entonces
     // lo anterior no cuenta, y lo nuevo solo si se marcó "Descontar del stock
@@ -6753,6 +6899,18 @@ export class ComprobanteService {
           err?.message,
         );
       }
+    }
+
+    // La copia del A4 en S3 (s3PdfUrl) quedó con los montos de antes de la
+    // edición, y hay lectores que la usan tal cual (enlace de WhatsApp, API
+    // ERP). Se rehace en segundo plano sobre la misma key; si falla, "Ver
+    // PDF" igual la regenera porque las informales ya no se sirven cacheadas.
+    if (comp.s3PdfUrl) {
+      this.generarYSubirPdf(comp.id, { empresaId }, true).catch((err: any) =>
+        this.logger.warn(
+          `[editarNotaVenta] No se pudo refrescar el PDF ${comp.id}: ${err?.message}`,
+        ),
+      );
     }
 
     return this.prisma.comprobante.findUnique({
@@ -7119,12 +7277,22 @@ export class ComprobanteService {
     });
   }
 
+  /** Para rutas que reciben solo el id: un comprobante ajeno responde igual que uno inexistente. */
+  async asegurarDeLaEmpresa(comprobanteId: number, empresaId: number) {
+    const comp = await this.prisma.comprobante.findFirst({
+      where: { id: comprobanteId, empresaId },
+      select: { id: true },
+    });
+    if (!comp) throw new NotFoundException('Comprobante no encontrado');
+  }
+
   async actualizarEstadoOT(
     comprobanteId: number,
     input: { estadoOT: string; fechaRecojo?: string },
+    empresaId: number,
   ) {
-    const comp = await this.prisma.comprobante.findUnique({
-      where: { id: comprobanteId },
+    const comp = await this.prisma.comprobante.findFirst({
+      where: { id: comprobanteId, empresaId },
     });
     if (!comp) throw new NotFoundException('Comprobante no encontrado');
 
@@ -7134,11 +7302,13 @@ export class ComprobanteService {
       );
     }
 
-    const estadosValidos = ['EN_PROCESO', 'LISTO', 'ENTREGADO'];
-    if (!estadosValidos.includes(input.estadoOT)) {
+    if (!esEstadoOT(input.estadoOT)) {
       throw new BadRequestException(
-        `Estado debe ser uno de: ${estadosValidos.join(', ')}`,
+        `Estado debe ser uno de: ${ESTADOS_OT.join(', ')}`,
       );
+    }
+    if (comp.estadoPago === 'ANULADO') {
+      throw new BadRequestException('La orden de trabajo está anulada');
     }
 
     if (input.estadoOT === 'ENTREGADO' && (comp.saldo ?? 0) > 0) {
@@ -7864,14 +8034,16 @@ export class ComprobanteService {
     });
 
     if (!comprobante) throw new NotFoundException('Comprobante no encontrado');
-    // Las cotizaciones son editables y su formato es configurable por empresa,
-    // así que NO se cachea el PDF: siempre se regenera para reflejar el formato
-    // vigente. Los comprobantes fiscales sí conservan el PDF cacheado.
+    // Solo los comprobantes fiscales (no cambian después de emitidos) sirven el
+    // PDF cacheado. Las informales y cotizaciones se editan, cobran y cambian de
+    // saldo: con el A4 cacheado salía el total de antes de editar mientras el
+    // ticket (siempre regenerado) ya mostraba el nuevo.
     const esCotizacion = comprobante.tipoDoc === 'COT';
+    const esFiscal = ['01', '03', '07', '08'].includes(comprobante.tipoDoc);
     // s3PdfUrl guarda solo el A4 (es el que va al correo y a contabilidad); los
     // otros tamaños se regeneran y NO tocan esa columna.
     const esFormatoPrincipal = formato === 'a4' || esCotizacion;
-    if (comprobante.s3PdfUrl && !esCotizacion && !force && esFormatoPrincipal)
+    if (comprobante.s3PdfUrl && esFiscal && !force && esFormatoPrincipal)
       return comprobante.s3PdfUrl;
 
     let buffer: Buffer;

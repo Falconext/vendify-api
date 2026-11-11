@@ -1,3 +1,4 @@
+import { valoresParaGuardar } from '../tienda/organos-sistemas';
 import { num, round3 } from '../common/utils/stock';
 import {
   esEan13Valido,
@@ -76,6 +77,7 @@ import {
 } from '../compras/stock-en-camino';
 import { agruparAtributos, parsearFiltroVariante } from './filtro-variante';
 import { conStockDeSede } from './stock-variante-sede';
+import { exigirDeLaEmpresa } from '../common/utils/pertenece-a-empresa';
 @Injectable()
 export class ProductoService {
   constructor(
@@ -420,6 +422,9 @@ export class ProductoService {
       disponibilidad?: DisponibilidadProducto;
       /** Empuje frente a equivalentes: 4 muy alta, 3 alta, 2 media, 1 baja. */
       prioridadVenta?: number;
+      /** Órganos y sistemas sobre los que actúa ("Hígado, Colon"). */
+      organos?: string | null;
+      sistemas?: string | null;
     },
     empresaId: number,
     sedeId?: number,
@@ -475,7 +480,30 @@ export class ProductoService {
       ubicacionSede,
       disponibilidad,
       prioridadVenta,
+      organos,
+      sistemas,
     } = data;
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      [data.productoPadreId],
+      empresaId,
+      'El producto padre no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'categoria',
+      [categoriaId],
+      empresaId,
+      'La categoría no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'marca',
+      [marcaId],
+      empresaId,
+      'La marca no pertenece a la empresa',
+    );
 
     const porcentajes = this.normalizarPorcentajes(
       porcentajeVenta,
@@ -592,6 +620,8 @@ export class ProductoService {
           stockMaximo: stockMaximo != null ? stockMaximo : undefined,
           disponibilidad: disponibilidad ?? undefined,
           prioridadVenta: prioridadVenta ?? undefined,
+          organos: valoresParaGuardar(organos) ?? undefined,
+          sistemas: valoresParaGuardar(sistemas) ?? undefined,
           categoriaId:
             categoriaId && Number(categoriaId) > 0
               ? Number(categoriaId)
@@ -699,6 +729,8 @@ export class ProductoService {
           stockMaximo: stockMaximo != null ? stockMaximo : undefined,
           disponibilidad: disponibilidad ?? undefined,
           prioridadVenta: prioridadVenta ?? undefined,
+          organos: valoresParaGuardar(organos) ?? undefined,
+          sistemas: valoresParaGuardar(sistemas) ?? undefined,
           categoriaId:
             categoriaId && Number(categoriaId) > 0
               ? Number(categoriaId)
@@ -3028,6 +3060,9 @@ export class ProductoService {
       disponibilidad?: DisponibilidadProducto | null;
       /** Empuje frente a equivalentes: 4 muy alta, 3 alta, 2 media, 1 baja. */
       prioridadVenta?: number | null;
+      /** Órganos y sistemas sobre los que actúa ("Hígado, Colon"). */
+      organos?: string | null;
+      sistemas?: string | null;
 
       sedeId?: number; // Nueva propiedad opcional para identificar dónde se ajusta el stock
       /** Sede donde se escribe el stock; null = "Todas las sedes". */
@@ -3035,6 +3070,27 @@ export class ProductoService {
     },
     usuarioId?: number,
   ) {
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'producto',
+      [data.productoPadreId],
+      data.empresaId,
+      'El producto padre no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'categoria',
+      [data.categoriaId],
+      data.empresaId,
+      'La categoría no pertenece a la empresa',
+    );
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'marca',
+      [data.marcaId],
+      data.empresaId,
+      'La marca no pertenece a la empresa',
+    );
     const producto = await this.prisma.producto.findFirst({
       where: { id: data.id, empresaId: data.empresaId },
     });
@@ -3437,6 +3493,8 @@ export class ProductoService {
           ? Number(data.unidadMedidaId)
           : undefined,
         tipoAfectacionIGV: data.tipoAfectacionIGV,
+        organos: valoresParaGuardar(data.organos),
+        sistemas: valoresParaGuardar(data.sistemas),
         moneda: data.moneda !== undefined ? data.moneda : undefined,
         valorUnitario:
           data.valorUnitario !== undefined
@@ -3638,13 +3696,20 @@ export class ProductoService {
     }
     const stocks = await this.prisma.productoStock.findMany({
       where: { productoId },
-      select: { sedeId: true, stock: true },
+      select: { sedeId: true, stock: true, visibleEnSede: true },
     });
     const stockPorSede = new Map(stocks.map((s) => [s.sedeId, num(s.stock)]));
+    // Solo se "quita" una sede que hoy está disponible. Una que ya estaba
+    // oculta con stock (dato heredado) no debe trabar cada guardado: DEMENVER
+    // no podía ni sumar stock en Zapallal porque Ancón figuraba oculta con 25.
+    const ocultas = new Set(
+      stocks.filter((s) => s.visibleEnSede === false).map((s) => s.sedeId),
+    );
     if (stockNuevo) stockPorSede.set(stockNuevo.sedeId, stockNuevo.stock);
     for (const sede of sedes) {
       const stockSede = stockPorSede.get(sede.id) ?? 0;
-      if (!marcadas.has(sede.id) && stockSede > 0) {
+      const yaOculta = ocultas.has(sede.id) && sede.id !== stockNuevo?.sedeId;
+      if (!marcadas.has(sede.id) && stockSede > 0 && !yaOculta) {
         throw new BadRequestException(
           `No puedes quitar el producto de ${sede.nombre}: aún tiene ${stockSede} en stock. Traslada o ajusta el stock primero.`,
         );

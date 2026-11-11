@@ -45,7 +45,8 @@ export class CombosController {
   }
 
   @Get(':id/stock')
-  checkStock(@Param('id', ParseIntPipe) id: number) {
+  async checkStock(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
+    await this.combosService.findOne(id, req.user.empresaId);
     return this.combosService.checkStock(id);
   }
 

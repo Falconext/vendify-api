@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Body,
   Controller,
   Delete,
@@ -43,6 +44,7 @@ import {
 import { numeroALetras } from './utils/numero-a-letras';
 import { verificarPuedeAnularComprobante } from './puede-anular-comprobante.util';
 import { verificarPuedeVenderEnSede } from '../usuarios/puede-vender-en-sede.util';
+import { verificarSinDescuentos } from '../usuarios/sin-descuentos.util';
 import { IdempotenciaPanelInterceptor } from '../integraciones/idempotencia/idempotencia-panel.interceptor';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -54,6 +56,16 @@ export class ComprobanteController {
     private readonly empresaService: EmpresaService,
     private readonly importarNotaVenta: ImportarNotaVentaService,
   ) {}
+
+  /** La empresa de la URL tiene que ser la del token: sin esto, cambiar el número daba acceso a otra empresa. */
+  private empresaDeLaRuta(user: any, empresaIdParam: string): number {
+    const empresaId = Number(empresaIdParam);
+    if (!empresaId || Number.isNaN(empresaId))
+      throw new BadRequestException('empresaId inválido');
+    if (Number(user?.empresaId) !== empresaId)
+      throw new ForbiddenException('No autorizado para esta empresa');
+    return empresaId;
+  }
 
   @Get('tipo-operacion')
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
@@ -148,6 +160,7 @@ export class ComprobanteController {
       estado: query.estado as any,
       tipoDoc: query.tipoDoc,
       estadoPago: query.estadoPago,
+      estadoOT: query.estadoOT,
       soloPendientesSunat: query.soloPendientesSunat,
     });
     res.locals.message = 'Comprobantes listados correctamente';
@@ -183,6 +196,7 @@ export class ComprobanteController {
   @Get('empresa/:empresaId/listar/:tipoComprobante')
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async listarPath(
+    @User() user: any,
     @Param('empresaId') empresaIdParam: string,
     @Param('tipoComprobante') tipoComprobante: 'FORMAL' | 'INFORMAL',
     @Query('search') search?: string,
@@ -195,13 +209,16 @@ export class ComprobanteController {
     @Query('estado') estado?: string,
     @Query('tipoDoc') tipoDoc?: string,
   ) {
-    const empresaId = Number(empresaIdParam);
-    if (!empresaId || Number.isNaN(empresaId))
-      throw new BadRequestException('empresaId inválido');
+    const empresaId = this.empresaDeLaRuta(user, empresaIdParam);
     if (!['FORMAL', 'INFORMAL'].includes(tipoComprobante))
       throw new BadRequestException('tipoComprobante inválido');
     return this.service.listar({
       empresaId,
+      // Quien no es admin solo ve su sede, igual que en GET /comprobante/listar.
+      sedeId:
+        user.rol === 'ADMIN_EMPRESA' || user.rol === 'ADMIN_SISTEMA'
+          ? undefined
+          : user.sedeId,
       tipoComprobante,
       search,
       page: page ? Number(page) : 1,
@@ -231,13 +248,12 @@ export class ComprobanteController {
   @Get('empresa/:empresaId/siguiente-correlativo/:tipoDoc')
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async siguienteCorrelativoPath(
+    @User() user: any,
     @Param('empresaId') empresaIdParam: string,
     @Param('tipoDoc') tipoDoc: string,
     @Query('tipDocAfectado') tipDocAfectado?: string,
   ) {
-    const empresaId = Number(empresaIdParam);
-    if (!empresaId || Number.isNaN(empresaId))
-      throw new BadRequestException('empresaId inválido');
+    const empresaId = this.empresaDeLaRuta(user, empresaIdParam);
     return this.service.siguienteCorrelativo(
       empresaId,
       tipoDoc,
@@ -265,17 +281,19 @@ export class ComprobanteController {
   @Get('empresa/:empresaId/detalle/:serie/:correlativo')
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async detallePath(
+    @User() user: any,
     @Param('empresaId') empresaIdParam: string,
     @Param('serie') serie: string,
     @Param('correlativo') correlativoParam: string,
   ) {
-    const empresaId = Number(empresaIdParam);
+    const empresaId = this.empresaDeLaRuta(user, empresaIdParam);
     const correlativo = Number(correlativoParam);
-    if (!empresaId || Number.isNaN(empresaId))
-      throw new BadRequestException('empresaId inválido');
     if (!serie || Number.isNaN(correlativo))
       throw new BadRequestException('Serie y correlativo son requeridos');
-    return this.service.detalle(empresaId, serie, correlativo);
+    const isAdmin =
+      user.rol === 'ADMIN_EMPRESA' || user.rol === 'ADMIN_SISTEMA';
+    const sedeId = isAdmin ? undefined : user.sedeId;
+    return this.service.detalle(empresaId, serie, correlativo, sedeId);
   }
 
   @Get('exportar-pdf')
@@ -547,7 +565,11 @@ export class ComprobanteController {
     @User() user: any,
   ) {
     verificarPuedeAnularComprobante(user);
-    return this.service.anularComprobante(comprobanteId, input?.motivo);
+    return this.service.anularComprobante(
+      comprobanteId,
+      input?.motivo,
+      user.empresaId,
+    );
   }
 
   // Notas de venta → elegir varias del mismo cliente → Cobrar.
@@ -576,10 +598,15 @@ export class ComprobanteController {
   @Patch(':comprobanteId/ot-estado')
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async actualizarEstadoOT(
+    @User() user: any,
     @Param('comprobanteId', ParseIntPipe) comprobanteId: number,
     @Body() input: { estadoOT: string; fechaRecojo?: string },
   ) {
-    return this.service.actualizarEstadoOT(comprobanteId, input);
+    return this.service.actualizarEstadoOT(
+      comprobanteId,
+      input,
+      user.empresaId,
+    );
   }
 
   // Cobranza en campo: reasignar el vendedor de campo de un comprobante ya
@@ -628,6 +655,7 @@ export class ComprobanteController {
     @Body() dto: CrearComprobanteDto,
     @User() user: any,
   ) {
+    verificarSinDescuentos(user, dto);
     const effectiveSedeId = user.sedeId ?? (dto as any)?.sedeId ?? undefined;
     return this.service.editarNotaVenta(
       id,
@@ -648,6 +676,7 @@ export class ComprobanteController {
     if (dto.tipoDoc !== 'COT') {
       throw new BadRequestException('Solo se pueden editar cotizaciones');
     }
+    verificarSinDescuentos(user, dto);
     return this.service.actualizarCotizacion(id, dto, user.empresaId);
   }
 
@@ -657,6 +686,7 @@ export class ComprobanteController {
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearBoleta(@User() user: any, @Body() dto: CrearComprobanteDto) {
     verificarPuedeVenderEnSede(user, undefined, dto?.sedeId);
+    verificarSinDescuentos(user, dto);
     let comp;
     try {
       console.log(
@@ -735,6 +765,7 @@ export class ComprobanteController {
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearFactura(@User() user: any, @Body() dto: CrearComprobanteDto) {
     verificarPuedeVenderEnSede(user, undefined, dto?.sedeId);
+    verificarSinDescuentos(user, dto);
     let comp;
     try {
       console.log(
@@ -871,6 +902,7 @@ export class ComprobanteController {
     @Body() dto: CrearComprobanteDto,
   ) {
     verificarPuedeVenderEnSede(user, dto?.tipoDoc, dto?.sedeId);
+    verificarSinDescuentos(user, dto);
     const effectiveSedeId = user.sedeId ?? dto?.sedeId ?? undefined;
     const comp = await this.service.crearInformal(
       dto,
@@ -1117,6 +1149,7 @@ export class ComprobanteController {
   @Post('ot')
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
   async crearOT(@User() user: any, @Body() dto: any) {
+    verificarSinDescuentos(user, dto);
     const effectiveSedeId = user.sedeId ?? dto?.sedeId ?? undefined;
     return this.service.crearOT(dto, user.empresaId, user.id, effectiveSedeId);
   }
@@ -1183,12 +1216,17 @@ export class ComprobanteController {
 
   @Post(':id/enviar-sunat')
   @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
-  async enviarASunat(@Param('id', ParseIntPipe) id: number) {
+  async enviarASunat(
+    @User() user: any,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    await this.service.asegurarDeLaEmpresa(id, user.empresaId);
     return this.enviarSunat.execute(id);
   }
 
+  // Devuelve el comprobante completo de cualquier empresa: solo el equipo de la plataforma.
   @Post(':id/debug-xml')
-  @Roles('ADMIN_EMPRESA', 'USUARIO_EMPRESA')
+  @Roles('ADMIN_SISTEMA')
   async debugXml(@Param('id', ParseIntPipe) id: number) {
     return this.enviarSunat.debugPayload(id);
   }

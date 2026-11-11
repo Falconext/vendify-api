@@ -94,4 +94,9 @@ export class ListComprobanteDto {
   @Type(() => String)
   @IsString()
   soloPendientesSunat?: string;
+
+  // Filtro "Fabricación" de las órdenes de trabajo (PENDIENTE, EN_PROCESO, ...).
+  @IsOptional()
+  @IsString()
+  estadoOT?: string;
 }

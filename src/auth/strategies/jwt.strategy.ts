@@ -38,6 +38,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         sistemaNegocio: true,
         sistemaProducto: true,
         puedeAnularComprobantes: true,
+        permisos: true,
+        bloquearDescuentos: true,
         soloImagenesProductos: true,
         sedesAsignadas: { where: { puedeVender: false }, select: { sedeId: true } },
         empresa: {
@@ -64,14 +66,30 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
+    // permisos se guarda como JSON string (ej. '["*"]' o '["usuarios",...]').
+    // Lo normalizamos a string[] para que los guards por permiso lo consuman.
+    let permisos: string[] = [];
+    if (Array.isArray(user.permisos)) {
+      permisos = user.permisos as string[];
+    } else if (typeof user.permisos === 'string' && user.permisos.trim()) {
+      try {
+        const parsed = JSON.parse(user.permisos);
+        if (Array.isArray(parsed)) permisos = parsed;
+      } catch {
+        permisos = [];
+      }
+    }
+
     return {
       id: user.id,
       rol: user.rol,
+      permisos,
       empresaId: user.empresaId ?? null,
       sedeId: payload.sedeId ?? null,
       sistemaNegocio: user.sistemaNegocio ?? payload.sistemaNegocio ?? null,
       sistemaProducto: user.sistemaProducto ?? payload.sistemaProducto ?? null,
       puedeAnularComprobantes: user.puedeAnularComprobantes,
+      bloquearDescuentos: user.bloquearDescuentos,
       soloImagenesProductos: user.soloImagenesProductos,
       // Sedes asignadas donde no emite ventas (ver puede-vender-en-sede.util).
       sedesSinVenta: user.sedesAsignadas.map((s) => s.sedeId),

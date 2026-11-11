@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import bcrypt from 'bcrypt';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { UpdateEmpresaDto } from './dto/update-empresa.dto';
+import { camposDeMiEmpresa, empresaSinSecretos } from './empresa-mia';
 import {
   CreateCuentaBancariaDto,
   UpdateCuentaBancariaDto,
@@ -28,6 +29,8 @@ import {
 } from '../common/utils/fecha-lima';
 import { diaCalendarioLima } from '../common/utils/fecha';
 import { filtroBusquedaEmpresa } from './busqueda-empresa';
+import { pagoEnMonedaCuenta } from '../common/utils/moneda-compra';
+import { PAGO_DE_COMPRA_CON_DINERO } from '../compras/solo-credito-igv';
 
 function parseDDMMYYYY(input: string): Date {
   if (!input || input.trim() === '') {
@@ -217,6 +220,12 @@ interface RestauranteSyncPayload {
   qpseExternalId?: string;
   usaDemo?: boolean;
 }
+
+import {
+  datosSaldoInicial,
+  gastoDesde,
+  porCuentaDesde,
+} from './saldo-inicial-cuenta';
 
 @Injectable()
 export class EmpresaService {
@@ -1972,6 +1981,45 @@ export class EmpresaService {
     return empresa;
   }
 
+  async actualizarMiEmpresa(
+    empresaId: number,
+    rol: string,
+    cuerpo: Record<string, unknown>,
+  ) {
+    const datos = camposDeMiEmpresa(cuerpo, rol);
+    const numero = datos.whatsappPhoneNumberId;
+    if (typeof numero === 'string' && numero) {
+      const actual = await this.prisma.empresa.findUnique({
+        where: { id: empresaId },
+        select: { whatsappPhoneNumberId: true },
+      });
+      if (actual?.whatsappPhoneNumberId !== numero) {
+        await this.validarNumeroWhatsappLibre(empresaId, numero);
+      }
+    }
+    const empresa = await this.actualizar({
+      ...datos,
+      id: empresaId,
+    } as unknown as UpdateEmpresaDto);
+    return empresaSinSecretos(empresa);
+  }
+
+  /** Dos cuentas con el mismo número se reparten los mensajes de sus clientes. */
+  private async validarNumeroWhatsappLibre(
+    empresaId: number,
+    phoneNumberId: string,
+  ) {
+    const enEmpresa = await this.prisma.empresa.findFirst({
+      where: { whatsappPhoneNumberId: phoneNumberId, id: { not: empresaId } },
+      select: { id: true },
+    });
+    if (enEmpresa) {
+      throw new BadRequestException(
+        'Ese número de WhatsApp ya está conectado a otra cuenta.',
+      );
+    }
+  }
+
   async obtenerMiEmpresa(empresaId: number) {
     if (!empresaId)
       throw new ForbiddenException(
@@ -2704,6 +2752,296 @@ export class EmpresaService {
   }
 
   /**
+   * Saldo por cuenta bancaria = ingresos − egresos, derivado de:
+   *   + Pago (cobros de comprobantes; Yape/Plin abonan aquí automáticamente)
+   *   + MovimientoCaja CIERRE depositado (efectivo de caja depositado al banco)
+   *   − PagoCompra (pagos a proveedores por banco)
+   *   − GastoOperativo (gastos pagados por banco)
+   * No hay un campo `saldo` persistido: se calcula al vuelo (una query agregada
+   * por fuente). Es un saldo operativo simple, no un libro contable.
+   * Con saldo inicial, parte de ese monto y cuenta solo lo de su fecha en adelante.
+   */
+  async saldosCuentasBancarias(empresaId: number) {
+    const cuentas = await this.prisma.cuentaBancaria.findMany({
+      where: { empresaId },
+      orderBy: { creadoEn: 'asc' },
+    });
+    const ids = cuentas.map((c) => c.id);
+    if (ids.length === 0) return [];
+
+    const [pagos, depositos, repartos, comprasPagos, gastos] = await Promise.all([
+      this.prisma.pago.groupBy({
+        by: ['cuentaBancariaId'],
+        where: {
+          OR: porCuentaDesde(cuentas, (gte) => ({ fecha: { gte } })),
+        },
+        _sum: { monto: true },
+      }),
+      this.prisma.movimientoCaja.groupBy({
+        by: ['cuentaBancariaId'],
+        where: {
+          OR: porCuentaDesde(cuentas, (gte) => ({ fechaDeposito: { gte } })),
+          tipoMovimiento: 'CIERRE',
+          depositado: true,
+        },
+        _sum: { montoEfectivo: true },
+      }),
+      // Depósitos repartidos entre cuentas: el cierre queda sin cuenta y cada
+      // parte entra a la suya.
+      this.prisma.depositoCajaReparto.groupBy({
+        by: ['cuentaBancariaId'],
+        where: { OR: porCuentaDesde(cuentas, (gte) => ({ fecha: { gte } })) },
+        _sum: { monto: true },
+      }),
+      // Pagos a proveedores en la MONEDA DE LA CUENTA (una cuenta en soles que
+      // pagó una factura en US$ registra lo que salió en soles).
+      this.prisma.pagoCompra.findMany({
+        // Solo para crédito de IGV: no salió de la cuenta de la empresa.
+        where: {
+          OR: porCuentaDesde(cuentas, (gte) => ({ fecha: { gte } })),
+          ...PAGO_DE_COMPRA_CON_DINERO,
+        },
+        select: {
+          cuentaBancariaId: true,
+          monto: true,
+          montoSoles: true,
+          tipoCambio: true,
+          moneda: true,
+          compra: { select: { moneda: true, tipoCambio: true } },
+        },
+      }),
+      this.prisma.gastoOperativo.groupBy({
+        by: ['cuentaBancariaId'],
+        where: { OR: porCuentaDesde(cuentas, gastoDesde) },
+        _sum: { monto: true },
+      }),
+    ]);
+    const monedaCuenta = new Map(cuentas.map((c) => [c.id, c.moneda]));
+    const comprasPorCuenta = new Map<number, number>();
+    for (const p of comprasPagos) {
+      if (p.cuentaBancariaId == null) continue;
+      comprasPorCuenta.set(
+        p.cuentaBancariaId,
+        (comprasPorCuenta.get(p.cuentaBancariaId) || 0) +
+          pagoEnMonedaCuenta(p, p.compra, monedaCuenta.get(p.cuentaBancariaId)),
+      );
+    }
+
+    const toMap = (arr: any[], field: string) =>
+      new Map<number, number>(
+        arr
+          .filter((r) => r.cuentaBancariaId != null)
+          .map((r) => [
+            r.cuentaBancariaId as number,
+            Number(r._sum[field] || 0),
+          ]),
+      );
+    const mPagos = toMap(pagos, 'monto');
+    const mDep = toMap(depositos, 'montoEfectivo');
+    for (const [id, monto] of toMap(repartos, 'monto'))
+      mDep.set(id, (mDep.get(id) || 0) + monto);
+    const mCompras = comprasPorCuenta;
+    const mGastos = toMap(gastos, 'monto');
+
+    return cuentas.map((c) => {
+      const ingresos = (mPagos.get(c.id) || 0) + (mDep.get(c.id) || 0);
+      const egresos = (mCompras.get(c.id) || 0) + (mGastos.get(c.id) || 0);
+      return {
+        ...c,
+        ingresos: Number(ingresos.toFixed(2)),
+        egresos: Number(egresos.toFixed(2)),
+        saldo: Number(
+          (Number(c.saldoInicial || 0) + ingresos - egresos).toFixed(2),
+        ),
+      };
+    });
+  }
+
+  /**
+   * Movimientos de una cuenta bancaria (ledger simple), unificando las 4
+   * fuentes en una lista normalizada ordenada por fecha desc.
+   */
+  async movimientosCuentaBancaria(
+    empresaId: number,
+    cuentaId: number,
+    desde?: string,
+    hasta?: string,
+  ) {
+    const cuenta = await this.prisma.cuentaBancaria.findFirst({
+      where: { id: cuentaId, empresaId },
+    });
+    if (!cuenta) throw new NotFoundException('Cuenta bancaria no encontrada');
+
+    const rango =
+      desde || hasta
+        ? {
+            gte: desde ? new Date(`${desde}T00:00:00.000-05:00`) : undefined,
+            lte: hasta ? new Date(`${hasta}T23:59:59.999-05:00`) : undefined,
+          }
+        : undefined;
+
+    // Lo anterior al saldo inicial ya está dentro de ese monto: no se muestra ni
+    // se suma, para que esta lista dé lo mismo que la tarjeta de saldos.
+    const inicio = cuenta.saldoInicialFecha ?? undefined;
+    const fechaDesdeInicio = inicio ? { fecha: { gte: inicio } } : {};
+
+    const [pagos, depositos, repartos, compras, gastos] = await Promise.all([
+      this.prisma.pago.findMany({
+        where: {
+          cuentaBancariaId: cuentaId,
+          AND: [fechaDesdeInicio, rango ? { fecha: rango } : {}],
+        },
+        select: {
+          id: true,
+          fecha: true,
+          monto: true,
+          referencia: true,
+          comprobante: { select: { serie: true, correlativo: true } },
+        },
+      }),
+      this.prisma.movimientoCaja.findMany({
+        where: {
+          cuentaBancariaId: cuentaId,
+          tipoMovimiento: 'CIERRE',
+          depositado: true,
+          AND: [
+            inicio ? { fechaDeposito: { gte: inicio } } : {},
+            rango ? { fechaDeposito: rango } : {},
+          ],
+        },
+        select: {
+          id: true,
+          fechaDeposito: true,
+          montoEfectivo: true,
+          numeroOperacionDeposito: true,
+        },
+      }),
+      this.prisma.depositoCajaReparto.findMany({
+        where: {
+          cuentaBancariaId: cuentaId,
+          AND: [fechaDesdeInicio, rango ? { fecha: rango } : {}],
+        },
+        select: { id: true, fecha: true, monto: true, numeroOperacion: true },
+      }),
+      this.prisma.pagoCompra.findMany({
+        where: {
+          cuentaBancariaId: cuentaId,
+          AND: [fechaDesdeInicio, rango ? { fecha: rango } : {}],
+          ...PAGO_DE_COMPRA_CON_DINERO,
+        },
+        select: {
+          id: true,
+          fecha: true,
+          monto: true,
+          montoSoles: true,
+          tipoCambio: true,
+          moneda: true,
+          referencia: true,
+          compra: {
+            select: {
+              moneda: true,
+              tipoCambio: true,
+              proveedor: { select: { nombre: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.gastoOperativo.findMany({
+        where: {
+          cuentaBancariaId: cuentaId,
+          AND: [inicio ? gastoDesde(inicio) : {}, rango ? { fecha: rango } : {}],
+        },
+        select: {
+          id: true,
+          fecha: true,
+          creadoEn: true,
+          monto: true,
+          descripcion: true,
+          numeroOperacion: true,
+        },
+      }),
+    ]);
+
+    const movimientos = [
+      ...pagos.map((p) => ({
+        id: `pago-${p.id}`,
+        fecha: p.fecha,
+        tipo: 'INGRESO' as const,
+        origen: 'COBRO',
+        concepto: p.comprobante
+          ? `Cobro ${p.comprobante.serie}-${p.comprobante.correlativo}`
+          : 'Cobro',
+        referencia: p.referencia || null,
+        monto: Number(p.monto),
+      })),
+      ...depositos.map((d) => ({
+        id: `dep-${d.id}`,
+        fecha: d.fechaDeposito as Date,
+        tipo: 'INGRESO' as const,
+        origen: 'DEPOSITO',
+        concepto: 'Depósito de efectivo (cierre de caja)',
+        referencia: d.numeroOperacionDeposito || null,
+        monto: Number(d.montoEfectivo || 0),
+      })),
+      ...repartos.map((r) => ({
+        id: `deprep-${r.id}`,
+        fecha: r.fecha,
+        tipo: 'INGRESO' as const,
+        origen: 'DEPOSITO',
+        concepto: 'Depósito de efectivo (cierre de caja, repartido)',
+        referencia: r.numeroOperacion || null,
+        monto: Number(r.monto),
+      })),
+      ...compras.map((c) => {
+        const proveedor = c.compra?.proveedor?.nombre?.trim();
+        return {
+          id: `compra-${c.id}`,
+          fecha: c.fecha,
+          tipo: 'EGRESO' as const,
+          origen: 'COMPRA',
+          concepto: proveedor ? `Pago a ${proveedor}` : 'Pago a proveedor',
+          referencia: c.referencia || null,
+          // En la moneda de la cuenta (ver saldos de cuentas).
+          monto: Number(
+            pagoEnMonedaCuenta(c, c.compra, cuenta.moneda).toFixed(2),
+          ),
+        };
+      }),
+      ...gastos.map((g) => ({
+        id: `gasto-${g.id}`,
+        fecha: (g.fecha || g.creadoEn) as Date,
+        tipo: 'EGRESO' as const,
+        origen: 'GASTO',
+        concepto: g.descripcion || 'Gasto operativo',
+        referencia: g.numeroOperacion || null,
+        monto: Number(g.monto),
+      })),
+    ].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+
+    const ingresos = movimientos
+      .filter((m) => m.tipo === 'INGRESO')
+      .reduce((s, m) => s + m.monto, 0);
+    const egresos = movimientos
+      .filter((m) => m.tipo === 'EGRESO')
+      .reduce((s, m) => s + m.monto, 0);
+
+    // Con un rango que empieza después, el saldo inicial queda fuera de lo pedido.
+    const saldoInicial =
+      inicio && !(rango?.gte && inicio < rango.gte) && !(rango?.lte && inicio > rango.lte)
+        ? Number(cuenta.saldoInicial || 0)
+        : 0;
+
+    return {
+      cuenta,
+      ingresos: Number(ingresos.toFixed(2)),
+      egresos: Number(egresos.toFixed(2)),
+      saldo: Number((saldoInicial + ingresos - egresos).toFixed(2)),
+      saldoInicial,
+      movimientos,
+    };
+  }
+
+  /**
    * Máximo una cuenta ACTIVA por medio digital (YAPE/PLIN) por empresa: es la
    * cuenta a la que ese medio abona automáticamente, tener dos sería ambiguo.
    */
@@ -2746,6 +3084,7 @@ export class EmpresaService {
         alias: dto.alias ?? null,
         mostrarEnCotizacion: dto.mostrarEnCotizacion ?? true,
         medioPagoVinculado: dto.medioPagoVinculado ?? null,
+        ...datosSaldoInicial(dto),
       },
     });
   }
@@ -2789,6 +3128,7 @@ export class EmpresaService {
         ...(dto.medioPagoVinculado !== undefined && {
           medioPagoVinculado: dto.medioPagoVinculado,
         }),
+        ...datosSaldoInicial(dto),
       },
     });
   }

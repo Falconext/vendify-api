@@ -315,6 +315,8 @@ model Empresa {
   esWhiteLabel              Boolean                       @default(false) // Cliente bajo la marca blanca del reseller vs. marca estándar.
   costoEnvioFijo            Decimal?                      @default(0)
   envioGratisDesdeSoles     Decimal?                      @default(0)
+  /// El negocio coordina el envío aparte: la tienda no cobra envío ni lo anuncia gratis.
+  envioACoordinar           Boolean                       @default(false)
   minimoCompra              Decimal?                      @default(0)
   direccionRecojo           String?
   tiempoPreparacionMin      Int?                          @default(30)
@@ -521,6 +523,8 @@ model Usuario {
   // comprobantes queda reservado a ADMIN_EMPRESA salvo que se active aquí.
   puedeAnularComprobantes         Boolean                 @default(false)
   /// Solo gestiona las fotos de los productos: no ve ni toca precios, costos ni datos.
+  /// No da descuentos (por línea ni global) al vender o cotizar.
+  bloquearDescuentos              Boolean                 @default(false)
   soloImagenesProductos           Boolean                 @default(false)
   actasInspeccion                 ActaInspeccion[]
   listasPrecio                    ListaPrecioUsuario[]
@@ -643,6 +647,10 @@ model Producto {
   localizacion        String?
   porcentajeVenta     Int                  @default(100)
   porcentajeProvision Int                  @default(0)
+  /// Órganos y sistemas sobre los que actúa ("Hígado, Colon"), separados por
+  /// coma. Naturistas: la tienda busca y filtra por ellos.
+  organos             String?
+  sistemas            String?
   detalleCompras      DetalleCompra[]
   detallesOrdenCompra DetalleOrdenCompra[]
   detalleComprobantes DetalleComprobante[]
@@ -1260,12 +1268,17 @@ model CuentaBancaria {
   /// depósitos de caja (solo el efectivo). Máx. una cuenta activa por medio
   /// por empresa (validado en servicio).
   medioPagoVinculado         String?
+  /// Lo que había en la cuenta al empezar `saldoInicialFecha`. El saldo cuenta
+  /// desde ahí: lo anterior ya está dentro de este monto.
+  saldoInicial               Decimal?         @db.Decimal(12, 2)
+  saldoInicialFecha          DateTime?
   creadoEn                   DateTime         @default(now())
   empresa                    Empresa          @relation(fields: [empresaId], references: [id])
   pagos                      Pago[]
   pagosCompra                PagoCompra[]
   gastosOperativos           GastoOperativo[]
   movimientosCajaDepositados MovimientoCaja[]
+  depositosRepartidos        DepositoCajaReparto[]
 
   @@index([empresaId])
 }
@@ -1377,6 +1390,10 @@ model MovimientoCaja {
   numeroOperacionDeposito String?
   depositadoPorUsuarioId  Int?
   depositadoPor           Usuario?        @relation("DepositoCajaRealizadoPor", fields: [depositadoPorUsuarioId], references: [id])
+  // Depósito repartido entre varias cuentas: los cierres depositados juntos
+  // comparten este lote y quedan con cuentaBancariaId en null; cuánto fue a
+  // cada cuenta está en DepositoCajaReparto (mismo lote).
+  depositoLote            String?
 
   // uuid de la operación offline que lo originó (null = registrado online).
   origenSyncUuid String?
@@ -1384,6 +1401,25 @@ model MovimientoCaja {
   @@index([usuarioId, fecha])
   @@index([empresaId, fecha])
   @@index([tipoMovimiento])
+  @@index([depositoLote])
+}
+
+// Una parte de un depósito de efectivo de caja repartido entre cuentas (una
+// empresa que lleva lo facturado a una cuenta y el resto a otra). Agrupa por
+// `lote` los cierres que se depositaron juntos.
+model DepositoCajaReparto {
+  id               Int            @id @default(autoincrement())
+  empresaId        Int
+  lote             String
+  cuentaBancariaId Int
+  cuentaBancaria   CuentaBancaria @relation(fields: [cuentaBancariaId], references: [id])
+  monto            Decimal        @db.Decimal(12, 2)
+  numeroOperacion  String?
+  fecha            DateTime
+  creadoEn         DateTime       @default(now())
+
+  @@index([empresaId, lote])
+  @@index([cuentaBancariaId, fecha])
 }
 
 model PedidoTienda {
@@ -2514,6 +2550,9 @@ model DespachoMensajeTemplate {
   mensajeEntregadoAgencia String?
   notificarEnCamino  Boolean @default(true)
   notificarEntregado Boolean @default(true)
+  /// La clave de retiro en los avisos. Apagada: el negocio la da aparte,
+  /// por ejemplo cuando ya le pagaron.
+  claveEnAvisos      Boolean @default(true)
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
@@ -3625,4 +3664,18 @@ model AgendaRecordatorioEnviado {
   evento     AgendaEvento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
 
   @@unique([eventoId, ocurrencia])
+}
+
+/// Equipos desde los que entró un administrador del sistema. Si entra desde
+/// uno que no está aquí, se avisa al equipo de la plataforma (`src/alertas`).
+/// `huella` = navegador + sistema + red de la IP, en hash.
+model EquipoConocido {
+  id          Int      @id @default(autoincrement())
+  usuarioId   Int
+  huella      String
+  descripcion String
+  creadoEn    DateTime @default(now())
+  ultimoUso   DateTime @default(now())
+
+  @@unique([usuarioId, huella])
 }

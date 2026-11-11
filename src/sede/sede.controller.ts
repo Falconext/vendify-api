@@ -31,8 +31,8 @@ export class SedeController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.sedeService.findOne(+id);
+  findOne(@Param('id') id: string, @Request() req) {
+    return this.sedeService.findOne(+id, req.user.empresaId);
   }
 
   @Patch(':id')
@@ -45,8 +45,8 @@ export class SedeController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.sedeService.remove(+id);
+  remove(@Param('id') id: string, @Request() req) {
+    return this.sedeService.remove(+id, req.user.empresaId);
   }
 
   /**

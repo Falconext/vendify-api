@@ -19,6 +19,7 @@ export class VentasController {
     @Query('fechaEnvio') fechaEnvio?: string,
     @Query('sedeId') sedeId?: string,
     @Query('usuarioId') usuarioId?: string,
+    @Query('limite') limite?: string,
   ) {
     const fechaFinal =
       fecha ||
@@ -32,6 +33,8 @@ export class VentasController {
       fechaFin: fechaFin || undefined,
       // "Sale el": lista por día de entrega en vez de por fecha de emisión.
       fechaEnvio: fechaEnvio || undefined,
+      // "Todas": trae solo las más recientes, para no cargar años de ventas de golpe.
+      limite: Number(limite) > 0 ? Math.min(Number(limite), 5000) : undefined,
       sedeId: sedeId ? Number(sedeId) : undefined,
       usuarioId: isAdmin
         ? usuarioId

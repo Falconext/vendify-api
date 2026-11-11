@@ -74,7 +74,15 @@ export interface InventarioValorizadoResponse {
     descripcion: string;
     stock: number;
     costoPromedio: number;
+    /** Unitario con IGV si es gravado: lo que se le pagó al proveedor. */
+    costoDeBolsillo: number;
     valorTotal: number;
+    precioVenta: number;
+    valorVenta: number;
+    gananciaPotencial: number;
+    margenPotencial: number;
+    sinCosto: boolean;
+    sinPrecio: boolean;
     stockMinimo: number;
     stockMaximo: number;
     categoria?: {
@@ -96,6 +104,15 @@ export interface InventarioValorizadoResponse {
     valorTotalInventario: number;
     productosStockCritico: number;
     productosStockCero: number;
+    valorVentaInventario: number;
+    gananciaPotencial: number;
+    margenPotencial: number;
+    baseGanancia: 'SIN_IGV' | 'CON_IGV';
+    criterioIgv: string;
+    productosSinCosto: number;
+    productosSinPrecio: number;
+    productosStockNegativo: number;
+    todasLasSedes: boolean;
   };
 }
 

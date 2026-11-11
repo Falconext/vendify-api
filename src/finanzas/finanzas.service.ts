@@ -15,6 +15,7 @@ import {
   normalizarCriterio,
 } from './igv-ventas';
 import { COMPRA_CON_DINERO, PAGO_DE_COMPRA_CON_DINERO } from '../compras/solo-credito-igv';
+import { exigirDeLaEmpresa } from '../common/utils/pertenece-a-empresa';
 
 @Injectable()
 export class FinanzasService {
@@ -736,6 +737,13 @@ export class FinanzasService {
       medioPago?: string;
     },
   ) {
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cuentaBancaria',
+      [body.cuentaBancariaId],
+      empresaId,
+      'La cuenta bancaria no pertenece a la empresa',
+    );
     const fechaDate = new Date(`${body.fecha}T12:00:00.000-05:00`);
     const monedaNorm = (body.moneda || 'PEN').toUpperCase() === 'USD' ? 'USD' : 'PEN';
     return this.prisma.gastoOperativo.create({
@@ -772,6 +780,13 @@ export class FinanzasService {
       medioPago: string;
     }>,
   ) {
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cuentaBancaria',
+      [body.cuentaBancariaId],
+      empresaId,
+      'La cuenta bancaria no pertenece a la empresa',
+    );
     const extraDate = body.fecha
       ? {
           mes: new Date(`${body.fecha}T12:00:00.000-05:00`).getMonth() + 1,

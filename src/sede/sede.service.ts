@@ -84,15 +84,16 @@ export class SedeService {
     });
   }
 
-  async findOne(id: number) {
-    const sede = await this.prisma.sede.findUnique({
-      where: { id },
+  async findOne(id: number, empresaId: number) {
+    const sede = await this.prisma.sede.findFirst({
+      where: { id, empresaId },
     });
     if (!sede) throw new NotFoundException('Sede no encontrada');
     return sede;
   }
 
   async update(id: number, updateSedeDto: UpdateSedeDto, empresaId: number) {
+    await this.findOne(id, empresaId);
     if (updateSedeDto.esPrincipal) {
       await this.prisma.sede.updateMany({
         where: { empresaId, esPrincipal: true },
@@ -105,7 +106,8 @@ export class SedeService {
     });
   }
 
-  async remove(id: number) {
+  async remove(id: number, empresaId: number) {
+    await this.findOne(id, empresaId);
     // Prevent deletion if there are associated records like Comprobantes
     const comprobantes = await this.prisma.comprobante.findFirst({
       where: { sedeId: id },

@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import { CrearPagoDto } from './dto/crear-pago.dto';
 import { resolverCuentaVinculada } from '../common/utils/cuenta-vinculada.util';
+import { exigirDeLaEmpresa } from '../common/utils/pertenece-a-empresa';
 
 @Injectable()
 export class PagoService {
@@ -119,6 +120,13 @@ export class PagoService {
       );
     }
 
+    await exigirDeLaEmpresa(
+      this.prisma,
+      'cuentaBancaria',
+      [dto.cuentaBancariaId],
+      comprobante.empresaId,
+      'La cuenta bancaria no pertenece a la empresa',
+    );
     const medioPagoNormalizado = (dto.medioPago ?? 'EFECTIVO').toUpperCase();
     const pago = await this.prisma.pago.create({
       data: {

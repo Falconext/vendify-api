@@ -14,6 +14,7 @@ describe('KardexService', () => {
 
   const mockPrismaService = {
     producto: {
+      count: jest.fn().mockResolvedValue(1),
       findUnique: jest.fn(),
       update: jest.fn(),
       findMany: jest.fn(),

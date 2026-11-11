@@ -14,6 +14,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { imageUploadOptions } from '../common/utils/multer.config';
 import { ProductoPlantillaService } from './producto-plantilla.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { GeminiService } from '../gemini/gemini.service';
 
 @Controller('plantillas')
@@ -24,7 +26,8 @@ export class ProductoPlantillaController {
   ) {}
 
   @Post(':id/imagen')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN_SISTEMA')
   @UseInterceptors(FileInterceptor('file', imageUploadOptions))
   async subirImagen(
     @Param('id', ParseIntPipe) id: number,
@@ -55,7 +58,8 @@ export class ProductoPlantillaController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN_SISTEMA')
   async create(@Body() body: any) {
     return this.plantillaService.create(body);
   }
@@ -111,7 +115,8 @@ export class ProductoPlantillaController {
    * También detecta y guarda la marca si está presente en el nombre
    */
   @Post('categorizar-ia')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN_SISTEMA')
   async categorizarConIA(
     @Body() body: { rubroId?: number; soloSinCategoria?: boolean },
   ) {
@@ -179,7 +184,8 @@ export class ProductoPlantillaController {
   }
 
   @Post('search-image')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN_SISTEMA')
   async searchImage(@Body() body: { id: number; nombre: string }) {
     return this.plantillaService.autoAsignarImagen(
       Number(body.id),
@@ -189,25 +195,29 @@ export class ProductoPlantillaController {
 
   // IMPORTANT: Static routes MUST come before dynamic :id routes
   @Post('masivo/delete')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN_SISTEMA')
   async deleteMany(@Body() body: { ids: number[] }) {
     return this.plantillaService.deleteMany(body.ids);
   }
 
   @Post('masivo/delete-images')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN_SISTEMA')
   async deleteImagesMany(@Body() body: { ids: number[] }) {
     return this.plantillaService.deleteImagesMany(body.ids);
   }
 
   // Dynamic :id routes AFTER static routes
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN_SISTEMA')
   @Post(':id') // Usando POST con ID para update si PUT da problemas, o standard PUT
   async update(@Param('id') id: string, @Body() body: any) {
     return this.plantillaService.update(Number(id), body);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN_SISTEMA')
   @Post(':id/delete') // Usando POST para delete si DELETE da problemas
   async remove(@Param('id') id: string) {
     return this.plantillaService.remove(Number(id));

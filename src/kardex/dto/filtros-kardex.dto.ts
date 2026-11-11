@@ -89,4 +89,9 @@ export class FiltrosReporteDto {
   @IsInt()
   @Min(1)
   sedeId?: number;
+
+  /** Inventario valorizado de todas las sedes juntas (solo admin). */
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  todasLasSedes?: boolean = false;
 }

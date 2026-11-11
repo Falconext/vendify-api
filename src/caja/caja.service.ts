@@ -17,6 +17,12 @@ import {
   MarcarDepositadosDto,
 } from './dto/caja.dto';
 import { turnosEnCurso, turnosSinCuadrar, ventanaTurnoAbierto } from './turno-abierto';
+import {
+  esEfectivo,
+  sugerenciaConComprobante,
+  validarReparto,
+} from './reparto-deposito';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class CajaService {
@@ -2007,7 +2013,141 @@ export class CajaService {
         depositadoPor: { select: { nombre: true, email: true } },
       },
     });
-    return { cierres };
+
+    // Los depósitos repartidos no tienen una sola cuenta: se adjunta a cada
+    // cierre cuánto fue a cada cuenta, y con cuántos cierres se depositó junto.
+    const lotes = [
+      ...new Set(cierres.map((c) => c.depositoLote).filter(Boolean)),
+    ] as string[];
+    if (lotes.length === 0) return { cierres };
+    const repartos = await this.prisma.depositoCajaReparto.findMany({
+      where: { empresaId, lote: { in: lotes } },
+      orderBy: { id: 'asc' },
+      include: {
+        cuentaBancaria: {
+          select: { banco: true, numeroCuenta: true, alias: true },
+        },
+      },
+    });
+    const cierresPorLote = await this.prisma.movimientoCaja.groupBy({
+      by: ['depositoLote'],
+      where: { empresaId, depositoLote: { in: lotes } },
+      _count: { _all: true },
+    });
+    return {
+      cierres: cierres.map((c) =>
+        c.depositoLote
+          ? {
+              ...c,
+              cierresEnDeposito:
+                cierresPorLote.find((g) => g.depositoLote === c.depositoLote)
+                  ?._count._all ?? 1,
+              repartos: repartos
+                .filter((r) => r.lote === c.depositoLote)
+                .map((r) => ({
+                  id: r.id,
+                  monto: Number(r.monto),
+                  numeroOperacion: r.numeroOperacion,
+                  cuentaBancaria: r.cuentaBancaria,
+                })),
+            }
+          : c,
+      ),
+    };
+  }
+
+  /**
+   * Cuánto del efectivo de los cierres se cobró con factura/boleta, para
+   * sugerir el reparto entre la cuenta de lo facturado y la otra.
+   *
+   * Es una guía: el efectivo depositado es el que se CONTÓ en el cajón (con
+   * fondo, gastos y diferencias), así que la sugerencia se topa en él y la
+   * persona puede cambiar los montos.
+   */
+  async sugerenciaRepartoDeposito(empresaId: number, cierreIds: number[]) {
+    const cierres = await this.prisma.movimientoCaja.findMany({
+      where: {
+        id: { in: cierreIds },
+        empresaId,
+        tipoMovimiento: 'CIERRE',
+        estado: 'ACTIVO',
+      },
+    });
+    let conComprobante = 0;
+    let totalEfectivo = 0;
+    for (const cierre of cierres) {
+      totalEfectivo += Number(cierre.montoEfectivo || 0);
+      // Misma ventana que el detalle del turno: desde su apertura hasta que
+      // se cerró.
+      const apertura = await this.prisma.movimientoCaja.findFirst({
+        where: cierre.movimientoVinculadoId
+          ? { id: cierre.movimientoVinculadoId, empresaId }
+          : {
+              empresaId,
+              ...(cierre.sedeId ? { sedeId: cierre.sedeId } : {}),
+              tipoMovimiento: 'APERTURA',
+              estado: 'ACTIVO',
+              fecha: { lte: cierre.fecha },
+            },
+        orderBy: { fecha: 'desc' },
+        select: { fecha: true },
+      });
+      const desde = apertura?.fecha ?? cierre.fecha;
+      const hasta = cierre.fechaCierre ?? cierre.fecha;
+      const sede = cierre.sedeId ? { sedeId: cierre.sedeId } : {};
+
+      // Los mismos criterios con que el arqueo cuenta las ventas formales de
+      // contado y los cobros posteriores (ver obtenerVentasDelDia).
+      const [formales, pagos] = await Promise.all([
+        this.prisma.comprobante.findMany({
+          where: {
+            empresaId,
+            ...sede,
+            tipoDoc: { in: ['01', '03'] },
+            creadoEn: { gte: desde, lte: hasta },
+            estadoEnvioSunat: {
+              in: ['EMITIDO', 'PENDIENTE', 'REGISTRADO', 'ENVIADO'] as any,
+            },
+            formaPagoTipo: { equals: 'Contado', mode: 'insensitive' },
+            pagos: { none: {} },
+            comprobanteOrigenId: null,
+          },
+          select: {
+            mtoImpVenta: true,
+            medioPago: true,
+            tipoMoneda: true,
+            tipoCambio: true,
+          },
+        }),
+        this.prisma.pago.findMany({
+          where: {
+            empresaId,
+            fecha: { gte: desde, lte: hasta },
+            comprobante: { tipoDoc: { in: ['01', '03'] }, ...sede },
+          },
+          select: { monto: true, medioPago: true },
+        }),
+      ]);
+      for (const c of formales) {
+        if (esEfectivo(c.medioPago))
+          conComprobante += montoEnPen(c.mtoImpVenta, c.tipoMoneda, c.tipoCambio);
+      }
+      for (const p of pagos) {
+        if (esEfectivo(p.medioPago)) conComprobante += Number(p.monto || 0);
+      }
+    }
+    const conComprobanteTopado = sugerenciaConComprobante(
+      conComprobante,
+      totalEfectivo,
+    );
+    return {
+      totalEfectivo: Number(totalEfectivo.toFixed(2)),
+      efectivoConComprobante: Number(conComprobante.toFixed(2)),
+      sugerido: {
+        conComprobante: conComprobanteTopado,
+        resto: Number((totalEfectivo - conComprobanteTopado).toFixed(2)),
+      },
+    };
   }
 
   async marcarCierresDepositados(
@@ -2015,10 +2155,26 @@ export class CajaService {
     usuarioId: number,
     dto: MarcarDepositadosDto,
   ) {
-    const cuenta = await this.prisma.cuentaBancaria.findFirst({
-      where: { id: dto.cuentaBancariaId, empresaId, activo: true },
+    const repartido = (dto.repartos?.length ?? 0) > 1;
+    const partes = repartido ? dto.repartos! : [];
+    // Un reparto de una sola fila es un depósito normal a esa cuenta.
+    const cuentaUnica = repartido
+      ? null
+      : (dto.repartos?.[0]?.cuentaBancariaId ?? dto.cuentaBancariaId);
+    const numeroOperacionUnico = repartido
+      ? null
+      : (dto.repartos?.[0]?.numeroOperacion ?? dto.numeroOperacion);
+    if (!repartido && !cuentaUnica) {
+      throw new BadRequestException('Selecciona la cuenta bancaria destino.');
+    }
+
+    const idsCuentas = repartido
+      ? [...new Set(partes.map((p) => p.cuentaBancariaId))]
+      : [cuentaUnica as number];
+    const cuentas = await this.prisma.cuentaBancaria.findMany({
+      where: { id: { in: idsCuentas }, empresaId, activo: true },
     });
-    if (!cuenta) {
+    if (cuentas.length !== idsCuentas.length) {
       throw new BadRequestException(
         'La cuenta bancaria no existe o no pertenece a tu empresa.',
       );
@@ -2041,30 +2197,75 @@ export class CajaService {
       );
     }
 
-    const fechaDeposito = dto.fecha
-      ? new Date(`${dto.fecha}T12:00:00.000-05:00`)
-      : new Date();
-
-    await this.prisma.movimientoCaja.updateMany({
-      where: { id: { in: dto.cierreIds } },
-      data: {
-        depositado: true,
-        cuentaBancariaId: dto.cuentaBancariaId,
-        fechaDeposito,
-        numeroOperacionDeposito: dto.numeroOperacion || null,
-        depositadoPorUsuarioId: usuarioId,
-      },
-    });
-
     const totalDepositado = cierres.reduce(
       (sum, c) => sum + Number(c.montoEfectivo || 0),
       0,
     );
 
+    const fechaDeposito = dto.fecha
+      ? new Date(`${dto.fecha}T12:00:00.000-05:00`)
+      : new Date();
+
+    if (!repartido) {
+      const cuenta = cuentas[0];
+      await this.prisma.movimientoCaja.updateMany({
+        where: { id: { in: dto.cierreIds } },
+        data: {
+          depositado: true,
+          cuentaBancariaId: cuenta.id,
+          fechaDeposito,
+          numeroOperacionDeposito: numeroOperacionUnico || null,
+          depositadoPorUsuarioId: usuarioId,
+        },
+      });
+      return {
+        code: 1,
+        message: `${cierres.length} cierre(s) marcados como depositados en ${cuenta.banco} (S/ ${totalDepositado.toFixed(2)})`,
+        data: { cierresActualizados: cierres.length, totalDepositado },
+      };
+    }
+
+    const error = validarReparto(partes, totalDepositado);
+    if (error) throw new BadRequestException(error);
+
+    // Los cierres quedan sin cuenta propia (cuentaBancariaId null): así los
+    // saldos que suman por cierre no los cuentan, y lo que entró a cada
+    // cuenta sale de las filas del reparto.
+    const lote = randomUUID();
+    await this.prisma.$transaction([
+      this.prisma.movimientoCaja.updateMany({
+        where: { id: { in: dto.cierreIds }, depositado: false },
+        data: {
+          depositado: true,
+          cuentaBancariaId: null,
+          depositoLote: lote,
+          fechaDeposito,
+          numeroOperacionDeposito: null,
+          depositadoPorUsuarioId: usuarioId,
+        },
+      }),
+      this.prisma.depositoCajaReparto.createMany({
+        data: partes.map((p) => ({
+          empresaId,
+          lote,
+          cuentaBancariaId: p.cuentaBancariaId,
+          monto: Number(Number(p.monto).toFixed(2)),
+          numeroOperacion: p.numeroOperacion?.trim() || null,
+          fecha: fechaDeposito,
+        })),
+      }),
+    ]);
+
+    const nombreCuenta = (id: number) => {
+      const c = cuentas.find((x) => x.id === id)!;
+      return c.alias || c.banco;
+    };
     return {
       code: 1,
-      message: `${cierres.length} cierre(s) marcados como depositados en ${cuenta.banco} (S/ ${totalDepositado.toFixed(2)})`,
-      data: { cierresActualizados: cierres.length, totalDepositado },
+      message: `Depósito de S/ ${totalDepositado.toFixed(2)} repartido: ${partes
+        .map((p) => `${nombreCuenta(p.cuentaBancariaId)} S/ ${Number(p.monto).toFixed(2)}`)
+        .join(' · ')}`,
+      data: { cierresActualizados: cierres.length, totalDepositado, lote },
     };
   }
 
@@ -2083,15 +2284,41 @@ export class CajaService {
       );
     }
 
+    const limpiar = {
+      depositado: false,
+      cuentaBancariaId: null,
+      depositoLote: null,
+      fechaDeposito: null,
+      numeroOperacionDeposito: null,
+      depositadoPorUsuarioId: null,
+    };
+
+    // Un depósito repartido es UNA operación: deshacer uno de sus cierres
+    // deshace el depósito entero, o las cuentas quedarían con montos de un
+    // depósito que ya no existe.
+    if (cierre.depositoLote) {
+      const lote = cierre.depositoLote;
+      const [revertidos] = await this.prisma.$transaction([
+        this.prisma.movimientoCaja.updateMany({
+          where: { empresaId, depositoLote: lote },
+          data: limpiar,
+        }),
+        this.prisma.depositoCajaReparto.deleteMany({
+          where: { empresaId, lote },
+        }),
+      ]);
+      return {
+        code: 1,
+        message:
+          revertidos.count > 1
+            ? `Depósito revertido: los ${revertidos.count} cierres de ese depósito vuelven a estar pendientes.`
+            : 'Depósito revertido, el cierre vuelve a estar pendiente.',
+      };
+    }
+
     await this.prisma.movimientoCaja.update({
       where: { id: cierreId },
-      data: {
-        depositado: false,
-        cuentaBancariaId: null,
-        fechaDeposito: null,
-        numeroOperacionDeposito: null,
-        depositadoPorUsuarioId: null,
-      },
+      data: limpiar,
     });
 
     return {

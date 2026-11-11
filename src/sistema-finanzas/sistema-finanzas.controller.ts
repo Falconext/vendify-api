@@ -18,7 +18,7 @@ import { User } from 'src/common/decorators/user.decorator';
 
 @Controller('sistema-finanzas')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN_SISTEMA', 'ADMIN_EMPRESA')
+@Roles('ADMIN_SISTEMA')
 export class SistemaFinanzasController {
   constructor(private readonly service: SistemaFinanzasService) {}
 

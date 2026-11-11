@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { EstadoSunat, GastoOperativo } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,6 +22,12 @@ import {
   type ResumenAnualMes,
 } from './resumen-anual';
 
+import {
+  DiaUtilidad,
+  TotalUtilidad,
+  completarDias,
+  totalizarDias,
+} from './utilidad-diaria';
 export interface GastoPorCategoria {
   categoria: string;
   etiqueta: string | null;
@@ -63,6 +70,9 @@ export interface PnlResponse {
   /** Criterio del IGV aplicado (configuración de la empresa). */
   criterioIgv: CriterioIgvVentas;
   criterioIgvLabel: string;
+  /** Todos los días del período (hasta hoy), con ceros donde no hubo venta. */
+  utilidadDiaria: DiaUtilidad[];
+  utilidadDiariaTotal: TotalUtilidad;
   periodo: {
     mes: number;
     anio: number;
@@ -1582,9 +1592,18 @@ export class AnalisisFinancieroService {
           )
         : null;
 
+    const utilidadDiaria = completarDias(
+      pnl.resumenDiario,
+      periodo.startKey,
+      periodo.endKey,
+      this.fechaLimaKey(new Date()) ?? new Date().toISOString().slice(0, 10),
+    );
+
     return {
       criterioIgv: criterio,
       criterioIgvLabel: CRITERIO_IGV_LABEL[criterio],
+      utilidadDiaria,
+      utilidadDiariaTotal: totalizarDias(utilidadDiaria, pnl.gananciaNeta),
       periodo: {
         mes: periodo.mes,
         anio: periodo.anio,
@@ -1605,6 +1624,121 @@ export class AnalisisFinancieroService {
         variacionMonto,
         variacionPorcentaje,
       },
+    };
+  }
+
+  /**
+   * Excel de la utilidad día por día. Sale de getPnl, así que cada número es
+   * el mismo que muestra Rentabilidad para ese período y esa sede.
+   */
+  async exportarUtilidadDiaria(
+    empresaId: number,
+    opts: Parameters<AnalisisFinancieroService['getPnl']>[1],
+  ): Promise<{ buffer: Buffer; nombre: string }> {
+    const pnl = await this.getPnl(empresaId, opts);
+    const sede = opts.sedeId
+      ? await this.prisma.sede.findFirst({
+          where: { id: opts.sedeId, empresaId },
+          select: { nombre: true },
+        })
+      : null;
+    const t = pnl.utilidadDiariaTotal;
+    const encabezado = [
+      'Fecha',
+      'Ventas',
+      'Ventas netas',
+      'Costo de lo vendido',
+      'Ganancia bruta',
+      'Margen bruto %',
+      'Publicidad',
+      'Otros gastos',
+      'Ganancia neta',
+      'Margen neto %',
+    ];
+    const ddmmyyyy = (k: string) => k.split('-').reverse().join('/');
+    // En el Excel van del más antiguo al más reciente, como se lee un mes.
+    const filas = [...pnl.utilidadDiaria]
+      .reverse()
+      .map((d) => [
+        ddmmyyyy(d.fecha),
+        d.pedidos,
+        d.ventasNetas,
+        d.costoMercaderia,
+        d.gananciaBruta,
+        d.margenBruto,
+        d.publicidad,
+        d.otrosGastos,
+        d.gananciaNeta,
+        d.margenNeto,
+      ]);
+    const filasTotal: any[][] = [
+      [
+        'TOTAL DÍAS',
+        t.pedidos,
+        t.ventasNetas,
+        t.costoMercaderia,
+        t.gananciaBruta,
+        t.margenBruto,
+        '',
+        t.gastosOperativos,
+        t.gananciaNeta,
+        t.margenNeto,
+      ],
+    ];
+    // Un par de céntimos es redondeo de sumar los días: no va como fila.
+    if (Math.abs(t.ajustesSinDia) >= 0.05) {
+      filasTotal.push(
+        [
+          'Otros ingresos y gastos del período sin día',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          t.ajustesSinDia,
+          '',
+        ],
+        [
+          'GANANCIA NETA DEL PERÍODO',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          t.gananciaNetaPeriodo,
+          '',
+        ],
+      );
+    }
+    const cabecera = [
+      ['Utilidad por día'],
+      ['Período', pnl.periodo.label],
+      ['Sede', sede?.nombre || 'Todas las sedes'],
+      ['IGV', pnl.criterioIgvLabel],
+      [
+        'Días con venta / sin venta',
+        `${t.diasConVenta} / ${t.diasSinVenta}`,
+      ],
+      [],
+    ];
+    const hoja = XLSX.utils.aoa_to_sheet([
+      ...cabecera,
+      encabezado,
+      ...filas,
+      ...filasTotal,
+    ]);
+    hoja['!cols'] = [40, 8, 14, 16, 14, 12, 12, 12, 14, 12].map((wch) => ({
+      wch,
+    }));
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, 'Utilidad por día');
+    return {
+      buffer: XLSX.write(libro, { bookType: 'xlsx', type: 'buffer' }),
+      nombre: `utilidad_diaria_${pnl.periodo.fechaInicio}_a_${pnl.periodo.fechaFin}.xlsx`,
     };
   }
 

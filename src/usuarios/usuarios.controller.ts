@@ -60,7 +60,7 @@ export class UsersController {
   ) {
     this.soloAdminOtorgaAnular(user, dto);
     const empresaId = user.empresaId;
-    const nuevo = await this.usersService.create(dto, empresaId);
+    const nuevo = await this.usersService.create(dto, empresaId, user);
     res.locals.message = 'Usuario creado exitosamente';
     return nuevo;
   }
@@ -88,9 +88,15 @@ export class UsersController {
   async cambiarEstado(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ChangeStateDto,
+    @User() user: any,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.usersService.changeState(id, dto.estado);
+    const result = await this.usersService.changeState(
+      id,
+      dto.estado,
+      user.empresaId,
+      user?.rol,
+    );
     res.locals.message = `Usuario ${dto.estado === 'ACTIVO' ? 'activado' : 'desactivado'} correctamente`;
     return result;
   }
@@ -105,7 +111,7 @@ export class UsersController {
     this.soloAdminOtorgaAnular(user, body);
     const empresaId = user.empresaId;
     const dto: UpdateUserDto = { id, ...body } as UpdateUserDto;
-    const usuario = await this.usersService.update(dto, empresaId);
+    const usuario = await this.usersService.update(dto, empresaId, user);
     res.locals.message = 'Usuario editado correctamente';
     return usuario;
   }

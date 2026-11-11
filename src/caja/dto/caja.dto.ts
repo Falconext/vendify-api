@@ -1,5 +1,5 @@
-import { ArrayMinSize, IsArray, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 
 export enum TipoCaja {
   APERTURA = 'APERTURA',
@@ -164,15 +164,39 @@ export class TransferenciaCajaDto {
   observaciones?: string;
 }
 
+export class ParteDepositoDto {
+  @IsInt()
+  @Min(1, { message: 'Selecciona la cuenta de cada parte del reparto' })
+  cuentaBancariaId: number;
+
+  @IsNumber()
+  @Min(0.01, { message: 'Cada parte del reparto necesita un monto' })
+  monto: number;
+
+  @IsOptional()
+  @IsString()
+  numeroOperacion?: string;
+}
+
 export class MarcarDepositadosDto {
   @IsArray()
   @ArrayMinSize(1, { message: 'Selecciona al menos un cierre para depositar' })
   @IsInt({ each: true })
   cierreIds: number[];
 
+  // Una sola cuenta (lo de siempre). Con `repartos` no se usa.
+  @IsOptional()
   @IsInt()
   @Min(1, { message: 'Selecciona la cuenta bancaria destino' })
-  cuentaBancariaId: number;
+  cuentaBancariaId?: number;
+
+  // El efectivo repartido entre varias cuentas (2 o más).
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @ValidateNested({ each: true })
+  @Type(() => ParteDepositoDto)
+  repartos?: ParteDepositoDto[];
 
   @IsOptional()
   @IsString()

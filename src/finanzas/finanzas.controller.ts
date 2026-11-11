@@ -15,11 +15,24 @@ import { ConciliacionBancariaService } from './conciliacion-bancaria.service';
 import { ConciliacionImportarDto } from './dto/conciliacion.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { ModuleAccessGuard } from '../common/guards/module-access.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequiresModule } from '../common/decorators/module.decorator';
+import { RequiresPermission } from '../common/decorators/permission.decorator';
 import { User } from '../common/decorators/user.decorator';
 
+/**
+ * Flujo de caja, conciliación e ingresos/egresos: es la pantalla de Finanzas,
+ * que vive en el módulo "Mi negocio" (`reportes`/`finanzas` son sus nombres
+ * viejos). Igual que el menú: el plan tiene que incluirlo y el usuario tener
+ * el permiso. Sin esto, cualquier cajero o un plan sin Finanzas leía el flujo
+ * de caja llamando a la API directo.
+ */
 @Controller('finanzas')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ModuleAccessGuard, PermissionsGuard)
+@RequiresModule('mi-negocio', 'reportes', 'finanzas')
+@RequiresPermission('mi-negocio', 'reportes', 'finanzas')
 export class FinanzasController {
   constructor(
     private readonly finanzasService: FinanzasService,

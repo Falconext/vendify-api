@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { alertaDeBloqueo, avisarAlEquipo } from '../../alertas/alertas';
 
 type Bucket = {
   count: number;
@@ -24,7 +25,8 @@ const SENSITIVE_PATHS = [
 
 // Libro de Reclamaciones público: cada hoja registra datos y dispara correos.
 // Se cuentan todos los envíos (no solo los fallidos): 5 hojas por IP cada 15 min.
-const LIBRO_RECLAMACIONES_RE = /^\/api\/public\/store\/[^/]+\/libro-reclamaciones\/?$/;
+const LIBRO_RECLAMACIONES_RE =
+  /^\/api\/public\/store\/[^/]+\/libro-reclamaciones\/?$/;
 const LIBRO_RECLAMACIONES_REGLA = { limit: 5, onlyFailed: false };
 
 // Regla por ruta.
@@ -34,21 +36,39 @@ const LIBRO_RECLAMACIONES_REGLA = { limit: 5, onlyFailed: false };
 //  - onlyFailed=false → cuenta todos los intentos (p. ej. forgot-password,
 //    que dispara envío de correos y conviene acotar aunque respondan 200).
 function ruleFor(path: string): { limit: number; onlyFailed: boolean } {
-  if (path.startsWith('/api/auth/login')) return { limit: 15, onlyFailed: true };
-  if (path.startsWith('/api/auth/reset-password')) return { limit: 15, onlyFailed: true };
+  if (path.startsWith('/api/auth/login'))
+    return { limit: 15, onlyFailed: true };
+  if (path.startsWith('/api/auth/reset-password'))
+    return { limit: 15, onlyFailed: true };
   // forgot-password
   return { limit: 15, onlyFailed: false };
 }
 
-function clientIp(req: Request): string {
+// Tope por cuenta, además del de IP: frena probar claves de un mismo correo desde
+// muchas IP. Alto a propósito y solo con 401: un usuario que se equivoca no llega,
+// y aun bajo ataque solo se detiene esa cuenta, nunca a los demás.
+const LOGIN_POR_CUENTA_LIMITE = 30;
+
+function claveDeCuenta(req: Request): string | null {
+  if (req.method !== 'POST' || !(req.path || '').startsWith('/api/auth/login'))
+    return null;
+  const email = (req.body as { email?: unknown } | undefined)?.email;
+  if (typeof email !== 'string' || !email.trim()) return null;
+  return `cuenta:${email.trim().toLowerCase()}`;
+}
+
+// La IP sale del primer x-forwarded-for. El proxy público de Railway reemplaza lo
+// que manda el cliente, y `trust proxy` con otro salto podría juntar a todos los
+// usuarios en una sola IP y bloquearlos a la vez: no cambiar sin probarlo en Railway.
+export function clientIp(req: Request): string {
   const forwarded = req.headers['x-forwarded-for'];
   if (Array.isArray(forwarded)) return forwarded[0] ?? req.ip ?? 'unknown';
   if (forwarded) return forwarded.split(',')[0]?.trim() || req.ip || 'unknown';
   return req.ip || req.socket.remoteAddress || 'unknown';
 }
 
-// En desarrollo local (loopback) no aplicamos el límite. En producción, detrás
-// de un proxy, clientIp devuelve la IP real vía x-forwarded-for.
+// En desarrollo local (loopback) no aplicamos el límite. Se mira la conexión real,
+// no la cabecera: quien mande `x-forwarded-for: 127.0.0.1` no se salta el límite.
 function isLoopback(ip: string): boolean {
   return (
     ip === '127.0.0.1' ||
@@ -71,13 +91,15 @@ function cleanup(now: number) {
   }
 }
 
-function bump(key: string, now: number) {
+/** Suma un intento y devuelve cuántos van en la ventana. */
+function bump(key: string, now: number): number {
   const b = buckets.get(key);
   if (b && b.resetAt > now) {
     b.count += 1;
-  } else {
-    buckets.set(key, { count: 1, resetAt: now + WINDOW_MS });
+    return b.count;
   }
+  buckets.set(key, { count: 1, resetAt: now + WINDOW_MS });
+  return 1;
 }
 
 export function authRateLimit() {
@@ -86,11 +108,13 @@ export function authRateLimit() {
 
     const path = req.path || req.originalUrl || '';
     const esLibro = req.method === 'POST' && LIBRO_RECLAMACIONES_RE.test(path);
-    const isSensitive = esLibro || SENSITIVE_PATHS.some((item) => path.startsWith(item));
+    const isSensitive =
+      esLibro || SENSITIVE_PATHS.some((item) => path.startsWith(item));
     if (!isSensitive) return next();
 
     const ip = clientIp(req);
-    if (RATE_LIMIT_DISABLED || isLoopback(ip)) return next();
+    if (RATE_LIMIT_DISABLED || isLoopback(req.socket?.remoteAddress ?? ''))
+      return next();
 
     const now = Date.now();
     cleanup(now);
@@ -98,11 +122,14 @@ export function authRateLimit() {
     // El libro se cuenta por IP para todas las tiendas juntas: cambiar de slug
     // no abre una cuota nueva.
     const key = esLibro ? `${ip}:libro-reclamaciones` : `${ip}:${path}`;
-    const { limit, onlyFailed } = esLibro ? LIBRO_RECLAMACIONES_REGLA : ruleFor(path);
+    const { limit, onlyFailed } = esLibro
+      ? LIBRO_RECLAMACIONES_REGLA
+      : ruleFor(path);
 
     const current = buckets.get(key);
     const count = current && current.resetAt > now ? current.count : 0;
-    const resetAt = current && current.resetAt > now ? current.resetAt : now + WINDOW_MS;
+    const resetAt =
+      current && current.resetAt > now ? current.resetAt : now + WINDOW_MS;
 
     // Bloquear solo cuando ya se acumularon demasiados intentos (fallidos) en la
     // ventana. No se incrementa aquí: el conteo ocurre al finalizar la respuesta.
@@ -117,12 +144,48 @@ export function authRateLimit() {
       });
     }
 
+    const cuenta = claveDeCuenta(req);
+    if (cuenta) {
+      const previo = buckets.get(cuenta);
+      if (
+        previo &&
+        previo.resetAt > now &&
+        previo.count >= LOGIN_POR_CUENTA_LIMITE
+      ) {
+        res.setHeader('Retry-After', Math.ceil((previo.resetAt - now) / 1000));
+        return res.status(429).json({
+          code: 0,
+          message:
+            'Demasiados intentos fallidos. Intenta nuevamente en unos minutos.',
+          error: 'TooManyRequests',
+        });
+      }
+    }
+
     // Contar el intento al terminar la respuesta:
     //  - onlyFailed → solo si la respuesta fue un error (>= 400).
     //  - si no → siempre.
     res.on('finish', () => {
       const failed = res.statusCode >= 400;
-      if (!onlyFailed || failed) bump(key, Date.now());
+      if (!onlyFailed || failed) {
+        const n = bump(key, Date.now());
+        // Justo al quedar bloqueado, una vez: aviso al equipo (solo login).
+        if (n === limit && path.startsWith('/api/auth/login'))
+          avisarAlEquipo(
+            alertaDeBloqueo({ tipo: 'ip', valor: ip, intentos: n }),
+          );
+      }
+      if (cuenta && res.statusCode === 401) {
+        const n = bump(cuenta, Date.now());
+        if (n === LOGIN_POR_CUENTA_LIMITE)
+          avisarAlEquipo(
+            alertaDeBloqueo({
+              tipo: 'cuenta',
+              valor: cuenta.slice(7),
+              intentos: n,
+            }),
+          );
+      }
     });
 
     next();

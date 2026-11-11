@@ -10,6 +10,7 @@ import {
   IsString,
   Max,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
@@ -123,6 +124,17 @@ export class CreateProductoDto {
   @IsInt()
   @Type(() => Number)
   stockMinimo?: number;
+
+  /** Órganos y sistemas sobre los que actúa, separados por coma: la tienda busca y filtra por ellos. */
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  organos?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  sistemas?: string | null;
 
   @IsOptional()
   @IsInt()
