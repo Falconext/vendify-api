@@ -37,6 +37,20 @@ const ESTADOS_NOTIFICABLES = new Set([
   EstadoDespacho.ENTREGADO,
 ]);
 
+const COURIERS_A_AGENCIA = new Set(['SHALOM_PRO', 'SHALOM_COD', 'OLVA']);
+
+/** "En destino" de un envío que se recoge en agencia se avisa como "En agencia". */
+export function avisoComoAgencia(
+  estado: string | undefined,
+  envio: { transportista?: string | null; agenciaDestino?: string | null },
+): boolean {
+  if (estado !== EstadoDespacho.EN_DESTINO) return false;
+  return (
+    COURIERS_A_AGENCIA.has(String(envio.transportista ?? '')) ||
+    !!envio.agenciaDestino?.trim()
+  );
+}
+
 const MENSAJES_DEFAULT: Record<string, string> = {
   EN_CAMINO:
     'Hola {{nombre}}, tu pedido {{pedido}} ya está en camino 🚚. Repartidor: {{repartidor}}.',
@@ -419,15 +433,22 @@ export class EnvioDespachoService {
       );
     }
 
+    // El Panel de Ventas no tiene "En agencia": para un envío por agencia su
+    // "En destino" es el "ya llegó, puede recoger" (igual que la vista previa de
+    // mensajeParaEstado). Sin esto ese estado no avisaba nada al cliente
+    // (i-Touch, 09-11).
+    const estadoAviso = avisoComoAgencia(dto.estado, updated)
+      ? EstadoDespacho.EN_AGENCIA
+      : (dto.estado as EstadoDespacho);
     if (
       estadoCambia &&
       dto.notificar !== false &&
-      ESTADOS_NOTIFICABLES.has(dto.estado as EstadoDespacho)
+      ESTADOS_NOTIFICABLES.has(estadoAviso)
     ) {
       this.notificarCambioEstado(
         comprobanteId,
         empresaId,
-        dto.estado as EstadoDespacho,
+        estadoAviso,
         updated.repartidor?.nombre ?? null,
       ).catch((e) => this.logger.warn(`WA despacho fallido: ${e.message}`));
     }
