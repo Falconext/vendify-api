@@ -2794,7 +2794,19 @@ export class ComprobanteService {
           igv: igvMonto,
           tipAfeIgv: tipAfeIgvLibre,
           totalImpuestos: igvMonto,
-          mtoDescuento: 0,
+          // Igual que en las líneas de producto: el descuento por ítem viene
+          // plegado en el precio, y sin este monto el PDF (link de WhatsApp)
+          // salía sin la línea de descuento ni el precio de lista.
+          mtoDescuento: esGratLibre
+            ? 0
+            : this.round2(
+                Math.max(
+                  0,
+                  (Number(item.precioUnitarioOriginal ?? precioConIgv) -
+                    precioConIgv) *
+                    cantidad,
+                ),
+              ),
         };
       }
 
