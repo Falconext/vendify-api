@@ -49,6 +49,7 @@ import {
   margen,
   valorizarPartida,
 } from './valorizar-inventario';
+import { avisoNoDescontado } from './stock-no-descontado';
 
 
 /** Sedes ya validadas de un traslado (nombres para los conceptos del kardex). */
@@ -393,7 +394,7 @@ export class KardexService {
     });
 
     // Actualizar el stock en la sede y costo promedio del producto
-    await this.actualizarStockYCosto(
+    const faltante = await this.actualizarStockYCosto(
       data.productoId,
       data.sedeId,
       stockActual,
@@ -401,6 +402,20 @@ export class KardexService {
       costoUnitario,
       data.cantidad,
     );
+
+    // El descuento no alcanzó: el saldo quedó recortado a 0 y esas unidades NO
+    // se descontaron nunca. Queda anotado en el movimiento para que quien
+    // devuelva stock (anulación, nota de crédito, edición) no las invente.
+    if (faltante > 0) {
+      const observacion = [movimiento.observacion, avisoNoDescontado(faltante)]
+        .filter(Boolean)
+        .join(' · ');
+      await this.prisma.movimientoKardex.update({
+        where: { id: movimiento.id },
+        data: { observacion },
+      });
+      (movimiento as any).observacion = observacion;
+    }
 
     return movimiento;
   }
@@ -1254,10 +1269,12 @@ export class KardexService {
     tipoMovimiento: string,
     costoUnitario?: number,
     cantidad?: number,
-  ) {
+  ): Promise<number> {
     // Actualizar stock en la sede específica.
     const esSalida =
       tipoMovimiento === 'SALIDA' || tipoMovimiento === 'TRANSFERENCIA';
+    // Unidades que no se pudieron descontar (no había stock suficiente).
+    let faltante = 0;
     if (esSalida && cantidad != null) {
       // Descuento ATÓMICO: resta la cantidad en UNA sola operación condicionada
       // al stock disponible. Evita el "lost update" de dos ventas simultáneas
@@ -1270,6 +1287,11 @@ export class KardexService {
       if (dec.count === 0) {
         // No alcanzaba el stock (venta sin stock permitida / servicio): se deja
         // en 0, idéntico al comportamiento previo (Math.max(0, ...)). No bloquea.
+        const previo = await this.prisma.productoStock.findUnique({
+          where: { productoId_sedeId: { productoId, sedeId } },
+          select: { stock: true },
+        });
+        faltante = round3(Math.max(0, qty - Math.max(0, num(previo?.stock ?? 0))));
         await this.prisma.productoStock.update({
           where: { productoId_sedeId: { productoId, sedeId } },
           data: { stock: 0 },
@@ -1352,6 +1374,7 @@ export class KardexService {
     // también cambia la mezcla, y vender en la sede barata deja el producto
     // concentrado en la cara. Con una sola sede el resultado es el de siempre.
     await alinearCostoGlobal(this.prisma, productoId, producto?.costoPromedio);
+    return faltante;
   }
 
   /**

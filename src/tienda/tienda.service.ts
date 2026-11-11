@@ -35,6 +35,7 @@ import {
 import {
   SELECT_CATEGORIAS_EXTRA,
   aplanarCategoriasExtra,
+  categoriasParaMenu,
   condicionesCategoriaPorNombre,
 } from '../producto/categorias-extra.util';
 import {
@@ -46,6 +47,9 @@ import {
   type ContextoStockTienda,
 } from './stock-tienda';
 import type { DisponibilidadCarritoDto } from './dto/disponibilidad-carrito.dto';
+import { envioPublico } from './envio-tienda.util';
+import { filtroBusquedaTienda, sinTildes } from './busqueda-tienda.util';
+import { contarOrganosSistemas, filtroOrganosSistemas } from './organos-sistemas';
 
 const ESTADOS_ENVIO_NOTIFICABLES = new Set([
   'EN_CAMINO',
@@ -498,6 +502,7 @@ export class TiendaService {
         // Devolver también campos de envío/recojo para que el frontend los persista
         costoEnvioFijo: true,
         envioGratisDesdeSoles: true,
+        envioACoordinar: true,
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
@@ -575,6 +580,7 @@ export class TiendaService {
         // Campos de envío/recojo
         costoEnvioFijo: true,
         envioGratisDesdeSoles: true,
+        envioACoordinar: true,
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
@@ -1050,6 +1056,7 @@ export class TiendaService {
           colorSecundario: true,
           // Campos de envío/recojo visibles en tienda pública
           costoEnvioFijo: true,
+          envioACoordinar: true,
           aceptaRecojo: true,
           aceptaEnvio: true,
           // Si el negocio trabaja por encargo, la tienda deja de pintar
@@ -1146,7 +1153,7 @@ export class TiendaService {
         tiendaSedesIds,
       });
       return {
-        ...publico,
+        ...envioPublico(publico),
         stockTienda: {
           modo: ctxStock.modo,
           sedeDefaultId: ctxStock.sedeDefaultId,
@@ -1192,41 +1199,16 @@ export class TiendaService {
       },
     });
 
-    const categoriasMap = new Map<string, any>();
-
-    productos.forEach((p) => {
-      const categorias = [
+    const result = categoriasParaMenu(
+      productos.flatMap((p) => [
         p.categoria,
         ...(p.categoriasExtra ?? []).map((e) => e.categoria),
-      ];
-      for (const categoria of categorias) {
-        if (categoria?.nombre && !categoriasMap.has(categoria.nombre)) {
-          categoriasMap.set(categoria.nombre, {
-            nombre: categoria.nombre,
-            imagenUrl: categoria.imagenUrl,
-            // Subcategoría: el nombre de su madre, para que la tienda agrupe.
-            padre: categoria.padre?.nombre ?? null,
-          });
-        }
-        // La madre sale en el menú aunque sus productos estén todos en hijas.
-        const madre = categoria?.padre;
-        if (madre?.nombre && !categoriasMap.has(madre.nombre)) {
-          categoriasMap.set(madre.nombre, {
-            nombre: madre.nombre,
-            imagenUrl: madre.imagenUrl,
-            padre: null,
-          });
-        }
-      }
-    });
-
-    const result = Array.from(categoriasMap.values()).sort((a, b) =>
-      a.nombre.localeCompare(b.nombre),
-    );
+      ]),
+    ).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
     // Sign URLs if needed
     await Promise.all(
-      result.map(async (cat) => {
+      result.flatMap((c) => [c, ...c.subcategorias]).map(async (cat) => {
         if (cat.imagenUrl && cat.imagenUrl.includes('amazonaws.com')) {
           const parts = cat.imagenUrl.split('amazonaws.com/');
           if (parts.length > 1) {
@@ -1241,6 +1223,41 @@ export class TiendaService {
     );
 
     return result;
+  }
+
+  /**
+   * Palabras con tilde del catálogo (órganos, sistemas y nombres) para buscar
+   * sin tildes: "colageno" también encuentra "Colágeno". Cinco minutos en
+   * memoria por empresa: es el mismo catálogo en cada búsqueda.
+   */
+  private vocabularioCache = new Map<number, { hasta: number; palabras: string[] }>();
+  private async vocabularioOrganosSistemas(empresaId: number): Promise<string[]> {
+    const guardado = this.vocabularioCache.get(empresaId);
+    if (guardado && guardado.hasta > Date.now()) return guardado.palabras;
+    const filas = await this.prisma.producto.findMany({
+      where: { empresaId, estado: 'ACTIVO' },
+      select: { descripcion: true, organos: true, sistemas: true },
+    });
+    const palabras = new Set<string>();
+    for (const f of filas) {
+      for (const w of `${f.descripcion} ${f.organos ?? ''} ${f.sistemas ?? ''}`.split(/[^\p{L}]+/u)) {
+        if (w.length > 2 && sinTildes(w) !== w) palabras.add(w.toLowerCase());
+      }
+    }
+    const lista = [...palabras];
+    this.vocabularioCache.set(empresaId, { hasta: Date.now() + 5 * 60_000, palabras: lista });
+    return lista;
+  }
+
+  /** Órganos y sistemas del catálogo publicado, con cuántos productos tiene cada uno. */
+  async obtenerOrganosSistemasTienda(slug: string, sede?: unknown) {
+    const { ctx } = await this.contextoPublico(slug, sede);
+    const base = await this.whereCatalogoPublico(ctx);
+    const productos = await this.prisma.producto.findMany({
+      where: { ...base, AND: [...base.AND, { OR: [{ organos: { not: null } }, { sistemas: { not: null } }] }] },
+      select: { organos: true, sistemas: true },
+    });
+    return contarOrganosSistemas(productos);
   }
 
   async obtenerMarcasTienda(slug: string, sede?: unknown) {
@@ -1325,6 +1342,8 @@ export class TiendaService {
     brand = '',
     wholesale = false,
     sede?: unknown,
+    organo = '',
+    sistema = '',
   ) {
     try {
       // Sin tienda en el plan, la tienda no existe (404 neutro).
@@ -1422,6 +1441,8 @@ export class TiendaService {
         codigo: true,
         descripcion: true,
         descripcionLarga: true,
+        organos: true,
+        sistemas: true,
         videoUrl: true,
         precioUnitario: true,
         precioOferta: true,
@@ -1435,7 +1456,9 @@ export class TiendaService {
         ratingCount: true,
         atributosTecnicos: true,
         opcionesAtributos: true,
-        categoria: { select: { id: true, nombre: true } },
+        categoria: {
+          select: { id: true, nombre: true, padre: { select: { nombre: true } } },
+        },
         categoriasExtra: SELECT_CATEGORIAS_EXTRA,
         unidadMedida: { select: { codigo: true, nombre: true } },
         marca: { select: { id: true, nombre: true } },
@@ -1460,15 +1483,11 @@ export class TiendaService {
       // Productos de la tienda (publicados, o todos si no publicó ninguno) con
       // el filtro de stock de la sede; encima, los filtros del comprador.
       const where: any = await this.whereCatalogoPublico(ctx);
-      const term = (search || '').trim();
-      if (term) {
-        where.AND.push({
-          OR: [
-            { descripcion: { contains: term, mode: 'insensitive' } },
-            { codigo: { contains: term, mode: 'insensitive' } },
-          ],
-        });
-      }
+      // Con texto, las palabras con tilde del catálogo sirven de vocabulario
+      // para que "higado" encuentre "Hígado" (ver busqueda-tienda.util.ts).
+      const vocabulario = search.trim() ? await this.vocabularioOrganosSistemas(ctx.empresaId) : [];
+      where.AND.push(...filtroBusquedaTienda(search, vocabulario));
+      where.AND.push(...filtroOrganosSistemas(organo, sistema));
 
       // Filtro por rango de precios
       if (minPrice !== undefined || maxPrice !== undefined) {
@@ -1664,6 +1683,8 @@ export class TiendaService {
       codigo: true,
       descripcion: true,
       descripcionLarga: true,
+      organos: true,
+      sistemas: true,
       videoUrl: true,
       precioUnitario: true,
       precioOferta: true,
@@ -1678,6 +1699,7 @@ export class TiendaService {
       atributosTecnicos: true,
       categoria: {
         select: {
+          padre: { select: { nombre: true } },
           id: true,
           nombre: true,
         },
@@ -2295,6 +2317,7 @@ export class TiendaService {
       select: {
         costoEnvioFijo: true,
         envioGratisDesdeSoles: true,
+        envioACoordinar: true,
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
@@ -2309,7 +2332,7 @@ export class TiendaService {
       throw new NotFoundException('Tienda no encontrada');
     }
 
-    return empresa;
+    return envioPublico(empresa);
   }
 
   /**
@@ -2445,6 +2468,7 @@ export class TiendaService {
       select: {
         id: true,
         costoEnvioFijo: true,
+        envioACoordinar: true,
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
@@ -2496,8 +2520,11 @@ export class TiendaService {
       );
     }
 
+    // Si el negocio coordina el envío aparte, el pedido no lo cobra.
     const costoEnvio =
-      tipoEntrega === 'ENVIO' ? Number(empresa.costoEnvioFijo || 0) : 0;
+      tipoEntrega === 'ENVIO' && !empresa.envioACoordinar
+        ? Number(empresa.costoEnvioFijo || 0)
+        : 0;
 
     let subtotal = 0;
     const itemsData: {
@@ -3448,6 +3475,7 @@ export class TiendaService {
       select: {
         costoEnvioFijo: true,
         envioGratisDesdeSoles: true,
+        envioACoordinar: true,
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
@@ -3480,6 +3508,7 @@ export class TiendaService {
       select: {
         costoEnvioFijo: true,
         envioGratisDesdeSoles: true,
+        envioACoordinar: true,
         minimoCompra: true,
         aceptaRecojo: true,
         aceptaEnvio: true,
@@ -3799,6 +3828,7 @@ export class TiendaService {
             razonSocial: true,
             whatsappTienda: true,
             direccionRecojo: true,
+            envioACoordinar: true,
           },
         },
         // Dónde recoger (pedido con sede).

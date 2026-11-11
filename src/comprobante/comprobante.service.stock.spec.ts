@@ -9,6 +9,16 @@ import { ProductoLoteService } from '../producto/producto-lote.service';
 import { EnviarSunatService } from './enviar-sunat.service';
 import { ComisionesService } from '../comisiones/comisiones.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { avisoNoDescontado } from '../kardex/stock-no-descontado';
+
+// La primera consulta trae las salidas de la venta y la segunda lo ya devuelto.
+// Sin cantidad explícita, la salida alcanza para cualquier devolución.
+const salidasDe =
+  (salidas: any[], devoluciones: any[] = []) =>
+  async ({ where }: any) =>
+    where.tipoMovimiento === 'SALIDA'
+      ? salidas.map((s) => ({ cantidad: 1000, ...s }))
+      : devoluciones;
 
 describe('ComprobanteService - Stock Management', () => {
   let service: ComprobanteService;
@@ -149,10 +159,10 @@ describe('ComprobanteService - Stock Management', () => {
 
       // Un comprobante que descontó stock tiene movimientos SALIDA en kardex;
       // revertirStock solo revierte cuando existen.
-      mockPrismaService.movimientoKardex.findMany.mockResolvedValue([
+      mockPrismaService.movimientoKardex.findMany.mockImplementation(salidasDe([
         { id: 501, productoId: 100, sedeId: 1, tipoMovimiento: 'SALIDA' },
         { id: 502, productoId: 101, sedeId: 1, tipoMovimiento: 'SALIDA' },
-      ]);
+      ]));
 
       await service.anularComprobante(1);
 
@@ -212,9 +222,9 @@ describe('ComprobanteService - Stock Management', () => {
         saldo: 0,
       });
 
-      mockPrismaService.movimientoKardex.findMany.mockResolvedValue([
+      mockPrismaService.movimientoKardex.findMany.mockImplementation(salidasDe([
         { id: 503, productoId: 102, sedeId: 1, tipoMovimiento: 'SALIDA' },
-      ]);
+      ]));
 
       await service.anularComprobante(2);
 
@@ -307,9 +317,9 @@ describe('ComprobanteService - Stock Management', () => {
         estadoEnvioSunat: 'ANULADO',
       });
 
-      mockPrismaService.movimientoKardex.findMany.mockResolvedValue([
+      mockPrismaService.movimientoKardex.findMany.mockImplementation(salidasDe([
         { id: 505, productoId: 999, sedeId: 1, tipoMovimiento: 'SALIDA' },
-      ]);
+      ]));
 
       await service.anularComprobante(4);
 
@@ -336,9 +346,9 @@ describe('ComprobanteService - Stock Management', () => {
         empresaId: 5,
         detalles: [{ id: 1, productoId: 100, cantidad: 5 }],
       });
-      mockPrismaService.movimientoKardex.findMany.mockResolvedValue([
+      mockPrismaService.movimientoKardex.findMany.mockImplementation(salidasDe([
         { id: 501, productoId: 100, sedeId: 1, tipoMovimiento: 'SALIDA' },
-      ]);
+      ]));
 
       await expect(service.anularComprobante(7)).rejects.toThrow(
         'ya está anulado',
@@ -357,9 +367,9 @@ describe('ComprobanteService - Stock Management', () => {
         detalles: [{ id: 1, productoId: 100, cantidad: 3 }],
       });
       mockPrismaService.producto.findUnique.mockResolvedValue({ id: 100, stock: 7, costoPromedio: 1 });
-      mockPrismaService.movimientoKardex.findMany.mockResolvedValue([
+      mockPrismaService.movimientoKardex.findMany.mockImplementation(salidasDe([
         { id: 700, productoId: 100, sedeId: 1, tipoMovimiento: 'SALIDA' },
-      ]);
+      ]));
       mockPrismaService.comprobante.update.mockResolvedValue({ id: 9 });
       mockPrismaService.comprobante.updateMany
         .mockResolvedValueOnce({ count: 1 })
@@ -372,6 +382,110 @@ describe('ComprobanteService - Stock Management', () => {
 
       expect(r.map((x) => x.status).sort()).toEqual(['fulfilled', 'rejected']);
       expect(mockKardexService.registrarMovimiento).toHaveBeenCalledTimes(1);
+    });
+
+    describe('venta hecha sin stock', () => {
+      const aviso = avisoNoDescontado;
+      const anular = async (cantidad: number, salidas: any[], devoluciones: any[] = []) => {
+        mockPrismaService.comprobante.findUnique.mockResolvedValue({
+          id: 9,
+          tipoDoc: 'NV',
+          serie: 'NV01',
+          correlativo: 46,
+          estadoEnvioSunat: 'NO_APLICA',
+          empresaId: 5,
+          detalles: [{ id: 1, productoId: 100, cantidad }],
+        });
+        mockPrismaService.producto.findUnique.mockResolvedValue({ stock: 0, costoPromedio: 10 });
+        mockPrismaService.comprobante.update.mockResolvedValue({ id: 9 });
+        mockPrismaService.movimientoKardex.findMany.mockImplementation(salidasDe(salidas, devoluciones));
+        await service.anularComprobante(9);
+      };
+      const salida = (cantidad: number, faltante?: number) => ({
+        id: 1,
+        productoId: 100,
+        sedeId: 1,
+        tipoMovimiento: 'SALIDA',
+        cantidad,
+        observacion: faltante ? aviso(faltante) : null,
+      });
+
+      it('no descontó nada: anular no inventa stock', async () => {
+        await anular(2, [salida(2, 2)]);
+        expect(mockKardexService.registrarMovimiento).not.toHaveBeenCalled();
+      });
+
+      it('descontó una parte: anular devuelve solo esa parte y lo explica', async () => {
+        await anular(3, [salida(3, 2)]);
+        expect(mockKardexService.registrarMovimiento).toHaveBeenCalledTimes(1);
+        expect(mockKardexService.registrarMovimiento).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tipoMovimiento: 'INGRESO',
+            cantidad: 1,
+            observacion: expect.stringContaining('De 3 solo se devuelven 1'),
+          }),
+        );
+      });
+
+      it('con stock de sobra se devuelve todo y sin nota', async () => {
+        await anular(3, [salida(3)]);
+        const mov = mockKardexService.registrarMovimiento.mock.calls[0][0];
+        expect(mov.cantidad).toBe(3);
+        expect(mov.observacion).toBeUndefined();
+      });
+
+      it('saldo negativo permitido: la salida no trae nota y se devuelve todo', async () => {
+        await anular(2, [{ ...salida(2), stockAnterior: 0, stockActual: -2 }]);
+        expect(mockKardexService.registrarMovimiento).toHaveBeenCalledWith(
+          expect.objectContaining({ cantidad: 2 }),
+        );
+      });
+
+      it('no devuelve otra vez lo que una edición o nota ya devolvió', async () => {
+        await anular(3, [salida(5)], [{ productoId: 100, tipoMovimiento: 'INGRESO', cantidad: 4 }]);
+        expect(mockKardexService.registrarMovimiento).toHaveBeenCalledWith(
+          expect.objectContaining({ cantidad: 1 }),
+        );
+      });
+
+      it('la devolución de una nota descartada se deshizo: vuelve a estar disponible', async () => {
+        await anular(3, [salida(3)], [
+          { productoId: 100, tipoMovimiento: 'INGRESO', cantidad: 3 },
+          { productoId: 100, tipoMovimiento: 'SALIDA', cantidad: 3 },
+        ]);
+        expect(mockKardexService.registrarMovimiento).toHaveBeenCalledWith(
+          expect.objectContaining({ cantidad: 3 }),
+        );
+      });
+
+      it('el mismo producto en dos líneas comparte lo descontado', async () => {
+        mockPrismaService.comprobante.findUnique.mockResolvedValue({
+          id: 9,
+          tipoDoc: 'NV',
+          serie: 'NV01',
+          correlativo: 46,
+          estadoEnvioSunat: 'NO_APLICA',
+          empresaId: 5,
+          detalles: [
+            { id: 1, productoId: 100, cantidad: 2 },
+            { id: 2, productoId: 100, cantidad: 2 },
+          ],
+        });
+        mockPrismaService.producto.findUnique.mockResolvedValue({ stock: 0, costoPromedio: 10 });
+        mockPrismaService.comprobante.update.mockResolvedValue({ id: 9 });
+        mockPrismaService.movimientoKardex.findMany.mockImplementation(
+          salidasDe([salida(2), { ...salida(2, 1), id: 2 }]),
+        );
+        await service.anularComprobante(9);
+        const cantidades = mockKardexService.registrarMovimiento.mock.calls.map((c) => c[0].cantidad);
+        expect(cantidades).toEqual([2, 1]);
+      });
+
+      it('busca las devoluciones de sus notas por ambas formas del correlativo', async () => {
+        await anular(1, [salida(1)]);
+        const [{ where }] = mockPrismaService.movimientoKardex.findMany.mock.calls[1];
+        expect(where.OR[1].comprobante.numDocAfectado.in).toEqual(['NV01-46', 'NV01-00000046']);
+      });
     });
 
     it('debería lanzar NotFoundException si el comprobante no existe', async () => {
@@ -413,9 +527,9 @@ describe('ComprobanteService - Stock Management', () => {
       });
       mockPrismaService.pago.deleteMany.mockResolvedValue({ count: 2 });
 
-      mockPrismaService.movimientoKardex.findMany.mockResolvedValue([
+      mockPrismaService.movimientoKardex.findMany.mockImplementation(salidasDe([
         { id: 504, productoId: 200, sedeId: 1, tipoMovimiento: 'SALIDA' },
-      ]);
+      ]));
 
       await service.anularComprobante(10);
 
@@ -547,9 +661,9 @@ describe('ComprobanteService - Stock Management', () => {
         numDocAfectado: null,
         motivoId: null,
       });
-      mockPrismaService.movimientoKardex.findMany.mockResolvedValue([
+      mockPrismaService.movimientoKardex.findMany.mockImplementation(salidasDe([
         { id: 1, productoId: 7, sedeId: 117, tipoMovimiento: 'SALIDA' },
-      ]);
+      ]));
       mockPrismaService.producto.findUnique.mockResolvedValue({
         stock: 5,
         costoPromedio: 10,

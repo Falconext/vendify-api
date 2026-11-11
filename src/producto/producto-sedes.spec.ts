@@ -134,6 +134,26 @@ describe('ProductoService — disponibilidad por sede', () => {
     });
   });
 
+  describe('sede que ya estaba oculta con stock', () => {
+    it('no traba el guardado si sigue sin marcar', async () => {
+      prisma.productoStock.findMany.mockResolvedValue([
+        { sedeId: 1, stock: 25, visibleEnSede: false },
+        { sedeId: 2, stock: 0, visibleEnSede: true },
+      ]);
+      await expect(
+        service.validarSedesDisponibles(10, 1, [2], { sedeId: 2, stock: 22 }),
+      ).resolves.toHaveLength(2);
+    });
+    it('quitar una sede visible con stock sigue bloqueado', async () => {
+      prisma.productoStock.findMany.mockResolvedValue([
+        { sedeId: 1, stock: 25, visibleEnSede: true },
+      ]);
+      await expect(
+        service.validarSedesDisponibles(10, 1, [2]),
+      ).rejects.toThrow('Ancón');
+    });
+  });
+
   describe('actualizar: "Disponible en" antes de escribir', () => {
     beforeEach(() => {
       prisma.producto.findFirst.mockResolvedValue({ id: 10, empresaId: 1, stock: 0, costoPromedio: 0 });

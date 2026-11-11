@@ -160,6 +160,7 @@ export class ComprobanteController {
       estado: query.estado as any,
       tipoDoc: query.tipoDoc,
       estadoPago: query.estadoPago,
+      estadoOT: query.estadoOT,
       soloPendientesSunat: query.soloPendientesSunat,
     });
     res.locals.message = 'Comprobantes listados correctamente';

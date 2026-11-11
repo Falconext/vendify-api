@@ -315,6 +315,8 @@ model Empresa {
   esWhiteLabel              Boolean                       @default(false) // Cliente bajo la marca blanca del reseller vs. marca estándar.
   costoEnvioFijo            Decimal?                      @default(0)
   envioGratisDesdeSoles     Decimal?                      @default(0)
+  /// El negocio coordina el envío aparte: la tienda no cobra envío ni lo anuncia gratis.
+  envioACoordinar           Boolean                       @default(false)
   minimoCompra              Decimal?                      @default(0)
   direccionRecojo           String?
   tiempoPreparacionMin      Int?                          @default(30)
@@ -645,6 +647,10 @@ model Producto {
   localizacion        String?
   porcentajeVenta     Int                  @default(100)
   porcentajeProvision Int                  @default(0)
+  /// Órganos y sistemas sobre los que actúa ("Hígado, Colon"), separados por
+  /// coma. Naturistas: la tienda busca y filtra por ellos.
+  organos             String?
+  sistemas            String?
   detalleCompras      DetalleCompra[]
   detallesOrdenCompra DetalleOrdenCompra[]
   detalleComprobantes DetalleComprobante[]

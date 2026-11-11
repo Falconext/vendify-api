@@ -28,6 +28,7 @@ import {
 } from './detalle-adicional';
 import { fechaLima, vencimientoCobro } from './utils/vencimiento-cobro';
 import { NOTA_SIN_CONVERTIR } from './convertidos';
+import { saldoPorDevolver } from '../kardex/stock-no-descontado';
 import { repartirPago } from './cobro-varias';
 import { excesosSobreSaldo, lineasPorConvertir, totalDeLineas } from './saldo-por-convertir';
 import {
@@ -115,6 +116,7 @@ const CAMPOS_DESPACHO_LISTA = {
   creadoEn: true,
 } as const;
 
+import { ESTADOS_OT, esEstadoOT, filtroEstadoOT } from './utils/estado-ot';
 @Injectable()
 export class ComprobanteService {
   private readonly logger = new Logger(ComprobanteService.name);
@@ -358,6 +360,7 @@ export class ComprobanteService {
     estado?: string;
     tipoDoc?: string;
     estadoPago?: string;
+    estadoOT?: string;
     soloPendientesSunat?: string | boolean;
   }) {
     const {
@@ -508,6 +511,12 @@ export class ComprobanteService {
             }
           : {}),
       };
+      // Filtro "Fabricación": solo órdenes de trabajo en ese estado.
+      const condicionOT = filtroEstadoOT(params.estadoOT);
+      if (condicionOT && tiposPermitidos.includes('OT')) {
+        where.tipoDoc = 'OT';
+        where.AND = [...(where.AND ?? []), condicionOT];
+      }
 
       const [rawItems, totalDb] = await Promise.all([
         this.prisma.comprobante.findMany({
@@ -3333,6 +3342,37 @@ export class ComprobanteService {
     }
   }
 
+  /**
+   * Lo ya devuelto de una venta: sus propios INGRESO (ediciones) y los
+   * movimientos de sus notas de crédito, incluida la SALIDA con que se deshace
+   * la devolución de una nota descartada.
+   */
+  private async devolucionesPrevias(comprobanteId?: number, empresaId?: number) {
+    const origen = await this.prisma.comprobante.findUnique({
+      where: { id: comprobanteId },
+      select: { serie: true, correlativo: true },
+    });
+    // `numDocAfectado` se guarda con el correlativo con o sin ceros a la izquierda.
+    const refs = origen
+      ? [String(origen.correlativo), String(origen.correlativo).padStart(8, '0')].map(
+          (corr) => `${origen.serie}-${corr}`,
+        )
+      : [];
+    return this.prisma.movimientoKardex.findMany({
+      where: {
+        empresaId,
+        OR: [
+          { comprobanteId, tipoMovimiento: 'INGRESO' },
+          {
+            tipoMovimiento: { in: ['INGRESO', 'SALIDA'] },
+            comprobante: { empresaId, tipoDoc: '07', numDocAfectado: { in: refs } },
+          },
+        ],
+      },
+      select: { productoId: true, tipoMovimiento: true, cantidad: true },
+    });
+  }
+
   private async revertirStock(
     detalles: any[],
     data?: {
@@ -3371,6 +3411,16 @@ export class ComprobanteService {
       return;
     }
 
+    // Solo vuelve lo que la venta descontó y aún no se devolvió. Una venta sin
+    // stock no descontó nada: devolver lo vendido inventaba unidades.
+    const saldoDevolucion = saldoPorDevolver(
+      movimientosOriginales,
+      await this.devolucionesPrevias(
+        data?.origenComprobanteId ?? data?.comprobanteId,
+        data?.empresaId,
+      ),
+    );
+
     for (const item of detalles) {
       if (item.productoId) {
         const producto = await this.prisma.producto.findUnique({
@@ -3387,6 +3437,12 @@ export class ComprobanteService {
           continue;
         }
 
+        const pedido = Number(item.cantidad);
+        const saldo = saldoDevolucion.get(item.productoId) ?? 0;
+        const cantidadADevolver = Math.max(0, Math.min(pedido, saldo));
+        if (!(cantidadADevolver > 0)) continue;
+        saldoDevolucion.set(item.productoId, saldo - cantidadADevolver);
+
         if (producto) {
           // Registrar movimiento de kardex GLOBAL (siempre se hace para subir el stock del producto)
           if (data && this.kardexService) {
@@ -3399,10 +3455,15 @@ export class ComprobanteService {
                   empresaId: data.empresaId,
                   tipoMovimiento: 'INGRESO',
                   concepto: data.concepto,
-                  cantidad: item.cantidad,
+                  cantidad: cantidadADevolver,
                   comprobanteId: data.comprobanteId,
                   costoUnitario: costoUnitario,
                   usuarioId: data.usuarioId,
+                  ...(cantidadADevolver < pedido
+                    ? {
+                        observacion: `De ${pedido} solo se devuelven ${cantidadADevolver}: el resto no se había descontado o ya se devolvió.`,
+                      }
+                    : {}),
                   sedeId:
                     movimientosOriginales.find(
                       (m) => m.productoId === item.productoId,
@@ -6822,6 +6883,18 @@ export class ComprobanteService {
       }
     }
 
+    // La copia del A4 en S3 (s3PdfUrl) quedó con los montos de antes de la
+    // edición, y hay lectores que la usan tal cual (enlace de WhatsApp, API
+    // ERP). Se rehace en segundo plano sobre la misma key; si falla, "Ver
+    // PDF" igual la regenera porque las informales ya no se sirven cacheadas.
+    if (comp.s3PdfUrl) {
+      this.generarYSubirPdf(comp.id, { empresaId }, true).catch((err: any) =>
+        this.logger.warn(
+          `[editarNotaVenta] No se pudo refrescar el PDF ${comp.id}: ${err?.message}`,
+        ),
+      );
+    }
+
     return this.prisma.comprobante.findUnique({
       where: { id: comp.id },
       include: { detalles: true },
@@ -7211,11 +7284,13 @@ export class ComprobanteService {
       );
     }
 
-    const estadosValidos = ['EN_PROCESO', 'LISTO', 'ENTREGADO'];
-    if (!estadosValidos.includes(input.estadoOT)) {
+    if (!esEstadoOT(input.estadoOT)) {
       throw new BadRequestException(
-        `Estado debe ser uno de: ${estadosValidos.join(', ')}`,
+        `Estado debe ser uno de: ${ESTADOS_OT.join(', ')}`,
       );
+    }
+    if (comp.estadoPago === 'ANULADO') {
+      throw new BadRequestException('La orden de trabajo está anulada');
     }
 
     if (input.estadoOT === 'ENTREGADO' && (comp.saldo ?? 0) > 0) {
@@ -7941,14 +8016,16 @@ export class ComprobanteService {
     });
 
     if (!comprobante) throw new NotFoundException('Comprobante no encontrado');
-    // Las cotizaciones son editables y su formato es configurable por empresa,
-    // así que NO se cachea el PDF: siempre se regenera para reflejar el formato
-    // vigente. Los comprobantes fiscales sí conservan el PDF cacheado.
+    // Solo los comprobantes fiscales (no cambian después de emitidos) sirven el
+    // PDF cacheado. Las informales y cotizaciones se editan, cobran y cambian de
+    // saldo: con el A4 cacheado salía el total de antes de editar mientras el
+    // ticket (siempre regenerado) ya mostraba el nuevo.
     const esCotizacion = comprobante.tipoDoc === 'COT';
+    const esFiscal = ['01', '03', '07', '08'].includes(comprobante.tipoDoc);
     // s3PdfUrl guarda solo el A4 (es el que va al correo y a contabilidad); los
     // otros tamaños se regeneran y NO tocan esa columna.
     const esFormatoPrincipal = formato === 'a4' || esCotizacion;
-    if (comprobante.s3PdfUrl && !esCotizacion && !force && esFormatoPrincipal)
+    if (comprobante.s3PdfUrl && esFiscal && !force && esFormatoPrincipal)
       return comprobante.s3PdfUrl;
 
     let buffer: Buffer;

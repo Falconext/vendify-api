@@ -1,7 +1,7 @@
 /**
  * Subcategorías y filtros del inventario (pedido 02-11).
  */
-import { filtroPorCategoria, separarRutaCategoria, condicionesCategoriaPorNombre } from './categorias-extra.util';
+import { categoriasParaMenu, filtroPorCategoria, separarRutaCategoria, condicionesCategoriaPorNombre } from './categorias-extra.util';
 import { agruparAtributos, parsearFiltroVariante } from './filtro-variante';
 
 describe('filtrar por una categoría trae también sus subcategorías', () => {
@@ -19,6 +19,56 @@ describe('filtrar por una categoría trae también sus subcategorías', () => {
   it('en la tienda, elegir la madre por nombre incluye a sus hijas', () => {
     const conds = condicionesCategoriaPorNombre(['Peluches']) as any[];
     expect(conds).toContainEqual({ categoria: { padre: { nombre: { equals: 'Peluches', mode: 'insensitive' } } } });
+  });
+});
+
+describe('tienda: subcategoría con su madre', () => {
+  const insensible = (equals: string) => ({ equals, mode: 'insensitive' });
+  const rama = { nombre: insensible('Honda'), padre: { nombre: insensible('Sliders') } };
+
+  it.each(['Sliders › Honda', 'Sliders > Honda', 'Sliders>Honda'])('"%s" filtra por esa rama, principal o adicional', (ruta) => {
+    const conds = condicionesCategoriaPorNombre([ruta]) as any[];
+    expect(conds).toContainEqual({ categoria: rama });
+    expect(conds).toContainEqual({ categoriasExtra: { some: { categoria: rama } } });
+  });
+
+  it('un nombre sin ruta no agrega rama', () => {
+    expect(condicionesCategoriaPorNombre(['Honda'])).toHaveLength(4);
+  });
+});
+
+describe('menú de categorías de la tienda', () => {
+  const sliders = { nombre: 'Sliders', imagenUrl: 's.jpg' };
+  const cascos = { nombre: 'Cascos', imagenUrl: null };
+  const honda = { nombre: 'Honda', imagenUrl: null };
+
+  it('solo principales; la madre sale aunque sus productos estén todos en la hija', () => {
+    expect(categoriasParaMenu([{ ...honda, padre: sliders }])).toEqual([
+      { nombre: 'Sliders', imagenUrl: 's.jpg', subcategorias: [honda] },
+    ]);
+  });
+
+  it('el mismo nombre bajo dos madres queda en cada una, sin repetirse', () => {
+    const menu = categoriasParaMenu([
+      { ...honda, padre: sliders },
+      { ...honda, padre: cascos },
+      { ...honda, padre: sliders },
+    ]);
+    expect(menu.map((c) => [c.nombre, c.subcategorias.map((h) => h.nombre)])).toEqual([
+      ['Sliders', ['Honda']],
+      ['Cascos', ['Honda']],
+    ]);
+  });
+
+  it('un nombre que es principal y también hija sale en los dos lugares', () => {
+    const menu = categoriasParaMenu([{ ...honda, padre: sliders }, honda]);
+    expect(menu.map((c) => c.nombre)).toEqual(['Sliders', 'Honda']);
+    expect(menu[0].subcategorias).toEqual([honda]);
+  });
+
+  it('ordena las hijas e ignora productos sin categoría', () => {
+    const menu = categoriasParaMenu([null, undefined, { nombre: 'Z', imagenUrl: null, padre: sliders }, { nombre: 'A', imagenUrl: null, padre: sliders }]);
+    expect(menu[0].subcategorias.map((h) => h.nombre)).toEqual(['A', 'Z']);
   });
 });
 
