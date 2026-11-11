@@ -19,6 +19,7 @@ import {
   leyendaRetencion,
 } from './retencion';
 import { numeroALetras } from './utils/numero-a-letras';
+import { direccionSedeParaImprimir } from './utils/direccion-sede';
 import axios from 'axios';
 import { QpseClient, QpseSendResponse } from '../common/utils/qpse.client';
 import { lineasPagoMixto } from '../common/utils/pago-mixto';
@@ -2465,16 +2466,11 @@ export class EnviarSunatService {
               return { ...det, lotes: lotesParsed };
             });
 
-            // Dirección de la sede emisora: solo se muestra si tiene una
-            // dirección propia distinta a la fiscal del RUC.
-            const sedeDir = ((comp as any).sede?.direccion || '')
-              .trim()
-              .toUpperCase();
-            const fiscalDir = (comp.empresa.direccion || '')
-              .trim()
-              .toUpperCase();
-            const sedeDireccionPdf =
-              sedeDir && sedeDir !== fiscalDir ? sedeDir : '';
+            // Dirección de la sede emisora: solo si es otro local que la fiscal.
+            const sedeDireccionPdf = direccionSedeParaImprimir(
+              (comp as any).sede?.direccion,
+              comp.empresa.direccion,
+            );
 
             const pdfData = {
               tipoMoneda: (comp as any)?.tipoMoneda || 'PEN',
@@ -3755,13 +3751,11 @@ export class EnviarSunatService {
 
       const qrSunat = await generarQrSunatDataUrl(comp, comp.empresa);
 
-      // Dirección de la sede emisora: solo se muestra si tiene una
-      // dirección propia distinta a la fiscal del RUC.
-      const sedeDir = ((comp as any).sede?.direccion || '')
-        .trim()
-        .toUpperCase();
-      const fiscalDir = (comp.empresa.direccion || '').trim().toUpperCase();
-      const sedeDireccionPdf = sedeDir && sedeDir !== fiscalDir ? sedeDir : '';
+      // Dirección de la sede emisora: solo si es otro local que la fiscal.
+      const sedeDireccionPdf = direccionSedeParaImprimir(
+        (comp as any).sede?.direccion,
+        comp.empresa.direccion,
+      );
 
       const pdfData = {
         tipoMoneda: (comp as any)?.tipoMoneda || 'PEN',
