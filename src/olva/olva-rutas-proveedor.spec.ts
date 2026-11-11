@@ -12,6 +12,44 @@ import { OlvaApiService } from './olva-api.service';
  * cambió y lo único que no se nota hasta que un cliente reclama.
  */
 describe('Rutas del proveedor Olva', () => {
+  describe('registro de una guía', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it('muestra el motivo real de un 422, no "Olva respondió 422"', async () => {
+      jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: false,
+        status: 422,
+        text: async () =>
+          JSON.stringify({
+            error: 'Olva respondió 422 en cart-item',
+            details: {
+              body: {
+                detail: 'Los datos enviados no son validos.',
+                errors: [{ detail: 'Las medidas y el peso deben coincidir.' }],
+              },
+            },
+          }),
+      } as any);
+
+      await expect(new OlvaApiService().crearEnvio({} as any)).rejects.toThrow(
+        'Las medidas y el peso deben coincidir.',
+      );
+    });
+
+    it('manda la Idempotency-Key', async () => {
+      const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: {} }),
+      } as any);
+
+      await new OlvaApiService().crearEnvio({} as any, 'despacho-5-x');
+
+      expect((fetchMock.mock.calls[0][1] as any).headers['Idempotency-Key']).toBe(
+        'despacho-5-x',
+      );
+    });
+  });
+
   const montar = (respuesta: any = { success: true, data: {} }) => {
     const api = new OlvaApiService();
     const pedido = jest.fn().mockResolvedValue({ json: async () => respuesta });

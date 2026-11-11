@@ -2544,6 +2544,9 @@ model DespachoMensajeTemplate {
   mensajeEntregadoAgencia String?
   notificarEnCamino  Boolean @default(true)
   notificarEntregado Boolean @default(true)
+  /// La clave de retiro en los avisos. Apagada: el negocio la da aparte,
+  /// por ejemplo cuando ya le pagaron.
+  claveEnAvisos      Boolean @default(true)
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
