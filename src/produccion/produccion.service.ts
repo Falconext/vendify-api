@@ -15,6 +15,7 @@ import { UpdateEstadoOrdenDto } from './dto/update-estado-orden.dto';
 import { UpdateMetodoSalidaDto } from './dto/update-metodo-salida.dto';
 import { Prisma } from '@prisma/client';
 import { ProductoService } from '../producto/producto.service';
+import { recalcularStockPadre } from '../producto/variantes.util';
 import { Decimal } from '@prisma/client/runtime/library';
 import {
   alinearCostoGlobal,
@@ -89,13 +90,25 @@ export class ProduccionService {
     );
   }
 
-  private async asegurarRubroFabricacion(empresaId: number) {
+  /**
+   * Producción sirve a cualquier rubro: se activa con el módulo en el plan. Los
+   * rubros de fabricación la tienen siempre, como antes de existir el módulo.
+   */
+  private async asegurarAccesoProduccion(empresaId: number) {
     const empresa = await this.prisma.empresa.findUnique({
       where: { id: empresaId },
       select: {
         id: true,
         rubro: {
           select: { nombre: true },
+        },
+        plan: {
+          select: {
+            modulosAsignados: {
+              where: { modulo: { codigo: 'produccion' } },
+              select: { id: true },
+            },
+          },
         },
       },
     });
@@ -104,9 +117,35 @@ export class ProduccionService {
       throw new NotFoundException('Empresa no encontrada.');
     }
 
-    if (!this.esRubroFabricacion(empresa.rubro?.nombre)) {
+    const enPlan = (empresa.plan?.modulosAsignados?.length ?? 0) > 0;
+    if (!enPlan && !this.esRubroFabricacion(empresa.rubro?.nombre)) {
       throw new ForbiddenException(
-        'El módulo de producción está habilitado solo para rubros de fabricación/manufactura.',
+        'Tu plan no incluye el módulo de Producción.',
+      );
+    }
+  }
+
+  /**
+   * El stock de un modelo con tallas/colores es la suma de sus variantes: lo que
+   * entre o salga de él directamente se pierde al siguiente recálculo. Por eso
+   * se produce y se consume siempre sobre la variante.
+   */
+  private async asegurarSinVariantes(
+    empresaId: number,
+    productoIds: number[],
+    uso: string,
+  ) {
+    const modelo = await this.prisma.producto.findFirst({
+      where: {
+        empresaId,
+        id: { in: productoIds },
+        variantes: { some: { estado: 'ACTIVO' } },
+      },
+      select: { descripcion: true },
+    });
+    if (modelo) {
+      throw new BadRequestException(
+        `"${modelo.descripcion}" tiene variantes: elige la talla o el color exacto ${uso}.`,
       );
     }
   }
@@ -410,6 +449,12 @@ export class ProduccionService {
       },
     });
 
+    const { productoPadreId } = await tx.producto.findUniqueOrThrow({
+      where: { id: data.productoId },
+      select: { productoPadreId: true },
+    });
+    if (productoPadreId) await recalcularStockPadre(tx, productoPadreId);
+
     if (data.tipoMovimiento === 'INGRESO' && data.costoUnitario !== undefined) {
       const producto = await tx.producto.findUnique({
         where: { id: data.productoId },
@@ -461,7 +506,7 @@ export class ProduccionService {
 
   async crearReceta(empresaId: number, dto: CreateRecetaDto) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
 
     if (!dto.componentes?.length) {
       throw new BadRequestException('La receta debe tener al menos un insumo.');
@@ -477,6 +522,11 @@ export class ProduccionService {
       empresaId,
       dto.productoFinalId,
       'producto final',
+    );
+    await this.asegurarSinVariantes(
+      empresaId,
+      dto.componentes.map((item) => item.productoInsumoId),
+      'como insumo',
     );
 
     const componentes = await Promise.all(
@@ -552,7 +602,7 @@ export class ProduccionService {
 
   async obtenerConfiguracionProduccion(empresaId: number) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
     const empresa = await this.prisma.empresa.findUnique({
       where: { id: empresaId },
       select: { metodoSalidaLotes: true },
@@ -570,7 +620,7 @@ export class ProduccionService {
     usuarioId?: number,
   ) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
     const configActual = await this.obtenerConfiguracionProduccion(empresaId);
     const metodoSalidaLotes = this.normalizarMetodoSalidaLotes(
       dto.metodoSalidaLotes,
@@ -607,7 +657,7 @@ export class ProduccionService {
 
   async listarHistorialConfiguracionProduccion(empresaId: number, limit = 8) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
     const safeLimit = Math.max(1, Math.min(Number(limit) || 8, 30));
     return this.prisma.empresaLog.findMany({
       where: {
@@ -629,7 +679,7 @@ export class ProduccionService {
 
   async listarRecetas(empresaId: number, activo?: string) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
     const filtroActivo =
       activo === undefined
         ? undefined
@@ -642,7 +692,22 @@ export class ProduccionService {
       },
       include: {
         productoFinal: {
-          select: { id: true, codigo: true, descripcion: true },
+          select: {
+            id: true,
+            codigo: true,
+            descripcion: true,
+            variantes: {
+              where: { estado: 'ACTIVO' },
+              select: {
+                id: true,
+                codigo: true,
+                descripcion: true,
+                valoresAtributos: true,
+                stock: true,
+              },
+              orderBy: { id: 'asc' },
+            },
+          },
         },
         _count: { select: { componentes: true, ordenes: true } },
       },
@@ -652,7 +717,7 @@ export class ProduccionService {
 
   async obtenerReceta(empresaId: number, recetaId: number) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
     const receta = await this.prisma.recetaProduccion.findFirst({
       where: { id: recetaId, empresaId },
       include: {
@@ -688,7 +753,7 @@ export class ProduccionService {
     dto: UpdateRecetaDto,
   ) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
     await this.obtenerRecetaEmpresa(empresaId, recetaId);
 
     if (dto.productoFinalId) {
@@ -706,6 +771,11 @@ export class ProduccionService {
           'La receta no puede quedarse sin componentes.',
         );
       }
+      await this.asegurarSinVariantes(
+        empresaId,
+        dto.componentes.map((item) => item.productoInsumoId),
+        'como insumo',
+      );
       componentes = await Promise.all(
         dto.componentes.map(async (item, index) => {
           if (item.cantidadBase <= 0) {
@@ -793,7 +863,7 @@ export class ProduccionService {
 
   async crearOrden(empresaId: number, dto: CreateOrdenProduccionDto) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
 
     if (!dto.recetaId && !dto.productoFinalId) {
       throw new BadRequestException(
@@ -821,6 +891,11 @@ export class ProduccionService {
       empresaId,
       productoFinalId,
       'producto final',
+    );
+    await this.asegurarSinVariantes(
+      empresaId,
+      [productoFinalId],
+      'que vas a producir',
     );
 
     if (dto.usuarioResponsableId) {
@@ -909,6 +984,11 @@ export class ProduccionService {
         'La orden debe tener al menos un componente.',
       );
     }
+    await this.asegurarSinVariantes(
+      empresaId,
+      componentesOrden.map((item) => item.productoInsumoId),
+      'como insumo',
+    );
 
     try {
       return await this.prisma.ordenProduccion.create({
@@ -962,7 +1042,7 @@ export class ProduccionService {
 
   async listarOrdenes(empresaId: number, query: any) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
     const {
       estado,
       productoFinalId,
@@ -1005,7 +1085,12 @@ export class ProduccionService {
             },
           },
           productoFinal: {
-            select: { id: true, codigo: true, descripcion: true },
+            select: {
+              id: true,
+              codigo: true,
+              descripcion: true,
+              valoresAtributos: true,
+            },
           },
           usuarioResponsable: {
             select: { id: true, nombre: true, email: true },
@@ -1048,7 +1133,7 @@ export class ProduccionService {
 
   async obtenerOrden(empresaId: number, ordenId: number) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
 
     const orden = await this.prisma.ordenProduccion.findFirst({
       where: { id: ordenId, empresaId },
@@ -1100,7 +1185,7 @@ export class ProduccionService {
     dto: UpdateEstadoOrdenDto,
   ) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
 
     const orden = await this.prisma.ordenProduccion.findFirst({
       where: { id: ordenId, empresaId },
@@ -1141,7 +1226,7 @@ export class ProduccionService {
     sedeId?: number,
   ) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
     const sedeIdProduccion = await this.resolverSedeIdProduccion(
       empresaId,
       sedeId,
@@ -1175,6 +1260,17 @@ export class ProduccionService {
     if (orden.estado === 'FINALIZADA') {
       throw new BadRequestException('La orden ya fue finalizada.');
     }
+
+    await this.asegurarSinVariantes(
+      empresaId,
+      [orden.productoFinalId],
+      'que vas a producir (anula esta orden y crea una por variante)',
+    );
+    await this.asegurarSinVariantes(
+      empresaId,
+      dto.componentes.map((item) => item.productoInsumoId),
+      'como insumo',
+    );
 
     const componentesOrdenMap = new Map(
       orden.componentes.map((item) => [item.productoInsumoId, item]),
@@ -1458,7 +1554,7 @@ export class ProduccionService {
 
   async resumenMaterialesOrden(empresaId: number, ordenId: number) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
     const orden = await this.prisma.ordenProduccion.findFirst({
       where: { id: ordenId, empresaId },
       include: {
@@ -1620,7 +1716,7 @@ export class ProduccionService {
 
   async generarPlantillaCargaMasiva(empresaId: number): Promise<Buffer> {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
 
     const wb = XLSX.utils.book_new();
     const unidades = await this.prisma.unidadMedida.findMany({
@@ -2305,7 +2401,7 @@ export class ProduccionService {
     sedeId?: number,
   ) {
     this.validarEmpresaId(empresaId);
-    await this.asegurarRubroFabricacion(empresaId);
+    await this.asegurarAccesoProduccion(empresaId);
 
     const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
     const sheetProductos = workbook.Sheets['PRODUCTOS'];

@@ -73,6 +73,13 @@ const modulosIniciales = [
     icono: 'mdi:store',
     orden: 11,
   },
+  {
+    codigo: 'produccion',
+    nombre: 'Producción',
+    descripcion: 'Recetas de insumos y órdenes de producción, para cualquier rubro',
+    icono: 'solar:box-minimalistic-bold-duotone',
+    orden: 12,
+  },
 ];
 
 async function seedModulos() {
@@ -94,10 +101,18 @@ async function seedModulos() {
   const planes = await prisma.plan.findMany();
   const modulos = await prisma.modulo.findMany();
   
+  // Módulos que son add-on de pago: NO se auto-asignan a todos los planes.
+  // Se asignan manualmente al plan que los contrata (ej. Producción).
+  const MODULOS_NO_AUTOASIGNAR = ['produccion'];
+
   // Asignar todos los módulos a cada plan existente (migración)
   for (const plan of planes) {
     const productoPlan = (plan as any).producto || 'facturacion';
-    const modulosDelProducto = modulos.filter((m: any) => ((m as any).producto || 'facturacion') === productoPlan);
+    const modulosDelProducto = modulos.filter(
+      (m: any) =>
+        ((m as any).producto || 'facturacion') === productoPlan &&
+        !MODULOS_NO_AUTOASIGNAR.includes(m.codigo),
+    );
     for (const modulo of modulosDelProducto) {
       const exists = await prisma.planModulo.findUnique({
         where: {
