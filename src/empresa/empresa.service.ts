@@ -2729,7 +2729,7 @@ export class EmpresaService {
     const ids = cuentas.map((c) => c.id);
     if (ids.length === 0) return [];
 
-    const [pagos, depositos, comprasPagos, gastos] = await Promise.all([
+    const [pagos, depositos, repartos, comprasPagos, gastos] = await Promise.all([
       this.prisma.pago.groupBy({
         by: ['cuentaBancariaId'],
         where: {
@@ -2745,6 +2745,13 @@ export class EmpresaService {
           depositado: true,
         },
         _sum: { montoEfectivo: true },
+      }),
+      // Depósitos repartidos entre cuentas: el cierre queda sin cuenta y cada
+      // parte entra a la suya.
+      this.prisma.depositoCajaReparto.groupBy({
+        by: ['cuentaBancariaId'],
+        where: { OR: porCuentaDesde(cuentas, (gte) => ({ fecha: { gte } })) },
+        _sum: { monto: true },
       }),
       // Pagos a proveedores en la MONEDA DE LA CUENTA (una cuenta en soles que
       // pagó una factura en US$ registra lo que salió en soles).
@@ -2791,6 +2798,8 @@ export class EmpresaService {
       );
     const mPagos = toMap(pagos, 'monto');
     const mDep = toMap(depositos, 'montoEfectivo');
+    for (const [id, monto] of toMap(repartos, 'monto'))
+      mDep.set(id, (mDep.get(id) || 0) + monto);
     const mCompras = comprasPorCuenta;
     const mGastos = toMap(gastos, 'monto');
 
@@ -2836,7 +2845,7 @@ export class EmpresaService {
     const inicio = cuenta.saldoInicialFecha ?? undefined;
     const fechaDesdeInicio = inicio ? { fecha: { gte: inicio } } : {};
 
-    const [pagos, depositos, compras, gastos] = await Promise.all([
+    const [pagos, depositos, repartos, compras, gastos] = await Promise.all([
       this.prisma.pago.findMany({
         where: {
           cuentaBancariaId: cuentaId,
@@ -2866,6 +2875,13 @@ export class EmpresaService {
           montoEfectivo: true,
           numeroOperacionDeposito: true,
         },
+      }),
+      this.prisma.depositoCajaReparto.findMany({
+        where: {
+          cuentaBancariaId: cuentaId,
+          AND: [fechaDesdeInicio, rango ? { fecha: rango } : {}],
+        },
+        select: { id: true, fecha: true, monto: true, numeroOperacion: true },
       }),
       this.prisma.pagoCompra.findMany({
         where: {
@@ -2926,6 +2942,15 @@ export class EmpresaService {
         concepto: 'Depósito de efectivo (cierre de caja)',
         referencia: d.numeroOperacionDeposito || null,
         monto: Number(d.montoEfectivo || 0),
+      })),
+      ...repartos.map((r) => ({
+        id: `deprep-${r.id}`,
+        fecha: r.fecha,
+        tipo: 'INGRESO' as const,
+        origen: 'DEPOSITO',
+        concepto: 'Depósito de efectivo (cierre de caja, repartido)',
+        referencia: r.numeroOperacion || null,
+        monto: Number(r.monto),
       })),
       ...compras.map((c) => {
         const proveedor = c.compra?.proveedor?.nombre?.trim();
