@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import bcrypt from 'bcrypt';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { UpdateEmpresaDto } from './dto/update-empresa.dto';
+import { camposDeMiEmpresa, empresaSinSecretos } from './empresa-mia';
 import {
   CreateCuentaBancariaDto,
   UpdateCuentaBancariaDto,
@@ -1970,6 +1971,45 @@ export class EmpresaService {
       );
     }
     return empresa;
+  }
+
+  async actualizarMiEmpresa(
+    empresaId: number,
+    rol: string,
+    cuerpo: Record<string, unknown>,
+  ) {
+    const datos = camposDeMiEmpresa(cuerpo, rol);
+    const numero = datos.whatsappPhoneNumberId;
+    if (typeof numero === 'string' && numero) {
+      const actual = await this.prisma.empresa.findUnique({
+        where: { id: empresaId },
+        select: { whatsappPhoneNumberId: true },
+      });
+      if (actual?.whatsappPhoneNumberId !== numero) {
+        await this.validarNumeroWhatsappLibre(empresaId, numero);
+      }
+    }
+    const empresa = await this.actualizar({
+      ...datos,
+      id: empresaId,
+    } as unknown as UpdateEmpresaDto);
+    return empresaSinSecretos(empresa);
+  }
+
+  /** Dos cuentas con el mismo número se reparten los mensajes de sus clientes. */
+  private async validarNumeroWhatsappLibre(
+    empresaId: number,
+    phoneNumberId: string,
+  ) {
+    const enEmpresa = await this.prisma.empresa.findFirst({
+      where: { whatsappPhoneNumberId: phoneNumberId, id: { not: empresaId } },
+      select: { id: true },
+    });
+    if (enEmpresa) {
+      throw new BadRequestException(
+        'Ese número de WhatsApp ya está conectado a otra cuenta.',
+      );
+    }
   }
 
   async obtenerMiEmpresa(empresaId: number) {

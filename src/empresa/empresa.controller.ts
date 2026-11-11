@@ -13,6 +13,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { empresaSinSecretos } from './empresa-mia';
 import { EmpresaService } from './empresa.service';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { ListEmpresaDto } from './dto/list-empresa.dto';
@@ -68,7 +69,7 @@ export class EmpresaController {
   ) {
     const empresa = await this.empresaService.obtenerMiEmpresa(user.empresaId);
     res.locals.message = 'Información de la empresa cargada correctamente';
-    return empresa;
+    return empresaSinSecretos(empresa);
   }
 
   @Put('mia')
@@ -79,12 +80,11 @@ export class EmpresaController {
     @Body() body: Partial<UpdateEmpresaDto>,
     @Res({ passthrough: true }) res: Response,
   ) {
-    // Force ID to match user's company
-    const dto: UpdateEmpresaDto = {
-      ...body,
-      id: user.empresaId,
-    } as UpdateEmpresaDto;
-    const result = await this.empresaService.actualizar(dto);
+    const result = await this.empresaService.actualizarMiEmpresa(
+      user.empresaId,
+      user.rol,
+      body,
+    );
     res.locals.message = 'Información de empresa actualizada correctamente';
     return result;
   }
