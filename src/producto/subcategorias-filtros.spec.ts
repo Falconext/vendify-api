@@ -1,7 +1,7 @@
 /**
  * Subcategorías y filtros del inventario (pedido 02-11).
  */
-import { filtroPorCategoria, separarRutaCategoria, condicionesCategoriaPorNombre } from './categorias-extra.util';
+import { categoriasParaMenu, filtroPorCategoria, separarRutaCategoria, condicionesCategoriaPorNombre } from './categorias-extra.util';
 import { agruparAtributos, parsearFiltroVariante } from './filtro-variante';
 
 describe('filtrar por una categoría trae también sus subcategorías', () => {
@@ -19,6 +19,56 @@ describe('filtrar por una categoría trae también sus subcategorías', () => {
   it('en la tienda, elegir la madre por nombre incluye a sus hijas', () => {
     const conds = condicionesCategoriaPorNombre(['Peluches']) as any[];
     expect(conds).toContainEqual({ categoria: { padre: { nombre: { equals: 'Peluches', mode: 'insensitive' } } } });
+  });
+});
+
+describe('tienda: subcategoría con su madre', () => {
+  const insensible = (equals: string) => ({ equals, mode: 'insensitive' });
+
+  it('"Sliders > Honda" filtra por esa rama, principal o adicional', () => {
+    const rama = { nombre: insensible('Honda'), padre: { nombre: insensible('Sliders') } };
+    const conds = condicionesCategoriaPorNombre(['Sliders > Honda']) as any[];
+    expect(conds).toContainEqual({ categoria: rama });
+    expect(conds).toContainEqual({ categoriasExtra: { some: { categoria: rama } } });
+  });
+
+  it('un nombre sin ruta no agrega rama', () => {
+    expect(condicionesCategoriaPorNombre(['Honda'])).toHaveLength(4);
+  });
+});
+
+describe('menú de categorías de la tienda', () => {
+  const sliders = { nombre: 'Sliders', imagenUrl: 's.jpg' };
+  const cascos = { nombre: 'Cascos', imagenUrl: null };
+
+  it('la madre sale aunque sus productos estén todos en la hija', () => {
+    expect(categoriasParaMenu([{ nombre: 'Honda', imagenUrl: null, padre: sliders }])).toEqual([
+      { nombre: 'Honda', imagenUrl: null, padre: 'Sliders', padres: ['Sliders'], principal: false },
+      { nombre: 'Sliders', imagenUrl: 's.jpg', padre: null, padres: [], principal: true },
+    ]);
+  });
+
+  it('el mismo nombre bajo dos madres es una sola fila con las dos', () => {
+    const menu = categoriasParaMenu([
+      { nombre: 'Honda', imagenUrl: null, padre: sliders },
+      { nombre: 'Honda', imagenUrl: null, padre: cascos },
+      { nombre: 'Honda', imagenUrl: null, padre: sliders },
+    ]);
+    expect(menu.filter((c) => c.nombre === 'Honda')).toEqual([
+      { nombre: 'Honda', imagenUrl: null, padre: 'Sliders', padres: ['Sliders', 'Cascos'], principal: false },
+    ]);
+  });
+
+  it('un nombre que es principal y también hija queda marcado como ambos', () => {
+    const [honda] = categoriasParaMenu([
+      { nombre: 'Honda', imagenUrl: null, padre: sliders },
+      { nombre: 'Honda', imagenUrl: null },
+    ]);
+    expect(honda).toMatchObject({ padres: ['Sliders'], principal: true });
+  });
+
+  it('ignora productos sin categoría', () => {
+    expect(categoriasParaMenu([null, undefined])).toEqual([]);
   });
 });
 

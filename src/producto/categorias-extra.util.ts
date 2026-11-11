@@ -163,21 +163,83 @@ export async function quitarPrincipalDeExtras(
 /**
  * Condiciones (para un `OR`) de "está en alguna de estas categorías", por
  * NOMBRE y sin distinguir mayúsculas: así filtra la tienda pública
- * (`?category=Polos,Ofertas`).
+ * (`?category=Polos,Ofertas`). "Sliders > Honda" pide solo esa subcategoría, y
+ * no la Honda que cuelgue de otra madre.
  */
 export function condicionesCategoriaPorNombre(
   nombres: string[],
 ): Prisma.ProductoWhereInput[] {
   return nombres.flatMap((nombre) => {
     const igual = { equals: nombre, mode: 'insensitive' as const };
+    const [madre, hija] = separarRutaCategoria(nombre);
+    const enRama = hija
+      ? {
+          nombre: { equals: hija, mode: 'insensitive' as const },
+          padre: { nombre: { equals: madre, mode: 'insensitive' as const } },
+        }
+      : null;
     return [
       { categoria: { nombre: igual } },
       { categoriasExtra: { some: { categoria: { nombre: igual } } } },
       // Elegir la categoría madre trae también lo de sus subcategorías.
       { categoria: { padre: { nombre: igual } } },
       { categoriasExtra: { some: { categoria: { padre: { nombre: igual } } } } },
+      ...(enRama
+        ? [
+            { categoria: enRama },
+            { categoriasExtra: { some: { categoria: enRama } } },
+          ]
+        : []),
     ];
   });
+}
+
+type CategoriaDeProducto = {
+  nombre: string;
+  imagenUrl: string | null;
+  padre?: { nombre: string; imagenUrl: string | null } | null;
+} | null | undefined;
+
+/**
+ * Menú de categorías de la tienda: una fila por nombre, como siempre, más
+ * `padres` (de qué madres cuelga) y `principal` (si también va suelta arriba).
+ * Un nombre repetido bajo dos madres sigue siendo una fila: las plantillas que
+ * pintan la lista plana no deben verlo duplicado.
+ */
+export function categoriasParaMenu(categorias: CategoriaDeProducto[]) {
+  const menu = new Map<
+    string,
+    {
+      nombre: string;
+      imagenUrl: string | null;
+      padre: string | null;
+      padres: string[];
+      principal: boolean;
+    }
+  >();
+  const fila = (nombre: string, imagenUrl: string | null) => {
+    let actual = menu.get(nombre);
+    if (!actual) {
+      actual = { nombre, imagenUrl, padre: null, padres: [], principal: false };
+      menu.set(nombre, actual);
+    }
+    return actual;
+  };
+
+  for (const categoria of categorias) {
+    if (!categoria?.nombre) continue;
+    const actual = fila(categoria.nombre, categoria.imagenUrl);
+    const madre = categoria.padre;
+    if (!madre?.nombre) {
+      actual.principal = true;
+      continue;
+    }
+    if (!actual.padres.includes(madre.nombre)) actual.padres.push(madre.nombre);
+    actual.padre ??= madre.nombre;
+    // La madre sale en el menú aunque sus productos estén todos en hijas.
+    fila(madre.nombre, madre.imagenUrl).principal = true;
+  }
+  return Array.from(menu.values());
 }
 
 /**

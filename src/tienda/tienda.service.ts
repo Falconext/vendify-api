@@ -35,6 +35,7 @@ import {
 import {
   SELECT_CATEGORIAS_EXTRA,
   aplanarCategoriasExtra,
+  categoriasParaMenu,
   condicionesCategoriaPorNombre,
 } from '../producto/categorias-extra.util';
 import {
@@ -1197,37 +1198,12 @@ export class TiendaService {
       },
     });
 
-    const categoriasMap = new Map<string, any>();
-
-    productos.forEach((p) => {
-      const categorias = [
+    const result = categoriasParaMenu(
+      productos.flatMap((p) => [
         p.categoria,
         ...(p.categoriasExtra ?? []).map((e) => e.categoria),
-      ];
-      for (const categoria of categorias) {
-        if (categoria?.nombre && !categoriasMap.has(categoria.nombre)) {
-          categoriasMap.set(categoria.nombre, {
-            nombre: categoria.nombre,
-            imagenUrl: categoria.imagenUrl,
-            // Subcategoría: el nombre de su madre, para que la tienda agrupe.
-            padre: categoria.padre?.nombre ?? null,
-          });
-        }
-        // La madre sale en el menú aunque sus productos estén todos en hijas.
-        const madre = categoria?.padre;
-        if (madre?.nombre && !categoriasMap.has(madre.nombre)) {
-          categoriasMap.set(madre.nombre, {
-            nombre: madre.nombre,
-            imagenUrl: madre.imagenUrl,
-            padre: null,
-          });
-        }
-      }
-    });
-
-    const result = Array.from(categoriasMap.values()).sort((a, b) =>
-      a.nombre.localeCompare(b.nombre),
-    );
+      ]),
+    ).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
     // Sign URLs if needed
     await Promise.all(
