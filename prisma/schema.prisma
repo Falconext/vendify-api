@@ -1260,6 +1260,10 @@ model CuentaBancaria {
   /// depósitos de caja (solo el efectivo). Máx. una cuenta activa por medio
   /// por empresa (validado en servicio).
   medioPagoVinculado         String?
+  /// Lo que había en la cuenta al empezar `saldoInicialFecha`. El saldo cuenta
+  /// desde ahí: lo anterior ya está dentro de este monto.
+  saldoInicial               Decimal?         @db.Decimal(12, 2)
+  saldoInicialFecha          DateTime?
   creadoEn                   DateTime         @default(now())
   empresa                    Empresa          @relation(fields: [empresaId], references: [id])
   pagos                      Pago[]
