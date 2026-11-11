@@ -1685,7 +1685,8 @@ export class AnalisisFinancieroService {
         t.margenNeto,
       ],
     ];
-    if (Math.abs(t.ajustesSinDia) >= 0.01) {
+    // Un par de céntimos es redondeo de sumar los días: no va como fila.
+    if (Math.abs(t.ajustesSinDia) >= 0.05) {
       filasTotal.push(
         [
           'Otros ingresos y gastos del período sin día',
