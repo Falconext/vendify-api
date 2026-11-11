@@ -6796,6 +6796,18 @@ export class ComprobanteService {
       }
     }
 
+    // La copia del A4 en S3 (s3PdfUrl) quedó con los montos de antes de la
+    // edición, y hay lectores que la usan tal cual (enlace de WhatsApp, API
+    // ERP). Se rehace en segundo plano sobre la misma key; si falla, "Ver
+    // PDF" igual la regenera porque las informales ya no se sirven cacheadas.
+    if (comp.s3PdfUrl) {
+      this.generarYSubirPdf(comp.id, { empresaId }, true).catch((err: any) =>
+        this.logger.warn(
+          `[editarNotaVenta] No se pudo refrescar el PDF ${comp.id}: ${err?.message}`,
+        ),
+      );
+    }
+
     return this.prisma.comprobante.findUnique({
       where: { id: comp.id },
       include: { detalles: true },
@@ -7905,14 +7917,16 @@ export class ComprobanteService {
     });
 
     if (!comprobante) throw new NotFoundException('Comprobante no encontrado');
-    // Las cotizaciones son editables y su formato es configurable por empresa,
-    // así que NO se cachea el PDF: siempre se regenera para reflejar el formato
-    // vigente. Los comprobantes fiscales sí conservan el PDF cacheado.
+    // Solo los comprobantes fiscales (no cambian después de emitidos) sirven el
+    // PDF cacheado. Las informales y cotizaciones se editan, cobran y cambian de
+    // saldo: con el A4 cacheado salía el total de antes de editar mientras el
+    // ticket (siempre regenerado) ya mostraba el nuevo.
     const esCotizacion = comprobante.tipoDoc === 'COT';
+    const esFiscal = ['01', '03', '07', '08'].includes(comprobante.tipoDoc);
     // s3PdfUrl guarda solo el A4 (es el que va al correo y a contabilidad); los
     // otros tamaños se regeneran y NO tocan esa columna.
     const esFormatoPrincipal = formato === 'a4' || esCotizacion;
-    if (comprobante.s3PdfUrl && !esCotizacion && !force && esFormatoPrincipal)
+    if (comprobante.s3PdfUrl && esFiscal && !force && esFormatoPrincipal)
       return comprobante.s3PdfUrl;
 
     let buffer: Buffer;
