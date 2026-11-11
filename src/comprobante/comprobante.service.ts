@@ -26,6 +26,7 @@ import {
   lineasDetalleAdicional,
   normalizarDetalleAdicional,
 } from './detalle-adicional';
+import { fechaLima, vencimientoCobro } from './utils/vencimiento-cobro';
 import { NOTA_SIN_CONVERTIR } from './convertidos';
 import { repartirPago } from './cobro-varias';
 import { excesosSobreSaldo, lineasPorConvertir, totalDeLineas } from './saldo-por-convertir';
@@ -978,19 +979,23 @@ export class ComprobanteService {
       OT: 'ORDEN DE TRABAJO',
     };
 
-    const ahora = Date.now();
-    const DIA_MS = 24 * 60 * 60 * 1000;
+    const hoy = fechaLima(new Date());
     let totalPorCobrar = 0;
     let vencidos = 0;
+    let porVencer = 0;
 
     const comprobantes = rawItems.map((it) => {
       const saldo = Number(it.saldo ?? 0);
       totalPorCobrar += saldo;
-      const dias = it.fechaEmision
-        ? Math.floor((ahora - new Date(it.fechaEmision).getTime()) / DIA_MS)
-        : 0;
-      if (dias > 30) vencidos += 1;
-      return { ...it, comprobante: tipoLabels[it.tipoDoc] || it.tipoDoc } as any;
+      // Por la fecha real de la cuota o del crédito: ver vencimiento-cobro.ts.
+      const vencimiento = vencimientoCobro(it, hoy);
+      if (vencimiento.situacion === 'VENCIDO') vencidos += 1;
+      if (vencimiento.situacion === 'POR_VENCER') porVencer += 1;
+      return {
+        ...it,
+        comprobante: tipoLabels[it.tipoDoc] || it.tipoDoc,
+        vencimiento,
+      } as any;
     });
 
     return {
@@ -999,6 +1004,7 @@ export class ComprobanteService {
         cantidad: comprobantes.length,
         totalPorCobrar: Number(totalPorCobrar.toFixed(2)),
         vencidos,
+        porVencer,
       },
     };
   }
