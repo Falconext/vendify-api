@@ -2,6 +2,10 @@ import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificacionesGateway } from './notificaciones.gateway';
+import {
+  avisoVencimientoPlan,
+  DIAS_AVISO_PLAN,
+} from '../common/utils/aviso-plan';
 
 export interface SunatNotifMeta {
   comprobanteId?: number;
@@ -32,20 +36,14 @@ export class NotificacionesService {
   // Verificar suscripciones próximas a vencer
   async verificarSuscripcionesProximasVencer() {
     const hoy = new Date();
-    const en7Dias = new Date();
-    en7Dias.setDate(hoy.getDate() + 7);
-    const en3Dias = new Date();
-    en3Dias.setDate(hoy.getDate() + 3);
-    const en1Dia = new Date();
-    en1Dia.setDate(hoy.getDate() + 1);
+    // Ventana amplia por fecha y luego el filtro exacto por día de Lima: desde
+    // 7 días antes del vencimiento hasta el último día de prórroga.
+    const desde = new Date(hoy.getTime() - 3 * 86_400_000);
+    const hasta = new Date(hoy.getTime() + (DIAS_AVISO_PLAN + 2) * 86_400_000);
 
-    // Empresas que vencen en 7 días
-    const empresas7Dias = await this.prisma.empresa.findMany({
+    const empresas = await this.prisma.empresa.findMany({
       where: {
-        fechaExpiracion: {
-          gte: hoy,
-          lte: en7Dias,
-        },
+        fechaExpiracion: { gte: desde, lte: hasta },
         estado: 'ACTIVO',
       },
       include: {
@@ -60,25 +58,10 @@ export class NotificacionesService {
     // Crear notificaciones para cada empresa
     const notificaciones: any[] = [];
 
-    for (const empresa of empresas7Dias) {
-      const diasRestantes = Math.ceil(
-        (empresa.fechaExpiracion.getTime() - hoy.getTime()) /
-          (1000 * 60 * 60 * 24),
-      );
-
-      let tipo: 'INFO' | 'WARNING' | 'CRITICAL' = 'INFO';
-      let mensaje = '';
-
-      if (diasRestantes <= 1) {
-        tipo = 'CRITICAL';
-        mensaje = `¡Tu suscripción vence mañana! Renueva ahora para evitar interrupciones.`;
-      } else if (diasRestantes <= 3) {
-        tipo = 'WARNING';
-        mensaje = `Tu suscripción vence en ${diasRestantes} días. Considera renovar pronto.`;
-      } else {
-        tipo = 'INFO';
-        mensaje = `Tu suscripción vence en ${diasRestantes} días.`;
-      }
+    for (const empresa of empresas) {
+      const aviso = avisoVencimientoPlan(empresa.fechaExpiracion, hoy);
+      if (!aviso) continue;
+      const { tipo, mensaje } = aviso;
 
       // Crear notificación para cada admin de la empresa
       for (const usuario of empresa.usuarios) {

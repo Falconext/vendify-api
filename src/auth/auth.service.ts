@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../s3/s3.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { planBloqueado } from '../common/utils/fecha-lima';
 
 interface LoginPayload {
   email: string;
@@ -92,10 +93,8 @@ export class AuthService {
       );
     }
 
-    if (
-      user.empresa?.fechaExpiracion &&
-      user.empresa.fechaExpiracion < new Date()
-    ) {
+    // El día que vence y el siguiente (prórroga) todavía puede entrar.
+    if (planBloqueado(user.empresa?.fechaExpiracion)) {
       throw new ForbiddenException(
         'Tu plan venció. Contacta a tu asesor o proveedor para renovarlo y seguir usando el sistema.',
       );
@@ -492,6 +491,8 @@ export class AuthService {
             formatoImpresionDefault: true,
             imprimirAutomatico: true,
             permitirFechaAnteriorEnSerie: true,
+            // Aviso "te faltan X días" / prórroga en el layout del POS.
+            fechaExpiracion: true,
             tipoEmpresa: true,
             rubroId: true,
             cuentasBancarias: {

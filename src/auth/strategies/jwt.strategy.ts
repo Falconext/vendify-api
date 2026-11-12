@@ -4,6 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveJwtSecret } from '../jwt-secret';
+import { planBloqueado } from '../../common/utils/fecha-lima';
 
 export type JwtPayload = {
   sub: number;
@@ -61,7 +62,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       if (!user.empresa || user.empresa.estado !== 'ACTIVO') {
         throw new UnauthorizedException('Empresa inactiva');
       }
-      if (user.empresa.fechaExpiracion < new Date()) {
+      if (planBloqueado(user.empresa.fechaExpiracion)) {
         throw new UnauthorizedException('Plan vencido');
       }
     }
